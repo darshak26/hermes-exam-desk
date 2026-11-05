@@ -16,7 +16,12 @@ def write_pack(pack, name=None):
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
+        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
+        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
         shutil.rmtree(DATA, ignore_errors=True)   # deterministic clean root per test
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["CBT_EXAM_DATA_DIR"] = self._old
     def test_list_packs_empty_then_one(self):
         self.assertEqual(store.list_packs(), [])
         write_pack(base_pack())
