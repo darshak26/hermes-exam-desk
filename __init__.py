@@ -9,7 +9,7 @@ import sys
 import types
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 BRIDGE = "cbt_exam_ctx_bridge"
 
 

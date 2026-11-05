@@ -15,6 +15,7 @@ const CSS = `
 .cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
 .cbt button.primary{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt button:disabled{opacity:.5;cursor:default}
+.cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;border-radius:4px;flex:0 0 auto}
 .cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cbt .badge{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px}
 .cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent)}
@@ -69,6 +70,7 @@ async function rest(path, opts) {
 }
 let ctxRest = () => { throw new Error('register not called') }
 let ctxStorage = null
+let ctxRunAction = null
 let activeAttemptId = null
 
 // The status-bar timer lives outside the page and cannot read React state, so the
@@ -138,6 +140,23 @@ function fmtHMS(seconds) {
   return `${h}:${m}:${sec}`
 }
 
+// The app drops its ENTIRE titlebar cluster on a plugin page when any plugin
+// claims the titlebar band (`pageOwnsTitlebar` in the app's titlebar-controls),
+// which takes the sidebar toggle with it. This page-local twin restores that one
+// affordance from inside the page, where nothing can take it away. Feature-
+// detected: an older host without ctx.runAction renders nothing.
+function SidebarButton() {
+  if (!ctxRunAction) return null
+  return jsx('button', {
+    type: 'button',
+    className: 'cbt-icon-btn',
+    title: 'Show / hide the sidebar (Ctrl+B)',
+    'aria-label': 'Show or hide the sidebar',
+    onClick: () => { void ctxRunAction('view.toggleSidebar') },
+    children: '«',
+  })
+}
+
 // Owns the 1 Hz tick so the exam page (question body + a 100-chip palette) does not
 // re-render every second. `left` comes from the server on each poll and re-anchors.
 function Countdown({ left, onExpire }) {
@@ -180,6 +199,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
   }
   return jsxs('div', { className: 'cbt pad', children: [
     jsx('div', { className: 'row', children: [
+      jsx(SidebarButton, {}),
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
       jsx('span', { className: `badge ${mode === 'assisted' ? 'assisted' : ''}`, children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
     ] }),
@@ -220,6 +240,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   }
   return jsxs('div', { className: 'cbt pad', children: [
     jsx('div', { className: 'row', children: [
+      jsx(SidebarButton, {}),
       jsx('h2', { children: 'CBT Exams' }),
       jsx('span', { className: 'muted', children: 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
@@ -449,6 +470,7 @@ function CbtExam({ attemptId, onResult, onHome }) {
   }).join(' · ')
   return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}`, children: [
     jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
+      jsx(SidebarButton, {}),
       jsx('strong', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
@@ -633,6 +655,7 @@ function CbtResult({ attemptId, onHome }) {
   const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
   return jsxs('div', { className: 'cbt pad', children: [
     jsx('div', { className: 'row', children: [
+      jsx(SidebarButton, {}),
       jsx('h2', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { className: 'muted', children: `submitted ${fmtWhen(attempt.submitted_at)}` }),
@@ -770,6 +793,7 @@ export default {
   register(ctx) {
     ctxRest = (p, o) => ctx.rest(p, o)
     ctxStorage = ctx.storage
+    ctxRunAction = ctx.runAction ? (id) => ctx.runAction(id) : null
     ctx.registerMany([
       { id: 'page', area: ROUTES_AREA, data: { path: '/cbt' }, render: () => jsx(CbtPage, {}) },
       { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/cbt', label: 'CBT Exams', codicon: 'checklist' } },

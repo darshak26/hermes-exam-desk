@@ -1,7 +1,7 @@
 {
   "name": "cbt-exam",
   "label": "CBT Exams",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Question-bank + exam/grading backend for the CBT desktop panel.",
   "tab": { "hidden": true },
   "entry": "index.js",

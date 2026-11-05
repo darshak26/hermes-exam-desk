@@ -16,7 +16,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 _pkg = Path(__file__).resolve().parents[1] / "cbt_exam"
 _name = "_cbt_exam_http"
