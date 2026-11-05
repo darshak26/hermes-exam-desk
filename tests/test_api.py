@@ -1,4 +1,4 @@
-import json, os, shutil, sys, tempfile, time, unittest
+import json, os, shutil, sys, tempfile, time, types, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 os.environ["CBT_EXAM_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-test-")
@@ -137,6 +137,103 @@ class ApiTests(unittest.TestCase):
                           res["totals"]["skipped"], res["totals"]["not_counted"]), (2, 2, 1, 1))
         # result view carries the full pack (answers included)
         self.assertIn("answer", r.json()["pack"]["questions"][0])
+
+class FakeResult:
+    def __init__(self, text="", parsed=None, model="fake-model", provider="fake"):
+        self.text, self.parsed, self.model, self.provider = text, parsed, model, provider
+
+class FakeLlm:
+    def __init__(self):
+        self.calls = []
+        self.return_parsed_none = False
+    def complete(self, **kw):
+        self.calls.append(kw)
+        return FakeResult(text="hint: check g again")
+    def complete_structured(self, **kw):
+        self.calls.append(kw)
+        if self.return_parsed_none:
+            return FakeResult(parsed=None)
+        return FakeResult(parsed={"overall_comment": "ok", "sections": [{"section_id": "A", "comment": "c"}],
+                                 "weak_topics": [{"topic": "t", "evidence": "e", "priority": "high"}],
+                                 "wrong_answer_notes": [{"question_id": "A-02", "note": "n"}],
+                                 "study_plan": ["revise x"]})
+
+FAKE_LLM = FakeLlm()
+
+class LlmApiTests(unittest.TestCase):
+    def setUp(self):
+        self._prev = sys.modules.get("cbt_exam_ctx_bridge")
+        m = types.ModuleType("cbt_exam_ctx_bridge")
+        m.ctx = types.SimpleNamespace(llm=FAKE_LLM)
+        sys.modules["cbt_exam_ctx_bridge"] = m
+        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
+        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        seed_pack()
+    def tearDown(self):
+        sys.modules.pop("cbt_exam_ctx_bridge", None)
+        if self._prev is not None:
+            sys.modules["cbt_exam_ctx_bridge"] = self._prev
+        if self._old is not None:
+            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+
+    def _attempt(self, mode="assisted"):
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": mode})
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()["attempt"]["id"]
+
+    def test_ask_rejected_on_exam_mode(self):
+        aid = self._attempt("exam")
+        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why?"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_ask_assisted_roundtrip(self):
+        aid = self._attempt("assisted")
+        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why is 4 right?", "current": 1})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["reply"], "hint: check g again")
+        self.assertEqual(body["model"], "fake-model")
+        self.assertEqual(body["assists"], 1)
+        got = client.get(f"/attempts/{aid}").json()
+        self.assertEqual(len(got["attempt"]["assist_log"]), 1)
+        last = FAKE_LLM.calls[-1]["messages"][-1]
+        self.assertIn("currently selected: 1", last["content"])
+
+    def test_ask_unknown_question_404(self):
+        aid = self._attempt("assisted")
+        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "ZZZ", "text": "why?"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_ask_without_bridge_503(self):
+        sys.modules.pop("cbt_exam_ctx_bridge", None)
+        aid = self._attempt("assisted")
+        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why?"})
+        self.assertEqual(r.status_code, 503)
+
+    def test_evaluate_requires_submit(self):
+        aid = self._attempt()
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 409)
+
+    def test_evaluate_after_submit(self):
+        aid = self._attempt()
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["data"]["overall_comment"], "ok")
+        got = client.get(f"/attempts/{aid}").json()
+        self.assertEqual(got["attempt"]["evaluation"]["data"]["overall_comment"], "ok")
+
+    def test_evaluate_unparseable_502(self):
+        FAKE_LLM.return_parsed_none = True
+        try:
+            aid = self._attempt()
+            client.post(f"/attempts/{aid}/submit")
+            r = client.post(f"/attempts/{aid}/evaluate")
+            self.assertEqual(r.status_code, 502)
+        finally:
+            FAKE_LLM.return_parsed_none = False
 
 if __name__ == "__main__":
     unittest.main()
