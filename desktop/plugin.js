@@ -18,6 +18,9 @@ const CSS = `
 .cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cbt .badge{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px}
 .cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent)}
+.cbt .badge.err{border-color:var(--ui-error-foreground);color:var(--ui-error-foreground)}
+.cbt .badge.ok{border-color:var(--ui-success-foreground);color:var(--ui-success-foreground)}
+.cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin:10px 0}
 .cbt .lg .item{display:flex;align-items:center}
 .cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
@@ -476,8 +479,85 @@ function CbtExam({ attemptId, onResult }) {
   ])
 }
 
-function CbtResult({ attemptId }) {
-  return jsx('div', { className: 'cbt pad', children: jsx('h2', { children: 'Result' }) })
+function fmtAns(q, v) {
+  if (v === undefined || v === null || v === '') return '—'
+  if (q.type === 'nat') return String(v)
+  const L = x => String.fromCharCode(65 + x)
+  return Array.isArray(v) ? v.map(L).join(', ') : L(v)
+}
+
+const VERDICT_CLS = { correct: 'ok', wrong: 'err', skipped: '', not_counted: 'acc' }
+const VERDICT_LABEL = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped', not_counted: 'Not counted' }
+
+function CbtResult({ attemptId, onHome }) {
+  const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
+  const [filter, setFilter] = useState('all')
+  const [open, setOpen] = useState(null)
+  if (q.isLoading) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'loading…' }) })
+  if (q.isError || !q.data) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'could not load result' }) })
+  const { attempt, pack } = q.data
+  if (attempt.status !== 'submitted' || !attempt.result) {
+    return jsxs('div', { className: 'cbt pad', children: [
+      jsx('h2', { children: pack.title || pack.exam_id }),
+      jsx('p', { className: 'muted', children: 'This attempt is still in progress — resume it to finish.' }),
+      jsx('button', { type: 'button', onClick: () => onHome(), children: 'Back to home' }),
+    ] })
+  }
+  const r = attempt.result
+  const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
+  const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
+  return jsxs('div', { className: 'cbt pad', children: [
+    jsx('div', { className: 'row', children: [
+      jsx('h2', { children: pack.title || pack.exam_id }),
+      jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      attempt.assist_log?.length
+        ? jsx('span', { className: 'badge', children: `${attempt.assist_log.length} tutor assist${attempt.assist_log.length === 1 ? '' : 's'}` })
+        : null,
+      jsx('span', { className: 'muted', children: `submitted ${fmtWhen(attempt.submitted_at)}` }),
+      jsx('span', { style: { flex: 1 } }),
+      jsx('button', { type: 'button', onClick: () => onHome(), children: 'New attempt' }),
+    ] }),
+    jsx('div', { style: { fontSize: 34, fontWeight: 700, marginTop: 8 }, children: String(r.score) }),
+    jsx('div', { className: 'row', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
+      jsxs('span', { key: k, className: 'badge', children: [`${VERDICT_LABEL[k]} `, jsx('strong', { children: String(r.totals[k]) })] })) }),
+    jsx('h3', { children: 'Sections' }),
+    jsxs('table', { children: [
+      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map(h => jsx('th', { key: h, children: h })) }) }),
+      jsx('tbody', { children: pack.pattern.sections.map(s => {
+        const st = r.sections[s.id] || {}
+        return jsxs('tr', { key: s.id, children: [
+          jsx('td', { children: s.title }),
+          jsx('td', { children: String(st.score ?? '—') }),
+          jsx('td', { children: String(st.correct ?? 0) }),
+          jsx('td', { children: String(st.wrong ?? 0) }),
+          jsx('td', { children: String(st.skipped ?? 0) }),
+          jsx('td', { children: String(st.not_counted ?? 0) }),
+        ] })
+      }) }) ] }),
+    jsx('h3', { children: 'Review' }),
+    jsx('div', { className: 'row', children: ['all', 'wrong', 'skipped', 'not_counted'].map(f =>
+      jsx('button', { key: f, type: 'button', className: filter === f ? 'primary' : '', onClick: () => setFilter(f), children: f })) }),
+    jsx('div', { style: { marginTop: 8 }, children: rows.map(row => {
+      const qq = qmap[row.id]
+      const expanded = open === row.id
+      return jsxs('div', { key: row.id, style: { borderTop: '1px solid var(--ui-stroke-secondary)', padding: '6px 0' }, children: [
+        jsx('div', { className: 'row', onClick: () => setOpen(expanded ? null : row.id), style: { cursor: 'pointer' }, children: [
+          jsx('strong', { children: row.id }),
+          jsx('span', { className: `badge ${VERDICT_CLS[row.verdict]}`, children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}` }),
+          jsx('span', { className: 'muted', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
+          jsx('span', { style: { flex: 1 } }),
+          jsx('span', { className: 'muted', children: expanded ? '▾' : '▸' }),
+        ] }),
+        expanded && jsxs('div', { style: { marginTop: 8, maxWidth: 860 }, children: [
+          jsx('p', { children: qq.text }),
+          (qq.options || []).map((o, i) => jsx('div', { key: i, className: 'muted', children: `${String.fromCharCode(65 + i)}) ${o}` })),
+          jsx('p', { children: [jsx('strong', { children: 'Your answer: ' }), fmtAns(qq, attempt.answers[row.id])] }),
+          jsx('p', { children: [jsx('strong', { children: 'Correct answer: ' }), fmtAns(qq, qq.answer)] }),
+          qq.explanation ? jsx('p', { className: 'muted', children: qq.explanation }) : null,
+        ] }),
+      ] })
+    }) }),
+  ] })
 }
 
 function CbtPage() {
@@ -498,7 +578,7 @@ function CbtPage() {
       onBack: () => setView({ name: 'home' }),
     }),
     view.name === 'exam' && jsx(CbtExam, { key: view.attemptId, attemptId: view.attemptId, onResult: id => setView({ name: 'result', attemptId: id }) }),
-    view.name === 'result' && jsx(CbtResult, { key: view.attemptId, attemptId: view.attemptId }),
+    view.name === 'result' && jsx(CbtResult, { key: view.attemptId, attemptId: view.attemptId, onHome: () => setView({ name: 'home' }) }),
   ] })
 }
 
