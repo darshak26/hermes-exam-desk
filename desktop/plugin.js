@@ -15,7 +15,11 @@ const CSS = `
 .cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
 .cbt button.primary{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt button:disabled{opacity:.5;cursor:default}
-.cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;border-radius:4px;flex:0 0 auto}
+.cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
+.cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
+.cbt .cbt-icon-btn:active{background:var(--ui-control-active-background,rgba(127,127,127,.24))}
+.cbt .cbt-icon-btn:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
+.cbt .cbt-icon-btn .codicon{font-size:14px;line-height:1}
 .cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cbt .badge{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px}
 .cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent)}
@@ -282,7 +286,9 @@ function SidebarButton() {
     title: 'Show / hide the sidebar (Ctrl+B)',
     'aria-label': 'Show or hide the sidebar',
     onClick: () => { void ctxRunAction('view.toggleSidebar') },
-    children: '«',
+    // the app's own titlebar glyph (20px codicon set is loaded app-wide), so the
+    // stand-in is indistinguishable from the button it replaces
+    children: jsx('i', { className: 'codicon codicon-layout-sidebar-left', 'aria-hidden': 'true' }),
   })
 }
 
