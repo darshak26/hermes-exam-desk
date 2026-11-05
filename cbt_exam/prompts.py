@@ -5,8 +5,10 @@ EVAL_INSTRUCTIONS = (
     "You get the exam pattern, the score breakdown, and every wrong/skipped/not-counted "
     "question with its full text, the student's choice and the correct answer. "
     "Write an honest, specific evaluation: no praise padding. For every wrong or skipped "
-    "question, name the likely misconception or gap. Group weaknesses into topics with a "
-    "priority, and end with a concrete 2-week study plan. All strings in English."
+    "question, name the likely misconception or gap. If a question was answered but not "
+    "counted, that is a pacing/attempt-limit mistake — say what it cost and how to avoid "
+    "it. Group weaknesses into topics with a priority, and end with a concrete 2-week "
+    "study plan. All strings in English."
 )
 
 EVAL_SCHEMA = {
@@ -32,7 +34,13 @@ def evaluation_input(pack, attempt):
     r = attempt["result"]
     lines = [f"EXAM: {pack.get('title', pack['exam_id'])} ({pack.get('provenance', '')})",
              f"MODE: {attempt['mode']}",
-             f"SCORE: {r['score']}  TOTALS: {r['totals']}", "SECTIONS:"]
+             "PATTERN:"]
+    for s in pack["pattern"]["sections"]:
+        limit = s.get("attempt_limit")
+        lines.append(f"  {s['id']} {s.get('title', '')}: {s.get('question_count')} questions, "
+                     f"attempt {'all' if not limit else f'first {limit}'}, "
+                     f"+{s.get('marks_correct')}/{s.get('marks_wrong')}")
+    lines += [f"SCORE: {r['score']}  TOTALS: {r['totals']}", "SECTIONS:"]
     for sid, st in r["sections"].items():
         lines.append(f"  {sid}: {st}")
     lines.append("QUESTIONS:")

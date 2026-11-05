@@ -27,7 +27,10 @@ Don't use for: exam (non-assisted) mode — there is no live file and there must
    `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('cbt-exam') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). If there is no file, there is no active assisted exam — say so and stop.
    **Completion criterion:** the newest live file's path.
 
-2. **Read it** with `read_file`. It contains: attempt id, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
+2. **Prove it is still live, then read it.** The header line of the file carries the attempt id. Confirm that attempt is still running before answering anything:
+   `terminal(command="{venv-python} -c \"import json;from plugins.plugin_storage import plugin_data_dir;d=plugin_data_dir('cbt-exam');a=json.loads((d/'attempts'/'<ATTEMPT-ID>.json').read_text());print(a['status'], int(a['duration_seconds']-(__import__('time').time()-a['started_at'])))\"")`
+   If the status is not `in_progress`, or the remaining time is ≤ 0, this context is stale: say the exam appears to have ended and stop — do not answer from it. (The plugin prunes files for finished attempts, so a live-looking file for a dead attempt means someone is mid-write; treat it as stale.)
+   Then `read_file` the live file. It contains: attempt id, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
 
 3. **Answer like a tutor, not a solver:**
    - Default to a hint that nudges toward the answer (name the underlying concept the doubt is about; walk back from the wrong option the student chose).

@@ -40,7 +40,9 @@ class ApiTests(unittest.TestCase):
     def test_health(self):
         r = client.get("/health")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), {"ok": True, "llm": False})
+        body = r.json()
+        self.assertEqual((body["ok"], body["llm"]), (True, False))
+        self.assertTrue(body["version"])
 
     def test_packs_list_and_sanitized_get(self):
         packs = client.get("/packs").json()["packs"]

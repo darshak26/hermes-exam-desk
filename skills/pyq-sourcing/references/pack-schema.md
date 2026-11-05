@@ -14,7 +14,7 @@ A plain-English mirror of what `cbt_exam/pack.py` + `scripts/validate_pack.py` e
 | `pattern.duration_minutes` | positive int (a full paper's full time) |
 | `pattern.sections[].id/title/question_count` | `question_count` MUST equal the actual question count in that section |
 | `pattern.sections[].attempt_limit` | `null` = every question counts; int N = only the first N saved answers are graded (NTA's "attempt 60 of 100" rule) |
-| `pattern.sections[].marks_correct/marks_wrong/marks_unanswered` | numbers; `marks_unanswered` must be 0 |
+| `pattern.sections[].marks_correct/marks_wrong/marks_unanswered` | numbers. **`marks_wrong` must be ≤ 0** (`-0.5`, not `0.5`) — a positive value is rejected, because the grader would otherwise *award* marks for a wrong answer. `marks_unanswered` must be `0`: unanswered never scores here. |
 
 ## Question level
 
@@ -27,11 +27,11 @@ A plain-English mirror of what `cbt_exam/pack.py` + `scripts/validate_pack.py` e
 | `text` | non-empty question text |
 | `options` | mcq/msq: ≥ 2, in order |
 | `answer` | mcq: **0-based** option index · msq: non-empty list of distinct 0-based indices · nat: number or numeric string |
-| `tolerance` | nat only, optional numeric tolerance |
-| `marks_correct/marks_wrong` | optional per-question overrides of the section defaults (GATE 1-mark/2-mark mixing) |
+| `tolerance` | nat only, optional numeric tolerance ≥ 0. A non-numeric tolerance is rejected — an unparseable one used to make submission fail forever |
+| `marks_correct/marks_wrong` | optional per-question overrides of the section defaults (GATE 1-mark/2-mark mixing). Same sign rule: `marks_wrong` ≤ 0 |
 | `explanation` | optional, shown after submit |
 | `source_url` | **required on every question** (provenance rule) |
-| `difficulty` | optional: `easy` / `medium` / `hard` |
+| `difficulty` | optional: `easy` / `medium` / `hard` (anything else is rejected) |
 
 ## Rules the grader lives by (so the pack can express them)
 
@@ -39,6 +39,19 @@ A plain-English mirror of what `cbt_exam/pack.py` + `scripts/validate_pack.py` e
 - `attempt_limit` counts a candidate's first N saved answers (a cleared answer keeps its slot).
 - "answered AND marked for review" is evaluated; marked *without* an answer is not.
 - msq is exact-set match in v1 (GATE/JAM/GAT-B style; JEE-Advanced-style partial marking is not supported).
+- a blank/whitespace NAT entry is not an answer: it grades as skipped, never as a wrong answer.
+
+## Lint warnings (non-fatal)
+
+`validate_pack.py` prints `WARN:` lines for a pack that will run but looks damaged.
+They are the OCR guard: a freshly sourced paper is usually full of them.
+
+- option text with fewer than 2 letters/digits (e.g. `"11001 . . :"`)
+- duplicate option text inside one question
+- a `topic` that just repeats the exam title (placeholder — the AI evaluation is only as good as the topics)
+- question text shorter than 15 characters
+
+Fix them before sitting the exam; they do not block grading.
 
 ## Compact example
 

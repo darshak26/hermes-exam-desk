@@ -1,8 +1,22 @@
-"""HTTP namespace for the cbt-exam desktop panel → mounted at /api/plugins/cbt-exam/*."""
-import importlib.util, sys, time
+"""HTTP namespace for the cbt-exam desktop panel → mounted at /api/plugins/cbt-exam/*.
+
+Shapes: every response is ``{attempt, pack, remaining_seconds}``. The `pack` in
+that envelope is the *sanitised* one (no answers, no explanations, no
+tolerances) until the attempt is submitted — the only exception is a submitted
+attempt, which is allowed to reveal the key.
+
+Concurrency: handlers that mutate an attempt run inside `store.attempt_lock`, so
+two tabs (or a tab racing the server-side auto-submit) cannot lose an answer.
+"""
+import importlib.util
+import sys
+import time
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+VERSION = "0.3.0"
 
 _pkg = Path(__file__).resolve().parents[1] / "cbt_exam"
 _name = "_cbt_exam_http"
@@ -17,32 +31,45 @@ store_mod = importlib.import_module(_name + ".store")
 prompt_mod = importlib.import_module(_name + ".prompts")
 
 router = APIRouter()
-BRIDGE = "cbt_exam_ctx_bridge"
+BRIDGE = "cbt_exam_ctx_bridge"          # set by the plugin's register(ctx)
+MODES = ("assisted", "exam")
+HISTORY_LIMIT = 50
+
 
 def _llm():
-    m = sys.modules.get(BRIDGE)
-    ctx = getattr(m, "ctx", None)
+    """The gateway's LLM bridge, or None when the agent half isn't loaded."""
+    ctx = getattr(sys.modules.get(BRIDGE), "ctx", None)
     return getattr(ctx, "llm", None)
 
+
 class AnswerPatch(BaseModel):
+    """Sparse update. Absent fields mean "leave alone"; `marked: []` means "clear"."""
     answers: dict = Field(default_factory=dict)
-    marked: list = Field(default_factory=list)
-    visited: list = Field(default_factory=list)
+    marked: list | None = None
+    visited: list | None = None
+    current: str | None = None
+
 
 class StartBody(BaseModel):
     exam_id: str
     mode: str
 
+
+# --------------------------------------------------------------------------- #
+# packs
+# --------------------------------------------------------------------------- #
 @router.get("/health")
 def health():
-    return {"ok": True, "llm": _llm() is not None}
+    return {"ok": True, "llm": _llm() is not None, "version": VERSION}
+
 
 @router.get("/packs")
 def get_packs():
     out = []
     for p in store_mod.list_packs():
-        out.append(pack_mod.summarize(p) if "invalid" not in p else p)
+        out.append(p if "invalid" in p else pack_mod.summarize(p))
     return {"packs": out}
+
 
 @router.get("/packs/{exam_id}")
 def get_pack(exam_id: str):
@@ -53,10 +80,14 @@ def get_pack(exam_id: str):
     except ValueError as e:
         raise HTTPException(422, f"pack {exam_id!r} is invalid: {e}")
 
+
+# --------------------------------------------------------------------------- #
+# attempts
+# --------------------------------------------------------------------------- #
 @router.post("/attempts")
 def create_attempt(body: StartBody):
-    if body.mode not in ("assisted", "exam"):
-        raise HTTPException(422, "mode must be 'assisted' or 'exam'")
+    if body.mode not in MODES:
+        raise HTTPException(422, f"mode must be one of {MODES}")
     try:
         pack = store_mod.get_pack(body.exam_id)
     except KeyError:
@@ -66,138 +97,168 @@ def create_attempt(body: StartBody):
     a = store_mod.new_attempt(pack, body.mode)
     if body.mode == "assisted":
         store_mod.write_live_context(a, pack)
-    return _live_view(a, pack)
+    return _view(a, pack)
+
 
 @router.get("/attempts")
-def list_attempts():
-    rows = []
-    for a in store_mod.list_attempts():
+def list_attempts(limit: int = HISTORY_LIMIT):
+    """History, newest first. Expired attempts are graded on the way out so the
+    panel never offers "Resume" on an attempt whose clock has already run out."""
+    rows, unreadable = [], []
+    for a, err in store_mod.iter_attempts(max(1, min(limit, 500))):
+        if err is not None:
+            unreadable.append(err)
+            continue
+        if store_mod.is_expired(a):
+            a = _reap(a)
         r = a.get("result") or {}
         rows.append({"id": a["id"], "exam_id": a["exam_id"], "mode": a["mode"],
                      "status": a["status"], "started_at": a["started_at"],
                      "submitted_at": a.get("submitted_at"),
                      "score": r.get("score"), "totals": r.get("totals"),
                      "has_evaluation": bool(a.get("evaluation"))})
-    return {"attempts": rows}
+    return {"attempts": rows, "unreadable": unreadable}
+
 
 @router.get("/attempts/{aid}")
 def get_attempt(aid: str):
     a, pack = _load(aid, touch=True)
-    return _live_view(a, pack)
+    return _view(a, pack)
+
 
 @router.patch("/attempts/{aid}")
 def patch_attempt(aid: str, patch: AnswerPatch):
-    a, pack = _load(aid, touch=True)
-    if a["status"] != "in_progress":
-        return _live_view(a, pack)
-    qmap = {q["id"]: q for q in pack["questions"]}
-    for qid, val in patch.answers.items():
-        q = qmap.get(qid)
-        if q is None:
-            raise HTTPException(422, f"unknown question {qid!r}")
-        err = _answer_error(q, val)
-        if err:
-            raise HTTPException(422, err)
-        if val is None or val == "" or val == []:
-            a["answers"].pop(qid, None)      # Clear Response: remove the key entirely
-        else:
-            if qid not in a["answer_seq"]:   # only the FIRST real save consumes an attempt-limit slot
-                a["answer_seq"].append(qid)
-            a["answers"][qid] = val
-    if patch.marked:
-        a["marked"] = [q for q in patch.marked if q in qmap]
-    if patch.visited:
-        seen = set(a["visited"])
-        seen.update(q for q in patch.visited if q in qmap)
-        a["visited"] = sorted(seen)
-    if a["mode"] == "assisted":
-        store_mod.write_live_context(a, pack, qid_for_current(a, pack))
-    if store_mod.remaining_seconds(a) <= 0:
-        store_mod.submit_attempt(a, pack)
-        store_mod.clear_live_context(a)
-    else:
-        store_mod.save_attempt(a)
-    return _live_view(a, pack)
+    with store_mod.attempt_lock(aid):
+        a, pack = _load(aid, touch=True)
+        if a["status"] != "in_progress":
+            return _view(a, pack)                      # late write: never resurrect
+        qmap = {q["id"]: q for q in pack["questions"]}
 
-def _answer_error(q, val):
-    """None when val is a legal answer for this question's type; else an error string.
-    Clearing (None/''/[]) is always legal — it removes the saved answer but the
-    question keeps its answer_seq slot if it ever had one (grading: skipped, slot consumed)."""
-    if val is None or val == "" or val == []:
-        return None
-    t = q["type"]
-    opts = q.get("options", [])
-    if t == "mcq":
-        if not isinstance(val, int) or isinstance(val, bool) or not (0 <= val < len(opts)):
-            return f"{q['id']}: mcq answer must be an option index"
-    elif t == "msq":
-        if (not isinstance(val, list) or not val or len(set(map(str, val))) != len(val)
-                or any(not isinstance(x, int) or isinstance(x, bool) or not (0 <= x < len(opts)) for x in val)):
-            return f"{q['id']}: msq answer must be a non-empty list of distinct option indices"
-    elif t == "nat":
-        if isinstance(val, bool) or not isinstance(val, (int, float, str)) or val == "":
-            return f"{q['id']}: nat answer must be a number or numeric string"
-    return None
+        for qid, val in patch.answers.items():
+            q = qmap.get(qid)
+            if q is None:
+                raise HTTPException(422, f"unknown question {qid!r}")
+            why = pack_mod.answer_error(q, val)
+            if why:
+                raise HTTPException(422, f"{qid}: {why}")
+            if pack_mod.is_clear(val):
+                a["answers"].pop(qid, None)            # Clear Response
+            else:
+                if qid not in a["answer_seq"]:         # only the first real save uses a slot
+                    a["answer_seq"].append(qid)
+                a["answers"][qid] = val
+
+        if patch.marked is not None:
+            a["marked"] = [q for q in dict.fromkeys(patch.marked) if q in qmap]
+        arrived = [q for q in dict.fromkeys(patch.visited or []) if q in qmap]
+        for qid in arrived:
+            if qid not in a["visited"]:
+                a["visited"].append(qid)               # insertion order = recency
+        target = patch.current if patch.current in qmap else (arrived[-1] if arrived else None)
+        if target:
+            a["current"] = target                      # what the live context describes
+
+        if a["mode"] == "assisted":
+            store_mod.write_live_context(a, pack, a.get("current"))
+        if store_mod.remaining_seconds(a) <= 0:
+            store_mod.submit_attempt(a, pack)
+            store_mod.clear_live_context(a)
+        else:
+            store_mod.save_attempt(a)
+        return _view(a, pack)
+
 
 @router.post("/attempts/{aid}/submit")
 def submit(aid: str):
-    a, pack = _load(aid, touch=True)
-    if a["status"] == "in_progress":
-        store_mod.submit_attempt(a, pack)
-        store_mod.clear_live_context(a)
-    return _result_view(a, pack)
+    with store_mod.attempt_lock(aid):
+        a, pack = _load(aid, touch=False)
+        if a["status"] == "in_progress":
+            a = store_mod.submit_attempt(a, pack)
+            store_mod.clear_live_context(a)
+        return _view(a, pack)
+
+
+@router.post("/attempts/{aid}/abandon")
+def abandon(aid: str):
+    """Throw away a live attempt: no grading, no answer key, an escape hatch for a
+    sitting you don't want to finish (the clock otherwise runs for hours)."""
+    with store_mod.attempt_lock(aid):
+        a, pack = _load(aid, touch=False)
+        if a["status"] == "in_progress":
+            a = store_mod.abandon_attempt(a)
+        return _view(a, pack)
+
 
 @router.post("/attempts/{aid}/evaluate")
-def evaluate(aid: str):
+def evaluate(aid: str, force: bool = False):
     a, pack = _load(aid, touch=True)
     if a["status"] != "submitted" or not a.get("result"):
         raise HTTPException(409, "submit the attempt before evaluating")
+    if a.get("evaluation") and not force:
+        return a["evaluation"]                          # idempotent: no second LLM call
     llm = _llm()
     if llm is None:
-        raise HTTPException(503, "AI unavailable: enable the cbt-exam plugin (agent half) and restart the gateway")
+        raise HTTPException(503, "AI unavailable: the cbt-exam agent half is not loaded — "
+                                 "enable the plugin in plugins.enabled and restart the gateway")
     blob = prompt_mod.evaluation_input(pack, a)
     try:
         r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
                                     input=[{"type": "text", "text": blob}],
                                     json_schema=prompt_mod.EVAL_SCHEMA, schema_name="cbt.evaluation",
-                                    temperature=0.2, max_tokens=2000, timeout=180, purpose="cbt-exam.evaluate")
+                                    temperature=0.2, max_tokens=2000, timeout=180,
+                                    purpose="cbt-exam.evaluate")
     except Exception as e:
         raise HTTPException(502, f"LLM call failed: {e}")
     data = prompt_mod.validate_evaluation(r.parsed)
     if data is None:
         raise HTTPException(502, "model returned unparseable evaluation")
-    a["evaluation"] = {"data": data, "model": r.model, "provider": r.provider, "generated_at": time.time()}
-    store_mod.save_attempt(a)
+    a["evaluation"] = {"data": data, "model": r.model, "provider": r.provider,
+                       "generated_at": time.time()}
+    store_mod.save_attempt(a, durable=True)
     return a["evaluation"]
 
-def qid_for_current(a, pack):
-    """The most recently visited question — what the live context file describes."""
-    visited = a.get("visited") or []
-    if visited:
-        return visited[-1]
-    return pack["questions"][0]["id"] if pack["questions"] else None
 
+# --------------------------------------------------------------------------- #
+# helpers
+# --------------------------------------------------------------------------- #
 def _load(aid, touch=False):
+    """(attempt, pack) or an HTTP error. `touch=True` grades an expired attempt."""
     try:
         a = store_mod.get_attempt(aid)
     except KeyError:
         raise HTTPException(404, "no such attempt")
+    except ValueError as e:
+        raise HTTPException(500, f"attempt file is unreadable: {e}")
     try:
         pack = store_mod.get_pack(a["exam_id"])
     except KeyError:
         raise HTTPException(500, "pack vanished; attempt orphaned")
     except ValueError as e:
         raise HTTPException(422, f"pack {a['exam_id']!r} is invalid: {e}")
-    if touch and a["status"] == "in_progress" and store_mod.remaining_seconds(a) <= 0:
-        store_mod.submit_attempt(a, pack)
-        store_mod.clear_live_context(a)
+    if touch and store_mod.is_expired(a):
+        a = _reap(a, pack)
     return a, pack
 
-def _live_view(a, pack):
-    if a["status"] == "in_progress":
-        return {"attempt": a, "pack": pack_mod.sanitize_pack(pack),
-                "remaining_seconds": max(0.0, store_mod.remaining_seconds(a))}
-    return _result_view(a, pack)
 
-def _result_view(a, pack):
-    return {"attempt": a, "pack": pack, "remaining_seconds": 0.0}
+def _reap(a, pack=None):
+    """Grade an attempt whose clock ran out while nobody was looking."""
+    if pack is None:
+        try:
+            pack = store_mod.get_pack(a["exam_id"])
+        except (KeyError, ValueError):
+            return a
+    with store_mod.attempt_lock(a["id"]):
+        a = store_mod.get_attempt(a["id"])             # re-read under the lock
+        if store_mod.is_expired(a):
+            a = store_mod.submit_attempt(a, pack)
+            store_mod.clear_live_context(a)
+    return a
+
+
+def _view(a, pack):
+    """The one envelope shape the panel understands."""
+    if a["status"] == "submitted":
+        return {"attempt": a, "pack": pack, "remaining_seconds": 0.0}
+    # in_progress and abandoned both hide the key; only a submitted attempt reveals it
+    return {"attempt": a, "pack": store_mod.get_pack_view(a["exam_id"]),
+            "remaining_seconds": max(0.0, store_mod.remaining_seconds(a))}

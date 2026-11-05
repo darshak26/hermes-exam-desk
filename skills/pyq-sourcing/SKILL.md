@@ -42,7 +42,7 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 
 4. **Build the pack JSON** per `references/pack-schema.md`: `exam_id` = lowercase slug (`gat-b-2024`, `gate-bt-2023`), pattern per step 1, `source_url` + `provenance` at pack level (and `provenance` per-question overrides apply). **Completion criterion:** file written to a scratch path (NOT the packs dir yet).
 
-5. **Validate:** `terminal(command="python3 <plugin>/skills/pyq-sourcing/scripts/validate_pack.py <scratch pack>", timeout=60)`. Must print `PASS: <id> — N questions, S sections, D min` (exit 0). Fix and re-run until PASS — section `question_count` MUST equal the actual per-section question count; answer indices are **0-based**. **Completion criterion:** exit 0.
+5. **Validate:** `terminal(command="python3 <plugin>/skills/pyq-sourcing/scripts/validate_pack.py <scratch pack>", timeout=60)`. Must print `PASS: <id> — N questions, S sections, D min` (exit 0). Fix and re-run until PASS — section `question_count` MUST equal the actual per-section question count; answer indices are **0-based**; `marks_wrong` is negative. Then read every `WARN:` line it prints (OCR debris, placeholder topics, duplicated options) and fix them too: they don't block grading, but a question whose options are transcription noise is unanswerable. **Completion criterion:** exit 0 and no `WARN:` lines you can fix.
 
 6. **Install:** copy the validated pack into the packs directory from Prerequisites as `<exam_id>.json`. Verify with `web_extract` or the CBT plugin's home page (ask the user to look, or check via the plugin's own tests) that the pack appears in the list. **Completion criterion:** the pack shows up in `GET /api/plugins/cbt-exam/packs` (desktop home page).
 
