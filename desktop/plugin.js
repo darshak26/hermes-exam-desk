@@ -62,6 +62,13 @@ const CSS = `
 .cbt-pal-submit{padding:8px 12px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-pal-toggle{position:absolute;right:0;top:0;height:100%;width:24px}
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
+/* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
+   question keeps its full width instead of being squeezed by a fixed 358px column. */
+.cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
+.cbt-shell.narrow .cbt-pal-toggle{display:none}
+.cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:0;width:min(340px,88%);z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
+.cbt-shell.narrow .cbt-qbody{padding:18px 16px}
+.cbt-shell.narrow .cbt-head{padding:0 10px;gap:8px}
 `;
 
 async function rest(path, opts) {
@@ -109,6 +116,81 @@ async function readActiveAttempt() {
     if (v) activeAttemptId = v
     return v || null
   } catch { return null }
+}
+
+// ── assisted mode is a SIDE PANE ────────────────────────────────────────────
+// The whole point of an assisted sitting is asking the tutor a doubt mid-exam,
+// so the chat must stay on screen. `host.openWorkspace` docks a plugin pane into
+// the main zone and reveals it; docking to the RIGHT of `workspace` is what makes
+// exam and chat sit side by side instead of sharing one tab strip.
+const EXAM_PANE_ID = 'cbt-exam:exam'
+let closeExamPane = null
+
+function goToChat() {
+  const sid = host.state?.activeSessionId?.get?.()
+  host.navigate(sid ? `/${encodeURIComponent(sid)}` : '/')
+}
+
+// A pane can't show the result page, so finishing from the pane hands the page a
+// pending view before navigating there (the page reads it once, at mount).
+let pendingResult = null
+
+function showResult(attemptId) {
+  pendingResult = attemptId || null
+  host.navigate('/cbt')
+}
+
+function openExamPane(attemptId, onFinished) {
+  if (typeof host.openWorkspace !== 'function') return false   // older desktop
+  const finish = () => {
+    const dispose = closeExamPane
+    closeExamPane = null
+    try { dispose?.() } catch {}
+    onFinished?.()
+  }
+  try { closeExamPane?.() } catch {}
+  closeExamPane = host.openWorkspace(EXAM_PANE_ID, {
+    dock: { pane: 'workspace', pos: 'right' },
+    headerVeto: true,
+    minWidth: '26rem',
+    title: 'CBT Exam',
+    onClose: () => { closeExamPane = null },
+    render: () => jsx(ExamPane, { attemptId, onFinished: finish }),
+  })
+  return true
+}
+
+// Measured, not guessed: a 26rem pane squeezed by the default 358px palette
+// column would leave the question body ~120px wide, so below 780px the palette
+// becomes an overlay drawer and the shell drops to one column.
+function ExamPane({ attemptId, onFinished }) {
+  const ref = useRef(null)
+  const [narrow, setNarrow] = useState(true)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect?.width ?? 0
+      if (w > 0) setNarrow(w < 780)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return jsxs('div', {
+    ref,
+    style: { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' },
+    children: [
+      jsx('style', { key: 'css', children: CSS }),
+      jsx(CbtExam, {
+        key: 'exam',
+        attemptId,
+        inPane: true,
+        narrow,
+        onResult: onFinished,
+        onHome: onFinished,
+      }),
+    ],
+  })
 }
 
 const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
@@ -186,14 +268,18 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     try {
       const r = await rest('/attempts', { method: 'POST', body: { exam_id: pack.exam_id, mode } })
       await setActiveAttempt(r.attempt.id)
-      onBegin(r.attempt.id)
-      if (mode === 'assisted') {
-        // prime the real composer: load the exam-assist skill so doubts typed in the
-        // app's own chatbox get answered against the live question context file.
+      const paned = mode === 'assisted' && openExamPane(r.attempt.id, () => showResult(r.attempt.id))
+      if (paned) {
+        // Assisted: exam lives in the side pane, the chat keeps the main pane, so a
+        // doubt can be asked without leaving the paper. The composer is primed with
+        // the live-context skill that the plugin keeps updated.
+        goToChat()
         host.composer.submit(host.state.activeSessionId.get() ?? null,
           'Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
           + r.attempt.id + '). Answer my doubts using the live question context file.')
         host.composer.focus(null)
+      } else {
+        onBegin(r.attempt.id)              // exam mode, or a desktop without the pane API
       }
     } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
   }
@@ -219,7 +305,9 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     jsx('div', { className: 'row', style: { marginTop: 18 }, children: [
       jsx('button', { type: 'button', className: 'primary', disabled: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
       jsx('button', { type: 'button', disabled: starting, onClick: onBack, children: 'Back' }),
-      jsx('span', { className: 'muted', children: 'The timer starts when you click begin.' }),
+      jsx('span', { className: 'muted', children: mode === 'assisted'
+        ? 'The timer starts when you click begin. The paper opens in a pane beside your chat, so you can ask doubts there.'
+        : 'The timer starts when you click begin.' }),
     ] }),
   ] })
 }
@@ -289,7 +377,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               jsx('td', { children: a.score == null ? '—' : String(a.score) }),
               jsx('td', { className: 'muted', children: fmtWhen(a.submitted_at || a.started_at) }),
               jsx('td', { children: a.status === 'in_progress'
-                ? jsx('button', { type: 'button', onClick: () => onResume(a.id), children: 'Resume' })
+                ? jsx('button', { type: 'button', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
                 : jsx('button', { type: 'button', onClick: () => onViewResult(a.id), children: 'View result' }) }),
             ] })) }) ] })
         : jsx('div', { className: 'muted', children: 'No attempts yet — start one above.' })),
@@ -308,12 +396,12 @@ function chipState(qid, answered, visited, marked) {
   return 's-not-visited'
 }
 
-function CbtExam({ attemptId, onResult, onHome }) {
+function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow = false }) {
   const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`), refetchInterval: 30000 })
   const qc = useQueryClient()
   const [curSec, setCurSec] = useState(null)
   const [curQid, setCurQid] = useState(null)
-  const [palCollapsed, setPalCollapsed] = useState(false)
+  const [palCollapsed, setPalCollapsed] = useState(inPane)
   const [showPaper, setShowPaper] = useState(false)
   const [sel, setSel] = useState(null)
   const [confirming, setConfirming] = useState(false)
@@ -468,13 +556,16 @@ function CbtExam({ attemptId, onResult, onHome }) {
     const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
     return `${s.title}: ${a} answered, ${qs.length - a} not answered`
   }).join(' · ')
-  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}`, children: [
+  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${narrow ? ' narrow' : ''}`, children: [
     jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
-      jsx(SidebarButton, {}),
+      inPane ? null : jsx(SidebarButton, {}),
       jsx('strong', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
       jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
+      narrow
+        ? jsx('button', { type: 'button', onClick: () => setPalCollapsed(v => !v), children: palCollapsed ? 'Palette' : 'Hide palette' })
+        : null,
       jsx(Countdown, { left: serverLeft, onExpire: () => { void doSubmit() } }),
     ] }),
     jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: sections.map(s =>
@@ -493,7 +584,7 @@ function CbtExam({ attemptId, onResult, onHome }) {
           })
         : cur.options.map((o, i) => optRow(i, o, cur.type)),
     ] }),
-    jsx('div', { className: 'cbt-pal', style: { gridArea: 'pal' }, children: [
+    (!narrow || !palCollapsed) && jsx('div', { className: `cbt-pal${narrow ? ' as-drawer' : ''}`, style: { gridArea: 'pal' }, children: [
       jsx('div', { className: 'cbt-pal-wrap', children: [
         jsx('div', { className: 'cbt-pal-inner', style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }, children: [
           jsx('div', { className: 'cbt-pal-head', children: [
@@ -730,7 +821,14 @@ function CbtResult({ attemptId, onHome }) {
 }
 
 function CbtPage() {
-  const [view, setView] = useState({ name: 'home' })
+  const [view, setView] = useState(() => {
+    if (pendingResult) {
+      const attemptId = pendingResult
+      pendingResult = null
+      return { name: 'result', attemptId }
+    }
+    return { name: 'home' }
+  })
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -745,7 +843,12 @@ function CbtPage() {
       if (live?.attempt?.status === 'in_progress') {
         // never override a view the user already reached while this was in flight
         void setActiveAttempt(id)          // announce it: the status-bar timer listens
-        setView(v => (v.name === 'home' ? { name: 'exam', attemptId: id } : v))
+        // Assisted attempts are a side pane, not this page — opening CBT Exams must not
+        // bounce the user to chat. The Home table's Resume opens the pane; exam-mode
+        // attempts keep the old behaviour of landing straight in the paper.
+        if (live.attempt.mode !== 'assisted') {
+          setView(v => (v.name === 'home' ? { name: 'exam', attemptId: id } : v))
+        }
       } else {
         void setActiveAttempt(null)
       }
@@ -756,7 +859,17 @@ function CbtPage() {
     jsx('style', { children: CSS }),
     view.name === 'home' && jsx(CbtHome, {
       onStart: (pack, mode) => setView({ name: 'instructions', pack, mode }),
-      onResume: id => setView({ name: 'exam', attemptId: id }),
+      onResume: (id, mode) => {
+        // Assisted attempts reopen in the side pane so the chat stays available;
+        // exam-mode attempts get the full page (nothing to ask, full concentration).
+        if (mode === 'assisted' && openExamPane(id, () => showResult(id))) {
+          void setActiveAttempt(id)
+          goToChat()
+          return
+        }
+        void setActiveAttempt(id)
+        setView({ name: 'exam', attemptId: id })
+      },
       onViewResult: id => setView({ name: 'result', attemptId: id }),
     }),
     view.name === 'instructions' && jsx(CbtInstructions, {

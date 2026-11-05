@@ -50,6 +50,17 @@ the attempt is submitted.
 | POST | `/attempts/{aid}/abandon` | discards without grading; key stays hidden |
 | POST | `/attempts/{aid}/evaluate?force=` | free when an evaluation already exists |
 
+## Assisted mode runs in a side pane
+
+Starting an **assisted** attempt docks the paper into a pane to the right of the
+workspace (`host.openWorkspace` with `dock: { pane: 'workspace', pos: 'right' }`)
+and returns you to the chat, so the tutor is one message away while the timer
+runs. Exam mode still takes the whole page — there is nothing to ask.
+
+The pane measures itself: below 780px the question palette becomes an overlay
+drawer (header button `Palette`) instead of a fixed 358px column, so the
+question keeps the full width in a narrow split.
+
 ## Decisions worth knowing
 
 - **One answer-shape rule.** `pack.answer_error()` is used by both the validator and
