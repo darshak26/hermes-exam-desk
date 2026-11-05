@@ -1,0 +1,12 @@
+name: cbt-exam
+version: 0.1.0
+description: Exam-agnostic CBT practice panel with PYQ sourcing skill and AI modes.
+author: Swapnil Dilip Padmane, Hermes Agent
+license: MIT
+manifest_version: 1
+requires_hermes: ">=0.22.2"
+kind: standalone
+provides_tools: []
+provides_hooks: []
+provides_middleware: []
+requires_env: []
