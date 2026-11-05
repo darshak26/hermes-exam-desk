@@ -38,7 +38,7 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 
 2. **Find the paper.** Prefer: official question paper PDF + official answer key from the conducting body. Acceptable fallback: official paper + reputable coaching key; or memory-based reconstructions — the latter MUST be labeled `"memory-based reconstruction by <source>; unverified"` in the pack's `provenance` and never silently mixed with official keys. **Completion criterion:** paper file downloaded (or extracted inline) and the key source identified.
 
-3. **Extract the questions.** `read_file` on the PDF (auto-extracts text). Scanned/image PDFs → load the `sarvam-vision-extract` skill for OCR; inline figures → `vision_analyze` on rendered pages. Transcribe faithfully: question text, all options, question type (`mcq` single-select / `msq` multi-select / `nat` numerical), topic tag (a REAL topic name — it drives AI evaluation), marked marks if the exam mixes them. **Completion criterion:** every question has text, options, type, topic, and `source_url`.
+3. **Extract the questions.** `read_file` on the PDF (auto-extracts text). Scanned/image PDFs → OCR first: try `sarvam-vision-extract` skill (needs SARVAM_API_KEY + MCP configured); if unavailable, fall back to local `tesseract` (render pages with `pdftoppm -r 200`, run `tesseract page.png stdout`). Inline figures → `vision_analyze` on rendered pages. Transcribe faithfully: question text, all options, question type (`mcq` single-select / `msq` multi-select / `nat` numerical), topic tag (a REAL topic name — it drives AI evaluation), marked marks if the exam mixes them. **Completion criterion:** every question has text, options, type, topic, and `source_url`.
 
 4. **Build the pack JSON** per `references/pack-schema.md`: `exam_id` = lowercase slug (`gat-b-2024`, `gate-bt-2023`), pattern per step 1, `source_url` + `provenance` at pack level (and `provenance` per-question overrides apply). **Completion criterion:** file written to a scratch path (NOT the packs dir yet).
 
@@ -50,11 +50,16 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 
 ## Pitfalls
 
+- **Answer key is mandatory for a valid pack.** The validator requires an `answer` on every question. If the user provides only the question paper, ask for the answer key (official NTA key, coaching key, or memory-based) before building — a transcription without answers cannot be validated or installed.
 - Never invent questions, options, or answer keys. A fabricated question in a practice exam is worse than a missing one.
+- NTA exams (GAT-B, CUET, etc.) do NOT publish a public master question paper — the paper is displayed per-candidate behind login at exams.nta.ac.in. Only GATE and JAM publish master papers publicly. For NTA exams you need either a candidate response sheet PDF or a coaching reconstruction.
+- NTA's servers (nta.ac.in / exams.nta.ac.in) may be unreachable from this VPS — TLS reset or cert-authentication failures. If curl and both browsers fail, stop retrying and ask the user to provide the PDF (or point to a reachable mirror). Do not report 'I sourced the paper' when you could not actually fetch it."
 - Answer indices are **0-based**. An index past the last option is the most common silent pack bug — the validator refuses it, so never skip step 5.
 - `question_count` per section must equal the actual count; the validator refuses a mismatch. If the real paper's structure can't be expressed (e.g. a true/false subpart), model it as its own section or type — do not force it.
 - Never hardcode numbers across exams (GAT-B's "attempt 60 of 100" is not GATE's rule). Every pattern number comes from step 1 of THIS run.
 - Memory-based papers carry wrong keys sometimes. Say so in the report; the pack's `provenance` already says it for the user.
+- **NTA exams (GAT-B, BET, CUET, etc.) do NOT publish a master question paper PDF** — the question paper is only shown per-candidate behind login on exams.nta.ac.in (response sheet + recorded responses). Unlike GATE/JAM, which publish master papers + keys publicly. So for these exams you cannot extract real questions from an official source; the only routes are (a) a coaching-site reconstruction (label `"memory-based reconstruction by <source>; unverified"`) or (b) a candidate's own response-sheet PDF. If the user expects verified questions, say up front that only (b) or a memory-based pack is possible, and get consent before building.
+- The official bulletin may be hard to reach on the NTA portal (rotates, times out). A coaching site mirroring the official NTA PDF is acceptable for *reading* the bulletin content — but verify the PDF header/NTA branding and that pattern numbers match the conducting body; never take a coaching site's *reconstructed* pattern as authoritative. If no bulletin can be found at all, STOP and ask the user (do not proceed on a coaching summary).
 
 ## Verification
 

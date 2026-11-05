@@ -288,7 +288,7 @@ function CbtExam({ attemptId, onResult }) {
     setSel(saved === undefined ? null : saved)
   }, [curQid, curSec, q.data?.attempt?.answers?.[curQid]])
   useEffect(() => {
-    if (status === 'in_progress' && q.data && base.left != null && shown <= 0 && !submitting && !subDone) {
+    if (status === 'in_progress' && q.data && base.left != null && base.left > 0 && shown <= 0 && !submitting && !subDone) {
       setSel(null)
       void doSubmit()
     }
