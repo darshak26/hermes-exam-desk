@@ -1,0 +1,39 @@
+---
+name: exam-assist
+description: Answer mid-exam doubts using the cbt live question context.
+version: 0.1.0
+author: Swapnil Dilip Padmane, Hermes Agent
+license: MIT
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [cbt, exams, exam-assist]
+    related_skills: []
+---
+# exam-assist Skill
+
+Mid-exam tutor for the cbt-exam plugin's ASSESM MODE. The user takes the exam in the CBT panel (route `/cbt`) and asks doubts in THIS chat. The plugin mirrors the question currently on screen into a live context file; you read it and answer like a hint-first tutor.
+
+## When to Use
+
+- The cbt-exam plugin primes you with a message when an assisted attempt starts ("Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam"). After that, the user's doubts about exam questions are yours to answer.
+- The user asks about a question ("what does this mean", "why is option B wrong here", "hint for B-03") while an assisted attempt is open.
+
+Don't use for: exam (non-assisted) mode — there is no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`cbt-exam:pyq-sourcing`).
+
+## Procedure
+
+1. **Find the live file.** The newest file in the plugin data root's `live/` folder:
+   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('cbt-exam') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). If there is no file, there is no active assisted exam — say so and stop.
+   **Completion criterion:** the newest live file's path.
+
+2. **Read it** with `read_file`. It contains: attempt id, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
+
+3. **Answer like a tutor, not a solver:**
+   - Default to a hint that nudges toward the answer (name the underlying concept the doubt is about; walk back from the wrong option the student chose).
+   - If the student explicitly asks for the full solution or the direct answer, give it.
+   - Keep it under ~150 words, plain English. Ground every claim in the file's question — don't invent additional question content, and don't "correct" the student's saved answer unless asked.
+   - The file tells you the SAVED answer, not what's on screen. If the doubt implies they just changed something, note that answers only count once saved.
+   **Completion criterion:** the doubt is answered without revealing any answer-key content beyond what the file shows.
+
+4. **Stay in your lane:** no asking for exam photos; no querying the cbt backend or editing the attempt from here (the exam panel owns state); no mid-exam tool calls beyond reading the live file (and `web_search` for a genuinely needed external fact). If the exam has been submitted, the live file is gone — point the user at the result page and evaluation instead.

@@ -124,7 +124,7 @@ class ApiTests(unittest.TestCase):
         rows = client.get("/attempts").json()["attempts"]
         row = next(x for x in rows if x["id"] == aid)
         self.assertIn("score", row); self.assertIn("totals", row)
-        self.assertIn("assists", row); self.assertIn("has_evaluation", row)
+        self.assertIn("has_evaluation", row)
         self.assertNotIn("questions", row)   # no per-question payload in history
 
     def test_full_run_scores_2_5(self):
@@ -146,9 +146,6 @@ class FakeLlm:
     def __init__(self):
         self.calls = []
         self.return_parsed_none = False
-    def complete(self, **kw):
-        self.calls.append(kw)
-        return FakeResult(text="hint: check g again")
     def complete_structured(self, **kw):
         self.calls.append(kw)
         if self.return_parsed_none:
@@ -182,35 +179,6 @@ class LlmApiTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["attempt"]["id"]
 
-    def test_ask_rejected_on_exam_mode(self):
-        aid = self._attempt("exam")
-        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why?"})
-        self.assertEqual(r.status_code, 403)
-
-    def test_ask_assisted_roundtrip(self):
-        aid = self._attempt("assisted")
-        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why is 4 right?", "current": 1})
-        self.assertEqual(r.status_code, 200)
-        body = r.json()
-        self.assertEqual(body["reply"], "hint: check g again")
-        self.assertEqual(body["model"], "fake-model")
-        self.assertEqual(body["assists"], 1)
-        got = client.get(f"/attempts/{aid}").json()
-        self.assertEqual(len(got["attempt"]["assist_log"]), 1)
-        last = FAKE_LLM.calls[-1]["messages"][-1]
-        self.assertIn("currently selected: 1", last["content"])
-
-    def test_ask_unknown_question_404(self):
-        aid = self._attempt("assisted")
-        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "ZZZ", "text": "why?"})
-        self.assertEqual(r.status_code, 404)
-
-    def test_ask_without_bridge_503(self):
-        sys.modules.pop("cbt_exam_ctx_bridge", None)
-        aid = self._attempt("assisted")
-        r = client.post(f"/attempts/{aid}/ask", json={"question_id": "A-01", "text": "why?"})
-        self.assertEqual(r.status_code, 503)
-
     def test_evaluate_requires_submit(self):
         aid = self._attempt()
         r = client.post(f"/attempts/{aid}/evaluate")
@@ -234,6 +202,27 @@ class LlmApiTests(unittest.TestCase):
             self.assertEqual(r.status_code, 502)
         finally:
             FAKE_LLM.return_parsed_none = False
+
+    def test_evaluate_without_bridge_503(self):
+        sys.modules.pop("cbt_exam_ctx_bridge", None)
+        aid = self._attempt()
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 503)
+
+    def test_live_context_lifecycle(self):
+        aid = self._attempt("assisted")              # create writes the file (first question)
+        live = DATA / "live" / f"{aid}.md"
+        self.assertTrue(live.exists())
+        self.assertIn("QUESTION A-01", live.read_text())
+        client.patch(f"/attempts/{aid}", json={"visited": ["B-03"]})
+        self.assertIn("QUESTION B-03", live.read_text())
+        client.post(f"/attempts/{aid}/submit")
+        self.assertFalse(live.exists())              # submit clears it
+
+    def test_exam_mode_has_no_live_context(self):
+        aid = self._attempt("exam")
+        self.assertFalse((DATA / "live" / f"{aid}.md").exists())
 
 if __name__ == "__main__":
     unittest.main()

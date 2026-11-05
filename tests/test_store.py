@@ -69,5 +69,23 @@ class StoreTests(unittest.TestCase):
         self.assertIsNotNone(saved["submitted_at"])
         self.assertEqual(saved["result"]["score"], 1)
 
+    def test_write_live_context_lifecycle(self):
+        pack = base_pack()
+        a = store.new_attempt(pack, "assisted")
+        p = store.write_live_context(a, pack)   # no visited yet → first question
+        self.assertTrue(p.exists())
+        text = p.read_text()
+        self.assertIn("QUESTION A-01", text)
+        self.assertIn("student has not saved an answer", text)
+        a["answers"] = {"B-03": "2"}
+        a["visited"] = ["B-03"]
+        store.write_live_context(a, pack)
+        text = p.read_text()
+        self.assertIn("QUESTION B-03", text)
+        self.assertIn("student's SAVED answer: '2'", text)
+        store.clear_live_context(a)
+        self.assertFalse(p.exists())
+        store.clear_live_context(a)   # clearing twice is a no-op
+
 if __name__ == "__main__":
     unittest.main()

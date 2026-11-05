@@ -37,13 +37,6 @@ const CSS = `
   grid-template-columns:minmax(0,1fr) 358px;
   grid-template-rows:44px 40px minmax(0,1fr) 48px;
   grid-template-areas:"head head" "tabs pal" "body pal" "act pal";}
-.cbt-shell.assisted{grid-template-rows:44px 40px minmax(0,1fr) var(--cbt-chat-h,168px) 48px;
-  grid-template-areas:"head head" "tabs pal" "body pal" "chat chat" "act pal";}
-.cbt-shell.assisted.collapsed{grid-template-rows:44px 40px minmax(0,1fr) 48px 48px}
-.cbt-shell.assisted.collapsed .cbt-chat-log{display:none}
-.cbt-chat{display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--ui-stroke-secondary)}
-.cbt-chat-log{flex:1;overflow:auto;padding:8px 16px;font-size:12.5px}
-.cbt-chat-input{display:flex;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
 .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
 .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
@@ -132,6 +125,14 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
       const r = await rest('/attempts', { method: 'POST', body: { exam_id: pack.exam_id, mode } })
       await setActiveAttempt(r.attempt.id)
       onBegin(r.attempt.id)
+      if (mode === 'assisted') {
+        // prime the real composer: load the exam-assist skill so doubts typed in the
+        // app's own chatbox get answered against the live question context file.
+        host.composer.submit(host.state.activeSessionId.get() ?? null,
+          'Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
+          + r.attempt.id + '). Answer my doubts using the live question context file.')
+        host.composer.focus(null)
+      }
     } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
   }
   return jsxs('div', { className: 'cbt pad', children: [
@@ -210,13 +211,12 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       ? jsx('div', { className: 'muted', children: hist.isError ? 'could not load attempts' : 'loading…' })
       : (hist.data?.attempts?.length
         ? jsxs('table', { children: [
-            jsx('thead', { children: jsx('tr', { children: ['Exam', 'Mode', 'Status', 'Score', 'Assists', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
+            jsx('thead', { children: jsx('tr', { children: ['Exam', 'Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
             jsx('tbody', { children: hist.data.attempts.map(a => jsxs('tr', { key: a.id, children: [
               jsx('td', { children: a.exam_id }),
               jsx('td', { children: a.mode }),
               jsx('td', { children: a.status }),
               jsx('td', { children: a.score == null ? '—' : String(a.score) }),
-              jsx('td', { children: a.assists ? String(a.assists) : '—' }),
               jsx('td', { className: 'muted', children: fmtWhen(a.submitted_at || a.started_at) }),
               jsx('td', { children: a.status === 'in_progress'
                 ? jsx('button', { type: 'button', onClick: () => onResume(a.id), children: 'Resume' })
@@ -386,7 +386,7 @@ function CbtExam({ attemptId, onResult }) {
     const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
     return `${s.title}: ${a} answered, ${qs.length - a} not answered`
   }).join(' · ')
-  return jsxs('div', { className: `cbt cbt-shell${attempt.mode === 'assisted' ? ' assisted' : ''}${palCollapsed ? ' pal-collapsed' : ''}` }, [
+  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}` }, [
     jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       jsx('strong', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
@@ -489,10 +489,67 @@ function fmtAns(q, v) {
 const VERDICT_CLS = { correct: 'ok', wrong: 'err', skipped: '', not_counted: 'acc' }
 const VERDICT_LABEL = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped', not_counted: 'Not counted' }
 
+function evaluationCard(d) {
+  if (!d) return null
+  return jsxs('div', { style: { marginTop: 8 }, children: [
+    jsx('p', { style: { margin: '4px 0 8px' }, children: d.overall_comment }),
+    (d.sections || []).map((s, i) => jsx('p', { key: i, className: 'muted', children: `${s.section_id}: ${s.comment}` })),
+    (d.weak_topics || []).length
+      ? jsxs('div', { children: [
+          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Weak topics' }),
+          jsx('div', { className: 'row', children: d.weak_topics.map((w, i) =>
+            jsxs('span', { key: i, className: `badge ${w.priority === 'high' ? 'err' : w.priority === 'medium' ? 'acc' : ''}`, children: [`${w.topic} `, jsx('span', { className: 'muted', children: `(${w.priority})` })] })) }),
+        ] })
+      : null,
+    (d.wrong_answer_notes || []).length
+      ? jsxs('div', { children: [
+          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Where it slipped' }),
+          ...d.wrong_answer_notes.map((n, i) => jsx('p', { key: i, style: { margin: '2px 0' }, children: [jsx('strong', { children: `${n.question_id}: ` }), n.note] })),
+        ] })
+      : null,
+    (d.study_plan || []).length
+      ? jsxs('div', { children: [
+          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Study plan' }),
+          jsx('ol', { style: { margin: '4px 0', paddingLeft: 20 }, children: d.study_plan.map((s, i) => jsx('li', { key: i, children: s })) }),
+        ] })
+      : null,
+  ] })
+}
+
 function CbtResult({ attemptId, onHome }) {
   const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
+  const qc = useQueryClient()
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(null)
+  const [evalBusy, setEvalBusy] = useState(false)
+  const [evalError, setEvalError] = useState(null)
+  const [evalTried, setEvalTried] = useState(false)
+  const [armingRe, setArmingRe] = useState(false)
+  const runEval = async () => {
+    if (evalBusy) return
+    setEvalBusy(true); setEvalError(null)
+    try {
+      const ev = await rest(`/attempts/${attemptId}/evaluate`, { method: 'POST' })
+      const d = q.data
+      qc.setQueryData(['cbt', 'attempt', attemptId], { ...d, attempt: { ...d.attempt, evaluation: ev } })
+      setEvalTried(true)
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+    } catch (e) { setEvalError(e?.message || String(e)) }
+    setEvalBusy(false)
+  }
+  useEffect(() => {
+    const a = q.data?.attempt
+    if (a?.status === 'submitted' && a.result && !a.evaluation && !evalTried && !evalBusy) {
+      setEvalTried(true)
+      void runEval()
+    }
+  }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, evalTried, evalBusy])
+  const discuss = () => {
+    const a = q.data?.attempt
+    host.composer.submit(host.state.activeSessionId.get() ?? null,
+      `Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the cbt-exam plugin result page.`)
+    host.composer.focus(null)
+  }
   if (q.isLoading) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'loading…' }) })
   if (q.isError || !q.data) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'could not load result' }) })
   const { attempt, pack } = q.data
@@ -510,9 +567,6 @@ function CbtResult({ attemptId, onHome }) {
     jsx('div', { className: 'row', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
-      attempt.assist_log?.length
-        ? jsx('span', { className: 'badge', children: `${attempt.assist_log.length} tutor assist${attempt.assist_log.length === 1 ? '' : 's'}` })
-        : null,
       jsx('span', { className: 'muted', children: `submitted ${fmtWhen(attempt.submitted_at)}` }),
       jsx('span', { style: { flex: 1 } }),
       jsx('button', { type: 'button', onClick: () => onHome(), children: 'New attempt' }),

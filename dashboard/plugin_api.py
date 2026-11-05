@@ -63,7 +63,10 @@ def create_attempt(body: StartBody):
         raise HTTPException(404, "unknown exam_id")
     except ValueError as e:
         raise HTTPException(422, f"pack {body.exam_id!r} is invalid: {e}")
-    return _live_view(store_mod.new_attempt(pack, body.mode), pack)
+    a = store_mod.new_attempt(pack, body.mode)
+    if body.mode == "assisted":
+        store_mod.write_live_context(a, pack)
+    return _live_view(a, pack)
 
 @router.get("/attempts")
 def list_attempts():
@@ -74,7 +77,6 @@ def list_attempts():
                      "status": a["status"], "started_at": a["started_at"],
                      "submitted_at": a.get("submitted_at"),
                      "score": r.get("score"), "totals": r.get("totals"),
-                     "assists": len(a.get("assist_log", [])),
                      "has_evaluation": bool(a.get("evaluation"))})
     return {"attempts": rows}
 
@@ -82,11 +84,6 @@ def list_attempts():
 def get_attempt(aid: str):
     a, pack = _load(aid, touch=True)
     return _live_view(a, pack)
-
-class AskBody(BaseModel):
-    question_id: str
-    text: str = Field(min_length=1, max_length=2000)
-    current: object = None   # the UI's live (possibly unsaved) selection; falls back to the saved answer
 
 @router.patch("/attempts/{aid}")
 def patch_attempt(aid: str, patch: AnswerPatch):
@@ -113,8 +110,11 @@ def patch_attempt(aid: str, patch: AnswerPatch):
         seen = set(a["visited"])
         seen.update(q for q in patch.visited if q in qmap)
         a["visited"] = sorted(seen)
+    if a["mode"] == "assisted":
+        store_mod.write_live_context(a, pack, qid_for_current(a, pack))
     if store_mod.remaining_seconds(a) <= 0:
         store_mod.submit_attempt(a, pack)
+        store_mod.clear_live_context(a)
     else:
         store_mod.save_attempt(a)
     return _live_view(a, pack)
@@ -144,31 +144,8 @@ def submit(aid: str):
     a, pack = _load(aid, touch=True)
     if a["status"] == "in_progress":
         store_mod.submit_attempt(a, pack)
+        store_mod.clear_live_context(a)
     return _result_view(a, pack)
-
-@router.post("/attempts/{aid}/ask")
-def ask(aid: str, body: AskBody):
-    a, pack = _load(aid, touch=True)
-    if a["mode"] != "assisted":
-        raise HTTPException(403, "ask is only available in assisted mode")
-    if a["status"] != "in_progress":
-        raise HTTPException(409, "attempt is not in progress")
-    llm = _llm()
-    if llm is None:
-        raise HTTPException(503, "AI unavailable: enable the cbt-exam plugin (agent half) and restart the gateway")
-    q = next((x for x in pack["questions"] if x["id"] == body.question_id), None)
-    if q is None:
-        raise HTTPException(404, "unknown question_id")
-    cur = body.current if body.current is not None else a["answers"].get(q["id"])
-    messages = prompt_mod.ask_messages(q, cur, body.text, pack, history=a["assist_log"])
-    try:
-        r = llm.complete(messages=messages, max_tokens=600, timeout=90, purpose="cbt-exam.ask")
-    except Exception as e:
-        raise HTTPException(502, f"LLM call failed: {e}")
-    a["assist_log"].append({"question_id": q["id"], "asked": body.text,
-                            "reply": r.text, "model": r.model, "at": time.time()})
-    store_mod.save_attempt(a)
-    return {"reply": r.text, "model": r.model, "assists": len(a["assist_log"])}
 
 @router.post("/attempts/{aid}/evaluate")
 def evaluate(aid: str):
@@ -193,6 +170,13 @@ def evaluate(aid: str):
     store_mod.save_attempt(a)
     return a["evaluation"]
 
+def qid_for_current(a, pack):
+    """The most recently visited question — what the live context file describes."""
+    visited = a.get("visited") or []
+    if visited:
+        return visited[-1]
+    return pack["questions"][0]["id"] if pack["questions"] else None
+
 def _load(aid, touch=False):
     try:
         a = store_mod.get_attempt(aid)
@@ -206,6 +190,7 @@ def _load(aid, touch=False):
         raise HTTPException(422, f"pack {a['exam_id']!r} is invalid: {e}")
     if touch and a["status"] == "in_progress" and store_mod.remaining_seconds(a) <= 0:
         store_mod.submit_attempt(a, pack)
+        store_mod.clear_live_context(a)
     return a, pack
 
 def _live_view(a, pack):

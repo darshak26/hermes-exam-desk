@@ -78,3 +78,50 @@ def submit_attempt(a, pack, now=None):
     a["submitted_at"] = time.time() if now is None else now
     a["result"] = grading.grade_attempt(pack, a)
     return save_attempt(a)
+
+def live_dir():
+    return data_root() / "live"
+
+def write_live_context(a, pack, qid=None):
+    """Mirror of the currently displayed question so the exam-assist skill (used by the
+    main chat) can answer doubts about it. Best-effort: never crashes the exam flow."""
+    try:
+        d = live_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        qs = pack.get("questions") or []
+        if qid is None and a.get("visited"):
+            qid = a["visited"][-1]
+        q = next((x for x in qs if x["id"] == qid), None) or (qs[0] if qs else None)
+        if q is None:
+            return None
+        sec = next((s for s in pack["pattern"]["sections"] if s["id"] == q["section"]), {})
+        marks = [q.get("marks_correct", sec.get("marks_correct")), q.get("marks_wrong", sec.get("marks_wrong"))]
+        lines = [
+            "# CBT exam — live question context",
+            f"attempt: {a['id']}   exam: {a.get('exam_id')}   mode: {a.get('mode')}",
+            f"remaining: {int(remaining_seconds(a))}s",
+            "",
+            f"QUESTION {q['id']} ({q['section']}, {q['type'].upper()}, topic: {q.get('topic', 'n/a')})",
+            f"marks: +{marks[0]} / {marks[1]}",
+            q["text"],
+            "",
+        ]
+        for i, o in enumerate(q.get("options") or []):
+            lines.append(f"{chr(65 + i)}) {o}")
+        cur = a.get("answers", {}).get(q["id"])
+        lines.append("")
+        lines.append("student's SAVED answer: " + repr(cur) if cur is not None
+                     else "student has not saved an answer to this question yet")
+        lines.append("")
+        lines.append("Note: the saved selection above is what was last SAVED — what is on screen now may differ.")
+        p = d / f"{a['id']}.md"
+        p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return p
+    except Exception:
+        return None
+
+def clear_live_context(a):
+    try:
+        (live_dir() / f"{a['id']}.md").unlink()
+    except FileNotFoundError:
+        pass
