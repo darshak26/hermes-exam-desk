@@ -402,7 +402,12 @@ function CbtHome({ onStart, onResume, onViewResult }) {
                 .filter((v, i, all) => all.indexOf(v) === i)     // one label per distinct value
                 .join(' ')
               const act = p.invalid
-                ? jsx('span', { className: 'muted', children: 'invalid — fix the source file' })
+                ? jsxs('span', { className: 'row', style: { gap: 8, alignItems: 'baseline' }, children: [
+                    jsx('span', { className: 'badge err', children: 'invalid' }),
+                    // the validator's message is the only thing that tells you what to
+                    // fix; a generic "fix the source file" makes you go read it yourself
+                    jsx('span', { className: 'muted', style: { fontSize: 12 }, children: String(p.invalid).replace(/^invalid pack:\s*/, '') }),
+                  ] })
                 : jsxs('span', { className: 'row', children: [
                     jsx('button', { type: 'button', onClick: () => start(p, 'assisted'), children: 'Start (assisted)' }),
                     jsx('button', { type: 'button', onClick: () => start(p, 'exam'), children: 'Start (exam)' }),
@@ -410,11 +415,11 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               return jsxs('tr', { key: p.exam_id, children: [
                 jsx('td', { children: p.title || p.exam_id }),
                 jsx('td', { children: String(p.year || '—') }),
-                jsx('td', { children: String(p.question_count ?? 'invalid') }),
-                jsx('td', { children: `${p.duration_minutes ?? '?'} min` }),
-                jsx('td', { children: marks || '—' }),
+                jsx('td', { children: p.invalid ? '—' : String(p.question_count) }),
+                jsx('td', { children: p.invalid ? '—' : `${p.duration_minutes ?? '?'} min` }),
+                jsx('td', { children: p.invalid ? '—' : (marks || '—') }),
                 jsx('td', { className: 'muted', children: [
-                  p.provenance || p.invalid || '',
+                  p.invalid ? '' : (p.provenance || ''),
                   p.warnings?.length
                     ? jsx('span', { key: 'w', className: 'badge err', style: { marginLeft: 6 }, title: p.warnings.slice(0, 8).join('\n'), children: `${p.warnings.length} warnings` })
                     : null,
