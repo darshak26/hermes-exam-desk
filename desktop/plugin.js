@@ -393,7 +393,7 @@ function CbtExam({ attemptId, onResult, onHome }) {
     const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
     return `${s.title}: ${a} answered, ${qs.length - a} not answered`
   }).join(' · ')
-  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}` }, [
+  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}`, children: [
     jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       jsx('strong', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
@@ -483,7 +483,7 @@ function CbtExam({ attemptId, onResult, onHome }) {
         ],
       })],
     }),
-  ])
+  ] })
 }
 
 function fmtAns(q, v) {
