@@ -203,6 +203,21 @@ function ExamPane({ attemptId, onFinished }) {
 }
 
 const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
+
+// A section may override the pattern's marking. Older agent halves omit the
+// per-section marks entirely (they only shipped attempt_limit), so fall back to
+// the pattern before ever printing "+undefined / undefined" at the user.
+function sectionMarks(section, pattern) {
+  const pick = (k) => section?.[k] ?? pattern?.[k] ?? null
+  return { correct: pick('marks_correct'), wrong: pick('marks_wrong') }
+}
+
+function marksLabel(section, pattern) {
+  const m = sectionMarks(section, pattern)
+  if (m.correct == null && m.wrong == null) return '—'
+  const fmt = (v) => (v == null ? '?' : v > 0 ? `+${v}` : String(v))
+  return `${fmt(m.correct)} / ${fmt(m.wrong)}`
+}
 const LEGEND = [
   ['', 'Not Visited'],
   ['err', 'Not Answered'],
@@ -335,7 +350,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
         jsx('td', { children: s.title }),
         jsx('td', { children: String(s.question_count) }),
         jsx('td', { children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' }),
-        jsx('td', { children: `+${s.marks_correct} / ${s.marks_wrong}` }),
+        jsx('td', { children: marksLabel(s, pack.pattern) }),
       ] })) }) ] }),
     jsx('h3', { children: 'Question palette' }),
     legendNode(),
@@ -381,8 +396,11 @@ function CbtHome({ onStart, onResume, onViewResult }) {
             jsx('thead', { children: jsx('tr', { children: ['Exam', 'Year', 'Questions', 'Duration', 'Marks', 'Provenance', ''].map(h => jsx('th', { key: h, children: h })) }) }),
             jsx('tbody', { children: (packs.data?.packs || []).map(p => {
               const marks = (p.sections || [])
-                .filter(s => s.marks_correct !== undefined && s.marks_correct !== null)
-                .map(s => `+${s.marks_correct}`).join(' ')
+                .map(s => sectionMarks(s, p.pattern || {}))
+                .filter(m => m.correct != null)
+                .map(m => (m.correct > 0 ? `+${m.correct}` : String(m.correct)))
+                .filter((v, i, all) => all.indexOf(v) === i)     // one label per distinct value
+                .join(' ')
               const act = p.invalid
                 ? jsx('span', { className: 'muted', children: 'invalid — fix the source file' })
                 : jsxs('span', { className: 'row', children: [
