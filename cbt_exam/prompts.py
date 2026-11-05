@@ -1,4 +1,5 @@
 """Prompt builders for the post-exam evaluation (the only in-plugin LLM use)."""
+import json
 
 EVAL_INSTRUCTIONS = (
     "You are analysing a submitted practice CBT attempt for a Biotechnology student. "
@@ -61,6 +62,23 @@ def evaluation_input(pack, attempt):
                 lines.append(f"    options: {opts}")
             lines.append(f"    student chose: {given}   correct: {q['answer']}")
     return "\n".join(lines)
+
+def parse_json_block(text):
+    """The first {...} block in a model reply, parsed. None when there isn't one.
+
+    Last-resort path for providers that refuse `response_format` entirely: ask for
+    JSON in the instructions and dig it out of the prose.
+    """
+    if not isinstance(text, str):
+        return None
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        return json.loads(text[start:end + 1])
+    except ValueError:
+        return None
+
 
 def validate_evaluation(parsed):
     """Defensive check — jsonschema is not installed in the gateway venv, so validate by hand."""

@@ -36,7 +36,9 @@ const CSS = `
 .cbt .opt{text-align:left;max-width:640px}
 .cbt-shell{display:grid;height:100%;min-height:0;
   grid-template-columns:minmax(0,1fr) 358px;
-  grid-template-rows:44px 40px minmax(0,1fr) 48px;
+  /* auto (not fixed px) rows: in a narrow pane the head wraps to two lines and the
+     action row wraps to two, and a fixed row clips the overflow off the pane. */
+  grid-template-rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
   grid-template-areas:"head head" "tabs pal" "body pal" "act pal";}
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
 .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
@@ -64,9 +66,14 @@ const CSS = `
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
 /* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
    question keeps its full width instead of being squeezed by a fixed 358px column. */
-.cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
+.cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act";
+  grid-template-rows:auto auto minmax(0,1fr) auto}
 .cbt-shell.narrow .cbt-pal-toggle{display:none}
-.cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:0;width:min(340px,88%);z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
+.cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:auto;width:min(340px,88%);max-height:min(560px,calc(100% - 150px));overflow:auto;z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
+/* 10 columns need 358px; the drawer is 340 — 8 columns fit with padding. */
+.cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
+.cbt-pal-close{display:none}
+.cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-close{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border-radius:4px;flex:0 0 auto}
 .cbt-shell.narrow .cbt-qbody{padding:18px 16px}
 .cbt-shell.narrow .cbt-head{padding:0 10px;gap:8px}
 `;
@@ -226,11 +233,34 @@ function fmtHMS(seconds) {
 
 // The app drops its ENTIRE titlebar cluster on a plugin page when any plugin
 // claims the titlebar band (`pageOwnsTitlebar` in the app's titlebar-controls),
-// which takes the sidebar toggle with it. This page-local twin restores that one
-// affordance from inside the page, where nothing can take it away. Feature-
-// detected: an older host without ctx.runAction renders nothing.
+// which takes the sidebar toggle with it. The in-page twin below only exists for
+// that case — when the real toggle IS on screen a second one just shoves the
+// heading out of line, so measure instead of assuming.
+function appTitlebarTogglePresent() {
+  const left = document.querySelector('[data-titlebar-cluster="left"]')
+  if (!left) return false
+  const box = left.getBoundingClientRect()
+  // present AND on screen: a cluster the app rendered but hid is just as gone
+  return box.width > 0 && box.height > 0 && Boolean(left.querySelector('button'))
+}
+
+function useAppTitlebarToggle() {
+  const [present, setPresent] = useState(true)     // assume present until measured
+  useEffect(() => {
+    let raf = 0
+    const check = () => { raf = 0; setPresent(appTitlebarTogglePresent()) }
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(check) }
+    check()
+    const mo = new MutationObserver(schedule)
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] })
+    return () => { mo.disconnect(); if (raf) cancelAnimationFrame(raf) }
+  }, [])
+  return present
+}
+
 function SidebarButton() {
-  if (!ctxRunAction) return null
+  const appHasToggle = useAppTitlebarToggle()
+  if (!ctxRunAction || appHasToggle) return null
   return jsx('button', {
     type: 'button',
     className: 'cbt-icon-btn',
@@ -273,12 +303,18 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
       const paned = mode === 'assisted' && openExamPane(r.attempt.id, () => showResult(r.attempt.id))
       if (paned) {
         // Assisted: exam lives in the side pane, the chat keeps the main pane, so a
-        // doubt can be asked without leaving the paper. The composer is primed with
-        // the live-context skill that the plugin keeps updated.
+        // doubt can be asked without leaving the paper. Stage the skill-loading line
+        // in the composer: `submit(null, …)` on a FRESH chat silently does nothing,
+        // while `setDraft(null, …)` addresses the resolved composer — and the user
+        // presses send when they actually have a doubt.
         goToChat()
-        host.composer.submit(host.state.activeSessionId.get() ?? null,
-          'Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
-          + r.attempt.id + '). Answer my doubts using the live question context file.')
+        const sid = host.state.activeSessionId.get() ?? null
+        const prime = 'Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
+          + r.attempt.id + '). Answer my doubts using the live question context file.'
+        await new Promise(done => setTimeout(done, 300))     // let goToChat mount its composer
+        let staged = false
+        try { staged = host.composer.setDraft ? await host.composer.setDraft(sid, prime) : false } catch { staged = false }
+        if (!staged) { try { host.composer.submit?.(sid, prime) } catch {} }
         host.composer.focus(null)
       } else {
         onBegin(r.attempt.id)              // exam mode, or a desktop without the pane API
@@ -344,7 +380,9 @@ function CbtHome({ onStart, onResume, onViewResult }) {
         : jsxs('table', { children: [
             jsx('thead', { children: jsx('tr', { children: ['Exam', 'Year', 'Questions', 'Duration', 'Marks', 'Provenance', ''].map(h => jsx('th', { key: h, children: h })) }) }),
             jsx('tbody', { children: (packs.data?.packs || []).map(p => {
-              const marks = (p.sections || []).map(s => `+${s.marks_correct}`).join(' ')
+              const marks = (p.sections || [])
+                .filter(s => s.marks_correct !== undefined && s.marks_correct !== null)
+                .map(s => `+${s.marks_correct}`).join(' ')
               const act = p.invalid
                 ? jsx('span', { className: 'muted', children: 'invalid — fix the source file' })
                 : jsxs('span', { className: 'row', children: [
@@ -590,6 +628,13 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       jsx('div', { className: 'cbt-pal-wrap', children: [
         jsx('div', { className: 'cbt-pal-inner', style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }, children: [
           jsx('div', { className: 'cbt-pal-head', children: [
+            narrow
+              ? jsxs('div', { className: 'row', style: { marginBottom: 4 }, children: [
+                  jsx('strong', { style: { fontSize: 12 }, children: 'Palette' }),
+                  jsx('span', { style: { flex: 1 } }),
+                  jsx('button', { type: 'button', className: 'cbt-pal-close', title: 'Close palette', onClick: () => setPalCollapsed(true), children: '✕' }),
+                ] })
+              : null,
             legendNode(secCounts),
             secMeta.attempt_limit
               ? jsx('div', { style: { fontSize: 12, color: counted >= secMeta.attempt_limit ? 'var(--ui-accent)' : 'var(--ui-text-secondary)' }, children: `Attempted ${counted} / ${secMeta.attempt_limit} counted — further answers in this section don't score` })
@@ -776,10 +821,16 @@ function CbtResult({ attemptId, onHome }) {
     evalBusy
       ? jsx('div', { className: 'muted', children: 'Analysing your attempt…' })
       : evalError
-        ? jsxs('div', { className: 'row', children: [
-            jsx('span', { className: 'badge err', children: `Evaluation failed: ${evalError}` }),
-            jsx('button', { type: 'button', onClick: () => void runEval(false), children: 'Retry' }),
-            jsx('button', { type: 'button', onClick: discuss, children: 'Discuss with the agent instead' }),
+        ? jsxs('div', { children: [
+            jsxs('div', { className: 'row', children: [
+              jsx('span', { className: 'badge err', children: 'AI evaluation failed' }),
+              jsx('button', { type: 'button', onClick: () => void runEval(false), children: 'Retry' }),
+              jsx('button', { type: 'button', onClick: discuss, children: 'Discuss with the agent instead' }),
+            ] }),
+            jsxs('details', { style: { marginTop: 6 }, children: [
+              jsx('summary', { className: 'muted', style: { cursor: 'pointer', fontSize: 12 }, children: 'What the model said' }),
+              jsx('pre', { className: 'muted', style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, margin: '6px 0 0' }, children: evalError }),
+            ] }),
           ] })
         : attempt.evaluation
           ? jsxs('div', { children: [
@@ -909,6 +960,9 @@ export default {
     ctxRest = (p, o) => ctx.rest(p, o)
     ctxStorage = ctx.storage
     ctxRunAction = ctx.runAction ? (id) => ctx.runAction(id) : null
+    // Hydrate the stored attempt once at boot: the status-bar countdown is mounted
+    // outside this page and otherwise stays blank until CBT Exams is opened.
+    void readActiveAttempt().then(() => announceActiveAttempt())
     ctx.registerMany([
       { id: 'page', area: ROUTES_AREA, data: { path: '/cbt' }, render: () => jsx(CbtPage, {}) },
       { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/cbt', label: 'CBT Exams', codicon: 'checklist' } },

@@ -42,6 +42,10 @@ class PackTests(unittest.TestCase):
         self.assertEqual(sm["exam_id"], "gat-b-demo")
         self.assertEqual(sm["question_count"], 6)
         self.assertEqual(sm["sections"][1]["attempt_limit"], 2)
+        # the panel's Marks column reads these — omitting them rendered "+undefined"
+        self.assertEqual(sm["sections"][0]["marks_correct"], 1)
+        self.assertEqual(sm["sections"][1]["marks_correct"], 3)
+        self.assertEqual(sm["sections"][1]["marks_wrong"], -1)
 
 if __name__ == "__main__":
     unittest.main()

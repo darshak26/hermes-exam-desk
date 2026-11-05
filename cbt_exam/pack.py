@@ -309,6 +309,8 @@ def summarize(pack):
             "question_count": len(pack["questions"]),
             "sections": [{"id": s["id"], "title": s["title"],
                           "question_count": s["question_count"],
-                          "attempt_limit": s.get("attempt_limit")} for s in pack["pattern"]["sections"]],
+                          "attempt_limit": s.get("attempt_limit"),
+                          "marks_correct": s.get("marks_correct"),
+                          "marks_wrong": s.get("marks_wrong")} for s in pack["pattern"]["sections"]],
             "provenance": pack.get("provenance"), "source_url": pack.get("source_url"),
             "warnings": lint_pack(pack)}

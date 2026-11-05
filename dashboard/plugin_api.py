@@ -16,7 +16,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 _pkg = Path(__file__).resolve().parents[1] / "cbt_exam"
 _name = "_cbt_exam_http"
@@ -201,18 +201,30 @@ def evaluate(aid: str, force: bool = False):
         raise HTTPException(503, "AI unavailable: the cbt-exam agent half is not loaded — "
                                  "enable the plugin in plugins.enabled and restart the gateway")
     blob = prompt_mod.evaluation_input(pack, a)
-    try:
-        r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
-                                    input=[{"type": "text", "text": blob}],
-                                    json_schema=prompt_mod.EVAL_SCHEMA, schema_name="cbt.evaluation",
-                                    temperature=0.2, max_tokens=2000, timeout=180,
-                                    purpose="cbt-exam.evaluate")
-    except Exception as e:
-        raise HTTPException(502, f"LLM call failed: {e}")
-    data = prompt_mod.validate_evaluation(r.parsed)
+    data, model, provider, last_err = None, "", "", None
+    # Degrade through the structured shapes providers actually support: a schema,
+    # then json_object, then plain text with the JSON dug out of the reply. Atlas /
+    # opencode-go answers a json_schema request with 400 "not yet supported".
+    for extra in ({"json_schema": prompt_mod.EVAL_SCHEMA, "schema_name": "cbt.evaluation"},
+                  {"json_mode": True, "schema_name": "cbt.evaluation"},
+                  {}):
+        try:
+            r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
+                                        input=[{"type": "text", "text": blob}],
+                                        temperature=0.2, max_tokens=2000, timeout=180,
+                                        purpose="cbt-exam.evaluate", **extra)
+        except Exception as e:                          # provider refused this shape
+            last_err = e
+            continue
+        parsed = r.parsed if isinstance(r.parsed, dict) else prompt_mod.parse_json_block(getattr(r, "text", ""))
+        data = prompt_mod.validate_evaluation(parsed)
+        if data is not None:
+            model, provider = getattr(r, "model", ""), getattr(r, "provider", "")
+            break
+        last_err = ValueError("model returned unparseable evaluation")
     if data is None:
-        raise HTTPException(502, "model returned unparseable evaluation")
-    a["evaluation"] = {"data": data, "model": r.model, "provider": r.provider,
+        raise HTTPException(502, f"evaluation failed: {last_err}")
+    a["evaluation"] = {"data": data, "model": model, "provider": provider,
                        "generated_at": time.time()}
     store_mod.save_attempt(a, durable=True)
     return a["evaluation"]

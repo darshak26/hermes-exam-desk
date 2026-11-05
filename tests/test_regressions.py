@@ -324,7 +324,7 @@ class Evaluation(Base):
                     model="m", provider="p")
 
         m = types.ModuleType("cbt_exam_ctx_bridge")
-        m.ctx = types.SimpleNamespace(llm=Fake())
+        setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
         sys.modules["cbt_exam_ctx_bridge"] = m
         try:
             aid = self.start()
@@ -336,6 +336,63 @@ class Evaluation(Base):
             self.assertEqual(len(calls), 2)
         finally:
             sys.modules.pop("cbt_exam_ctx_bridge", None)
+
+    def _fake_llm(self, behaviour):
+        """Install a fake bridge for the duration of one test."""
+        import types
+        calls = []
+
+        class Fake:
+            def complete_structured(self, **kw):
+                calls.append(kw)
+                return behaviour(kw)
+
+        m = types.ModuleType("cbt_exam_ctx_bridge")
+        setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
+        sys.modules["cbt_exam_ctx_bridge"] = m
+        self.addCleanup(lambda: sys.modules.pop("cbt_exam_ctx_bridge", None))
+        return calls
+
+    GOOD = {"overall_comment": "ok", "sections": [{"section_id": "A", "comment": "c"}],
+            "weak_topics": [], "wrong_answer_notes": [], "study_plan": ["revise"]}
+
+    def test_evaluation_falls_back_when_provider_rejects_json_schema(self):
+        """Atlas answers a json_schema request with 400 'not yet supported' — the
+        evaluation must still arrive via json_object instead of failing."""
+        import types
+
+        def behaviour(kw):
+            if kw.get("json_schema") is not None:
+                raise RuntimeError("400 this feature is not yet supported by atlas")
+            return types.SimpleNamespace(parsed=self.GOOD, text="", model="m", provider="p")
+
+        calls = self._fake_llm(behaviour)
+        aid = self.start()
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(len(calls), 2)                  # schema attempt, then json_object
+        self.assertIsNotNone(calls[1].get("json_mode"))
+        self.assertEqual(r.json()["data"]["overall_comment"], "ok")
+
+    def test_evaluation_parses_json_out_of_plain_text_as_the_last_resort(self):
+        """Provider refuses every response_format: dig the JSON out of the reply."""
+        import json as _json
+        import types
+
+        def behaviour(kw):
+            if kw.get("json_schema") is not None or kw.get("json_mode"):
+                raise RuntimeError("response_format unsupported")
+            return types.SimpleNamespace(parsed=None, text="Sure:\n" + _json.dumps(self.GOOD) + "\nDone",
+                                         model="m", provider="p")
+
+        calls = self._fake_llm(behaviour)
+        aid = self.start()
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(r.json()["data"]["study_plan"], ["revise"])
 
     def test_evaluate_refuses_before_submit(self):
         aid = self.start()
