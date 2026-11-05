@@ -1,5 +1,5 @@
 // cbt-exam — exam-agnostic CBT practice panel (route /cbt)
-import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, useQuery } from '@hermes/plugin-sdk'
+import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useState } from 'react'
 
@@ -25,6 +25,11 @@ const CSS = `
 .cbt .sw.ok{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
 .cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt h3{font-size:13px;margin:14px 0 6px}
+.cbt input[type=text]{font:inherit;color:inherit;background:var(--ui-surface-background,#fff);border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:6px 10px;min-width:280px}
+.cbt .opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;margin:8px 0;cursor:pointer;background:var(--ui-surface-background,#fff)}
+.cbt .opt input{margin-top:2px}
+.cbt .opt.sel{border-color:var(--ui-accent)}
+.cbt .opt{text-align:left;max-width:640px}
 .cbt-shell{display:grid;height:100%;min-height:0;
   grid-template-columns:minmax(0,1fr) 358px;
   grid-template-rows:44px 40px minmax(0,1fr) 48px;
@@ -44,7 +49,8 @@ const CSS = `
 .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt-chip.s-answered-marked{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-accent) 18%,transparent)}
 .cbt-qbody{max-width:860px;margin:0 auto;padding:24px 28px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt-actions{display:flex;gap:8px;align-items:center;padding:0 16px}
+.cbt-actions{display:flex;gap:8px;align-items:center;padding:0 16px;flex-wrap:wrap}
+.cbt-actions button{text-align:left}
 .cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr) 24px}
 .cbt-shell.pal-collapsed .cbt-pal-inner{display:none}
 .cbt-head{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--ui-stroke-secondary)}
@@ -231,13 +237,107 @@ function chipState(qid, answered, visited, marked) {
 
 function CbtExam({ attemptId, onResult }) {
   const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`), refetchInterval: 30000 })
+  const qc = useQueryClient()
   const [curSec, setCurSec] = useState(null)
   const [curQid, setCurQid] = useState(null)
   const [palCollapsed, setPalCollapsed] = useState(false)
   const [showPaper, setShowPaper] = useState(false)
+  const [sel, setSel] = useState(null)
+  const [confirming, setConfirming] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [subDone, setSubDone] = useState(false)
+  const [base, setBase] = useState({ t: Date.now(), left: null })
+  const [, setTick] = useState(0)
+  const serverLeft = q.data?.remaining_seconds ?? 0
+  const status = q.data?.attempt?.status
+  const shown = status === 'in_progress' && q.data && base.left != null
+    ? Math.max(0, base.left - (Date.now() - base.t) / 1000)
+    : 0
+  const adopt = resp => {
+    qc.setQueryData(['cbt', 'attempt', attemptId], resp)
+  }
+  const doSubmit = async () => {
+    if (submitting || subDone) return
+    setSubmitting(true)
+    try {
+      const resp = await rest(`/attempts/${attemptId}/submit`, { method: 'POST' })
+      adopt(resp)
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+      setSubDone(true)
+      onResult(attemptId)
+    } catch (e) {
+      host.notifyError?.(`Submit failed: ${e?.message || e}`)
+      setSubmitting(false)
+    }
+  }
+  useEffect(() => { setBase({ t: Date.now(), left: serverLeft }) }, [serverLeft])
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(iv)
+  }, [])
+  useEffect(() => {
+    const d = q.data
+    if (!d || d.attempt?.status !== 'in_progress') return
+    const qid = curQid && d.pack.questions.some(x => x.id === curQid)
+      ? curQid
+      : (d.pack.questions.find(x => x.section === (curSec || d.pack.pattern.sections[0].id)) || d.pack.questions[0]).id
+    const saved = d.attempt.answers[qid]
+    setSel(saved === undefined ? null : saved)
+  }, [curQid, curSec, q.data?.attempt?.answers?.[curQid]])
+  useEffect(() => {
+    if (status === 'in_progress' && q.data && base.left != null && shown <= 0 && !submitting && !subDone) {
+      setSel(null)
+      void doSubmit()
+    }
+  }, [shown <= 0, status, subDone, submitting])
   if (q.isLoading) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'loading…' }) })
   if (q.isError) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'could not load attempt' }) })
-  const { attempt, pack, remaining_seconds } = q.data
+  const { attempt, pack } = q.data
+  const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
+  const sections = pack.pattern.sections
+  const activeSecId = curSec || sections[0].id
+  const curIdResolved = qmap[curQid] ? curQid : (pack.questions.find(x => x.section === activeSecId) || pack.questions[0]).id
+  const cur = qmap[curIdResolved]
+  const answered = attempt.answers || {}
+  const marked = attempt.marked || []
+  const visited = attempt.visited || []
+  const secQs = sid => pack.questions.filter(x => x.section === sid)
+  const goTo = async qid => {
+    if (!qid || qid === curIdResolved) {
+      if (qid) { setCurQid(qid); setCurSec(qmap[qid].section) }
+      return
+    }
+    setCurQid(qid); setCurSec(qmap[qid].section)
+    try { adopt(await rest(`/attempts/${attemptId}`, { method: 'PATCH', body: { visited: [qid] } })) } catch {}
+  }
+  const neighbors = () => {
+    const all = pack.questions.map(x => x.id)
+    const i = all.indexOf(curIdResolved)
+    return { prev: all[i - 1], next: all[i + 1] }
+  }
+  const act = async kind => {
+    if (submitting) return
+    try {
+      if (kind === 'clear') {
+        adopt(await rest(`/attempts/${attemptId}`, { method: 'PATCH', body: { answers: { [curIdResolved]: null } } }))
+        setSel(null)
+        return
+      }
+      if (kind === 'back' || kind === 'next') {
+        adopt(await rest(`/attempts/${attemptId}`, { method: 'PATCH', body: { visited: [curIdResolved] } }))
+        const t = neighbors()[kind]
+        if (t) { setCurQid(t); setCurSec(qmap[t].section) }
+        return
+      }
+      const payload = { answers: { [curIdResolved]: sel } }
+      if (kind === 'saveMark' || kind === 'markNext') {
+        payload.marked = marked.includes(curIdResolved) ? marked : [...marked, curIdResolved]
+      }
+      adopt(await rest(`/attempts/${attemptId}`, { method: 'PATCH', body: payload }))
+      const t = neighbors().next
+      if (t) { setCurQid(t); setCurSec(qmap[t].section) }
+    } catch (e) { host.notifyError?.(`${kind} failed: ${e?.message || e}`) }
+  }
   if (attempt.status !== 'in_progress') {
     return jsxs('div', { className: 'cbt pad', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
@@ -245,14 +345,6 @@ function CbtExam({ attemptId, onResult }) {
       jsx('button', { type: 'button', onClick: () => onResult(attemptId), children: 'Open result' }),
     ] })
   }
-  const sections = pack.pattern.sections
-  const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
-  const activeSecId = curSec || sections[0].id
-  const cur = qmap[curQid] || pack.questions.find(x => x.section === activeSecId) || pack.questions[0]
-  const answered = attempt.answers || {}
-  const marked = attempt.marked || []
-  const visited = attempt.visited || []
-  const secQs = sid => pack.questions.filter(x => x.section === sid)
   const secCounts = (() => {
     const counts = [0, 0, 0, 0, 0]
     for (const x of secQs(activeSecId)) {
@@ -267,29 +359,53 @@ function CbtExam({ attemptId, onResult }) {
   })()
   const secMeta = sections.find(s => s.id === activeSecId) || {}
   const counted = secQs(activeSecId).filter(x => attempt.answer_seq.includes(x.id)).length
-  const jump = x => { setCurQid(x.id); setCurSec(x.section) }
   const jumpSection = sid => {
     setCurSec(sid)
     const first = secQs(sid)[0]
-    if (first) setCurQid(first.id)
+    goTo(first && first.id)
   }
+  const optRow = (i, text, kind) => {
+    if (kind === 'mcq') {
+      const on = sel === i
+      return jsxs('label', { key: i, className: `opt${on ? ' sel' : ''}`, children: [
+        jsx('input', { type: 'radio', name: curIdResolved, checked: on, onChange: () => setSel(i) }),
+        jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
+      ] })
+    }
+    const on = Array.isArray(sel) && sel.includes(i)
+    return jsxs('label', { key: i, className: `opt${on ? ' sel' : ''}`, children: [
+      jsx('input', { type: 'checkbox', checked: on, onChange: () => setSel(on ? sel.filter(x => x !== i) : [...(sel || []), i]) }),
+      jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
+    ] })
+  }
+  const confirmLines = sections.map(s => {
+    const qs = secQs(s.id)
+    const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
+    return `${s.title}: ${a} answered, ${qs.length - a} not answered`
+  }).join(' · ')
   return jsxs('div', { className: `cbt cbt-shell${attempt.mode === 'assisted' ? ' assisted' : ''}${palCollapsed ? ' pal-collapsed' : ''}` }, [
     jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       jsx('strong', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
       jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
-      jsx('strong', { style: { fontVariantNumeric: 'tabular-nums' }, children: `Remaining Time: ${fmtHMS(remaining_seconds)}` }),
+      jsx('strong', { style: { fontVariantNumeric: 'tabular-nums' }, children: `Remaining Time: ${fmtHMS(shown)}` }),
     ] }),
     jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: sections.map(s =>
       jsx('button', { key: s.id, type: 'button', className: s.id === activeSecId ? 'on' : '', onClick: () => jumpSection(s.id), children: s.title })) }),
     jsx('div', { className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
       jsxs('div', { className: 'muted', children: [
         `Question ${cur.id} · ${QTYPE_LABEL[cur.type] || cur.type}`,
-        cur.type === 'mcq' || cur.type === 'msq' ? ` · +${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` : '',
+        cur.type !== 'nat' ? ` · +${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` : '',
       ] }),
       jsx('p', { style: { fontSize: 16, marginTop: 8 }, children: cur.text }),
-      jsx('div', { className: 'muted', children: 'Answer controls land in the next step.' }),
+      cur.type === 'nat'
+        ? jsx('input', {
+            type: 'text', inputMode: 'decimal', placeholder: 'Your answer',
+            value: sel == null ? '' : String(sel),
+            onChange: e => setSel(e.target.value),
+          })
+        : cur.options.map((o, i) => optRow(i, o, cur.type)),
     ] }),
     jsx('div', { className: 'cbt-pal', style: { gridArea: 'pal' }, children: [
       jsx('div', { className: 'cbt-pal-wrap', children: [
@@ -307,14 +423,14 @@ function CbtExam({ attemptId, onResult }) {
                 const st = chipState(x.id, answered, visited, marked)
                 return jsx('button', {
                   key: x.id, type: 'button',
-                  className: `cbt-chip ${st}${x.id === cur.id ? ' cur' : ''}`,
-                  style: x.id === cur.id ? { outline: '2px solid var(--ui-accent)', outlineOffset: '1px' } : undefined,
-                  onClick: () => jump(x),
+                  className: `cbt-chip ${st}`,
+                  style: x.id === curIdResolved ? { outline: '2px solid var(--ui-accent)', outlineOffset: '1px' } : undefined,
+                  onClick: () => goTo(x.id),
                   children: st === 's-answered-marked' ? `${i + 1}✓` : String(i + 1),
                 })
               }) }),
             ] })) }),
-          jsx('div', { className: 'cbt-pal-submit', children: jsx('button', { type: 'button', style: { width: '100%' }, children: 'Submit' }) }),
+          jsx('div', { className: 'cbt-pal-submit', children: jsx('button', { type: 'button', style: { width: '100%' }, onClick: () => setConfirming(true), children: 'Submit' }) }),
         ] }),
         jsx('button', {
           type: 'button', className: 'cbt-pal-toggle',
@@ -323,8 +439,18 @@ function CbtExam({ attemptId, onResult }) {
         }),
       ] }),
     ] }),
-    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: [
-      jsx('span', { className: 'muted', children: 'actions bar — next step' }),
+    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: confirming ? [
+      jsx('strong', { key: 'q', children: 'Submit?' }), jsx('span', { key: 's', className: 'muted', children: confirmLines }),
+      jsx('button', { key: 'y', type: 'button', className: 'primary', disabled: submitting, onClick: () => void doSubmit(), children: submitting ? 'Submitting…' : 'Confirm submit' }),
+      jsx('button', { key: 'n', type: 'button', disabled: submitting, onClick: () => setConfirming(false), children: 'Keep answering' }),
+    ] : [
+      jsx('button', { key: 'sn', type: 'button', onClick: () => void act('saveNext'), children: 'Save & Next' }),
+      jsx('button', { key: 'sm', type: 'button', onClick: () => void act('saveMark'), children: 'Save & Mark for Review' }),
+      jsx('button', { key: 'cr', type: 'button', onClick: () => void act('clear'), children: 'Clear Response' }),
+      jsx('button', { key: 'mn', type: 'button', onClick: () => void act('markNext'), children: 'Mark for Review & Next' }),
+      jsx('span', { key: 'sp', style: { flex: 1 } }),
+      jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), children: '<< Back' }),
+      jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), children: 'Next >>' }),
     ] }),
     showPaper && jsxs('div', {
       style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
@@ -376,6 +502,22 @@ function CbtPage() {
   ] })
 }
 
+function TimerChip() {
+  const q = useQuery({
+    queryKey: ['cbt', 'attempt', activeAttemptId || 'none'],
+    queryFn: () => rest(`/attempts/${activeAttemptId}`),
+    enabled: !!activeAttemptId,
+    refetchInterval: 30000,
+  })
+  const a = q.data?.attempt
+  if (!activeAttemptId || !a || a.status !== 'in_progress') return null
+  return jsx('button', {
+    type: 'button',
+    onClick: () => host.navigate('/cbt'),
+    children: `⏱ ${fmtHMS(q.data.remaining_seconds)}`,
+  })
+}
+
 export default {
   id: 'cbt-exam',
   name: 'CBT Exams',
@@ -387,6 +529,7 @@ export default {
       { id: 'page', area: ROUTES_AREA, data: { path: '/cbt' }, render: () => jsx(CbtPage, {}) },
       { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/cbt', label: 'CBT Exams', codicon: 'checklist' } },
       { id: 'open', area: PALETTE_AREA, data: { id: 'cbt.open', label: 'Open CBT Exams', keywords: ['cbt', 'exam', 'mock'], run: () => host.navigate('/cbt') } },
+      { id: 'timer', area: STATUSBAR_AREAS.right, render: () => jsx(TimerChip, {}) },
     ])
   },
 }
