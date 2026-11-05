@@ -151,7 +151,9 @@ function openExamPane(attemptId, onFinished) {
   try { closeExamPane?.() } catch {}
   closeExamPane = host.openWorkspace(EXAM_PANE_ID, {
     dock: { pane: 'workspace', pos: 'right' },
-    headerVeto: true,
+    // No headerVeto: keep the pane's own tab so there is a visible ✕ to close it
+    // (closing the pane does NOT end the attempt — the status-bar timer and the
+    // Home table's Resume bring it back).
     minWidth: '26rem',
     title: 'CBT Exam',
     onClose: () => { closeExamPane = null },
