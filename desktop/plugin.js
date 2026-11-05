@@ -72,8 +72,11 @@ let ctxStorage = null
 let activeAttemptId = null
 
 async function setActiveAttempt(id) {
-  activeAttemptId = id
-  try { await ctxStorage.set('activeAttempt', id) } catch {}
+  activeAttemptId = id || null
+  try {
+    if (id) await ctxStorage.set('activeAttempt', id)
+    else await ctxStorage.remove('activeAttempt')
+  } catch {}
 }
 async function readActiveAttempt() {
   if (activeAttemptId) return activeAttemptId
@@ -238,7 +241,7 @@ function chipState(qid, answered, visited, marked) {
   return 's-not-visited'
 }
 
-function CbtExam({ attemptId, onResult }) {
+function CbtExam({ attemptId, onResult, onHome }) {
   const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`), refetchInterval: 30000 })
   const qc = useQueryClient()
   const [curSec, setCurSec] = useState(null)
@@ -267,6 +270,7 @@ function CbtExam({ attemptId, onResult }) {
       adopt(resp)
       qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
       setSubDone(true)
+      await setActiveAttempt(null)
       onResult(attemptId)
     } catch (e) {
       host.notifyError?.(`Submit failed: ${e?.message || e}`)
@@ -345,7 +349,10 @@ function CbtExam({ attemptId, onResult }) {
     return jsxs('div', { className: 'cbt pad', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
       jsx('p', { className: 'muted', children: 'This attempt is submitted.' }),
-      jsx('button', { type: 'button', onClick: () => onResult(attemptId), children: 'Open result' }),
+      jsxs('div', { className: 'row', children: [
+        jsx('button', { type: 'button', className: 'primary', onClick: () => onResult(attemptId), children: 'Open result' }),
+        onHome ? jsx('button', { type: 'button', onClick: () => onHome(), children: 'Home' }) : null,
+      ] }),
     ] })
   }
   const secCounts = (() => {
@@ -617,7 +624,24 @@ function CbtResult({ attemptId, onHome }) {
 function CbtPage() {
   const [view, setView] = useState({ name: 'home' })
   useEffect(() => {
-    readActiveAttempt().then(id => { if (id) setView({ name: 'exam', attemptId: id }) })
+    let cancelled = false
+    ;(async () => {
+      const id = await readActiveAttempt()
+      if (!id || cancelled) return
+      // Resume ONLY an attempt that is still running. A stored id from a finished
+      // attempt used to hijack the page into that attempt's old screen (a
+      // "submitted" stub or its result) instead of the start screen.
+      let live = null
+      try { live = await rest(`/attempts/${id}`) } catch { live = null }
+      if (cancelled) return
+      if (live?.attempt?.status === 'in_progress') {
+        // never override a view the user already reached while this was in flight
+        setView(v => (v.name === 'home' ? { name: 'exam', attemptId: id } : v))
+      } else {
+        void setActiveAttempt(null)
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
   return jsx('div', { style: { height: '100%' }, children: [
     jsx('style', { children: CSS }),
@@ -631,7 +655,7 @@ function CbtPage() {
       onBegin: id => setView({ name: 'exam', attemptId: id }),
       onBack: () => setView({ name: 'home' }),
     }),
-    view.name === 'exam' && jsx(CbtExam, { key: view.attemptId, attemptId: view.attemptId, onResult: id => setView({ name: 'result', attemptId: id }) }),
+    view.name === 'exam' && jsx(CbtExam, { key: view.attemptId, attemptId: view.attemptId, onResult: id => setView({ name: 'result', attemptId: id }), onHome: () => setView({ name: 'home' }) }),
     view.name === 'result' && jsx(CbtResult, { key: view.attemptId, attemptId: view.attemptId, onHome: () => setView({ name: 'home' }) }),
   ] })
 }
