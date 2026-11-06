@@ -77,6 +77,10 @@ const CSS = `
   margin:-20px -20px 12px;padding:12px 20px;background:var(--ui-surface-background,#fff);
   border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .kbd{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
+.cbt .dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:60}
+.cbt .dlg-box{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);width:min(560px,92%);max-height:80vh;overflow:auto;border-radius:10px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.cbt .dlg-box .modal-head{margin:-20px -20px 16px}
+.cbt .dlg-box table td.num{text-align:right;font-variant-numeric:tabular-nums}
 /* one paper = one card: title, numbers, then its own history */
 .cbt .card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:16px;margin:0 0 16px}
 .cbt .card-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
@@ -158,8 +162,8 @@ const CSS = `
 .cbt .cbt-actions button.on{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-text-primary);font-weight:600}
 .cbt .cbt-actions button.clear{color:var(--ui-text-secondary)}
 .cbt .cbt-actions button.clear:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt .cbt-actions button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt .cbt-actions button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
+.cbt button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
 /* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
    the screen edge. The header toggle (always in the same place) brings it back. */
@@ -863,6 +867,65 @@ function chipState(qid, answered, visited, marked) {
   return 's-not-visited'
 }
 
+// Submitting is irreversible, so it asks in a dialog that shows the same picture
+// the question map does — what is answered, what is flagged, what is still blank.
+function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDiscard }) {
+  const totals = stats.reduce((n, s) => ({
+    total: n.total + s.total,
+    answered: n.answered + s.answered + s.answered_marked,
+    marked: n.marked + s.marked + s.answered_marked,
+    blank: n.blank + s.not_answered + s.not_visited,
+  }), { total: 0, answered: 0, marked: 0, blank: 0 })
+  return jsx('div', {
+    className: 'dlg', role: 'presentation', onClick: onCancel,
+    children: jsxs('div', {
+      className: 'dlg-box', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Submit the paper',
+      onClick: e => e.stopPropagation(),
+      children: [
+        jsxs('div', { className: 'modal-head', children: [
+          jsx('strong', { children: 'Submit the paper?' }),
+          jsx('span', { className: 'muted', style: { fontSize: 12 }, children: 'this cannot be undone' }),
+          jsx('span', { style: { flex: 1 } }),
+          jsx('span', { className: 'kbd', children: 'Esc' }),
+        ] }),
+        jsxs('div', { className: 'row', style: { marginBottom: 12 }, children: [
+          jsx('span', { className: 'badge', children: `${totals.total} questions` }),
+          jsx('span', { className: 'badge ok', children: `${totals.answered} answered` }),
+          totals.marked
+            ? jsx('span', { className: 'badge acc', title: 'Flagged for review — a flagged question can also be answered', children: `${totals.marked} marked` })
+            : null,
+          totals.blank ? jsx('span', { className: 'badge err', children: `${totals.blank} unanswered` }) : null,
+        ] }),
+        jsxs('table', { children: [
+          jsx('thead', { children: jsx('tr', { children: [
+            jsx('th', { children: 'Section' }),
+            jsx('th', { children: 'Answered' }),
+            jsx('th', { title: 'Flagged for review — can also be answered, so it does not add up with the other columns', children: 'Marked' }),
+            jsx('th', { title: 'Visited but no answer saved', children: 'Blank' }),
+            jsx('th', { title: 'Never opened', children: 'Not visited' }),
+          ] }) }),
+          jsx('tbody', { children: stats.map(x => jsxs('tr', { key: x.id, children: [
+            jsx('td', { children: [x.title, x.limit ? jsx('span', { className: 'muted', children: ` · first ${x.limit} count` }) : null] }),
+            jsx('td', { className: 'num', children: String(x.answered + x.answered_marked) }),
+            jsx('td', { className: 'num', children: String(x.marked + x.answered_marked) }),
+            jsx('td', { className: 'num', children: String(x.not_answered) }),
+            jsx('td', { className: 'num', children: String(x.not_visited) }),
+          ] })) }),
+        ] }),
+        jsx('p', { className: 'muted', style: { marginTop: 12, marginBottom: 0 }, children: unanswered
+          ? `${unanswered} unanswered (blank + not visited) will score 0 — a blank never carries a negative mark.`
+          : 'Every question has an answer saved.' }),
+        jsxs('div', { className: 'row', style: { marginTop: 20 }, children: [
+          jsx('button', { type: 'button', className: 'primary', disabled: submitting, onClick: onSubmit, children: [icon('check'), submitting ? 'Submitting…' : 'Submit paper'] }),
+          jsx('button', { type: 'button', disabled: submitting, autoFocus: true, onClick: onCancel, children: 'Keep answering' }),
+          jsx('span', { style: { flex: 1 } }),
+          jsx('button', { type: 'button', className: 'danger', disabled: submitting, title: 'Throw this attempt away — it is not graded', onClick: onDiscard, children: [icon('trash'), 'Discard'] }),
+        ] }),
+      ],
+    }),
+  })
+}
+
 function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow = false }) {
   const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`), refetchInterval: 30000 })
   const qc = useQueryClient()
@@ -1065,16 +1128,24 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       ] }),
     ] })
   }
-  const confirmLines = sections.length > 1 ? sections.map(s => {
-    const qs = secQs(s.id)
-    const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
-    return `${s.title}: ${a} answered, ${qs.length - a} not answered`
-  }).join(' · ') : ''
   const qIndex = pack.questions.findIndex(x => x.id === curIdResolved) + 1
   const curAnswered = (() => {
     const v = answered[curIdResolved]
     return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
   })()
+  const submitStats = sections.map(s => {
+    const qs = secQs(s.id)
+    const st = { not_visited: 0, not_answered: 0, answered: 0, marked: 0, answered_marked: 0 }
+    for (const x of qs) {
+      const c = chipState(x.id, answered, visited, marked)
+      if (c === 's-not-visited') st.not_visited++
+      else if (c === 's-not-answered') st.not_answered++
+      else if (c === 's-answered') st.answered++
+      else if (c === 's-marked') st.marked++
+      else st.answered_marked++
+    }
+    return { title: s.title, id: s.id, total: qs.length, limit: s.attempt_limit || null, ...st }
+  })
   const unansweredTotal = pack.questions.length
     - pack.questions.filter(x => {
         const v = answered[x.id]
@@ -1224,21 +1295,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
 
       ] }),
     ] }),
-    jsxs('div', { className: `cbt-actions${confirming ? ' confirming' : ''}`, style: { gridArea: 'act' }, children: confirming ? [
-      jsx('span', { key: 'q', className: 'ask', children: [
-        jsx('strong', { children: 'Submit the paper?' }),
-        confirmLines ? jsx('span', { className: 'muted', children: confirmLines }) : null,
-      ] }),
-      unansweredTotal > 0
-        ? jsx('span', { key: 'u', className: 'badge err', children: `${unansweredTotal} unanswered` })
-        : jsx('span', { key: 'u', className: 'badge ok', children: 'all answered' }),
-      jsx('span', { key: 'sp', style: { flex: 1 } }),
-      jsxs('span', { key: 'g1', className: 'act-group', children: [
-        jsx('button', { key: 'y', type: 'button', className: 'primary', disabled: submitting, onClick: () => void doSubmit(), children: [icon('check'), submitting ? 'Submitting…' : 'Confirm submit'] }),
-        jsx('button', { key: 'n', type: 'button', disabled: submitting, onClick: () => setConfirming(false), title: 'Keep answering (Esc)', children: 'Keep answering' }),
-      ] }),
-      jsx('button', { key: 'd', type: 'button', className: 'danger', disabled: submitting, onClick: () => void doDiscard(), title: 'Throw this attempt away — it is not graded', children: [icon('trash'), 'Discard'] }),
-    ] : [
+    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: [
       // Three groups, in the order you use them: answer · review · navigate.
       jsxs('span', { key: 'g-answer', className: 'act-group', children: [
         jsx('button', { key: 'sv', type: 'button', onClick: () => void act('saveStay'), title: 'Save the answer and stay (S)', children: [icon('save'), 'Save'] }),
@@ -1275,6 +1332,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), title: 'Next question (→)', children: ['Next', icon('chevron-right')] }),
       ] }),
     ] }),
+    confirming && jsx(SubmitDialog, {
+      stats: submitStats, unanswered: unansweredTotal, submitting,
+      onCancel: () => setConfirming(false),
+      onSubmit: () => void doSubmit(),
+      onDiscard: () => void doDiscard(),
+    }),
     showPaper && jsxs('div', {
       style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
       onClick: () => setShowPaper(false),
