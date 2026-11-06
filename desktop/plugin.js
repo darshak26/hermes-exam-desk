@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from 'react'
 
 const CSS = `
 .cbt{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary,#222);font:13px/1.5 var(--font-sans,system-ui)}
+/* Exam convention: violet = flagged for review. The theme accent is neutral grey in
+   most themes here, so marked gets its own hue. It is a fixed violet mixed toward the
+   theme foreground, which keeps it legible on both light and dark instead of being a
+   literal that only works in one. */
+.cbt{--cbt-mark:color-mix(in srgb, #8b5cf6 82%, var(--ui-text-primary, #161616))}
 .cbt *{box-sizing:border-box}
 .cbt .muted{color:var(--ui-text-secondary,#666)}
 /* Spacing scale: 4 8 12 16 24 32. Every padding/gap/margin below is a step or a
@@ -110,9 +115,10 @@ const CSS = `
 .cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
 .cbt .sw.err{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 18%,transparent)}
 .cbt .sw.ok{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 18%,transparent)}
-.cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
+.cbt .sw.acc{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent)}
 .cbt .sw.current{box-shadow:0 0 0 2px var(--ui-accent);border-color:transparent;background:transparent}
-.cbt .sw.acc2{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
+.cbt .sw.acc2{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent);position:relative}
+.cbt .sw.acc2::after{content:'✓';position:absolute;inset:0;font-size:9px;line-height:11px;text-align:center;color:var(--ui-success, #10b981);font-weight:700}
 .cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
 .cbt p{margin:0 0 16px;max-width:70ch}
 .cbt p.note{margin:0 0 8px}
@@ -156,8 +162,9 @@ const CSS = `
 .cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
 .cbt .cbt-chip.s-not-answered{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 16%,transparent)}
 .cbt .cbt-chip.s-answered{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 16%,transparent)}
-.cbt .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
-.cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
+.cbt .cbt-chip.s-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent)}
+.cbt .cbt-chip.s-answered-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent)}
+.cbt .cbt-chip .tick{color:var(--ui-success, #10b981);font-weight:700;font-size:9px;margin-left:1px;vertical-align:1px}
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
 .cbt-actions{display:flex;gap:16px;row-gap:10px;align-items:center;padding:10px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary);background:var(--ui-surface-background,#fff)}
 .cbt .act-group{display:flex;gap:8px;align-items:center;min-width:0}
@@ -416,17 +423,17 @@ function marksLabel(section, pattern) {
 // Short labels + a right-aligned count in a fixed grid: the key used to reflow
 // every time a count changed width, which is what made the panel feel jumpy.
 const LEGEND = [
-  ['', 'Not visited'],
-  ['err', 'Not answered'],
-  ['ok', 'Answered'],
-  ['acc', 'Marked'],
-  ['acc2', 'Answered + marked'],
+  ['', 'Not visited', 'Not opened yet'],
+  ['err', 'Not answered', 'Visited, left blank'],
+  ['ok', 'Answered', 'Answer saved'],
+  ['acc', 'Marked', 'Flagged for review, no answer'],
+  ['acc2', 'Answered + marked', 'Answered and flagged — counts'],
 ]
 
 function legendNode(counts) {
   return jsx('div', { className: 'legend', children: [
-    ...LEGEND.map(([cls, label], i) =>
-      jsxs('span', { key: label, className: 'item', children: [
+    ...LEGEND.map(([cls, label, hint], i) =>
+      jsxs('span', { key: label, className: 'item', title: hint, children: [
         jsx('span', { className: `sw ${cls}` }),
         jsx('span', { className: 'lbl', children: label }),
         counts ? jsx('span', { className: 'n', children: counts[i] }) : null,
@@ -1299,7 +1306,9 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
                   style: x.id === curIdResolved ? { outline: '2px solid var(--ui-accent)', outlineOffset: '1px' } : undefined,
                   title: `Question ${i + 1}`,
                   onClick: () => goTo(x.id),
-                  children: st === 's-answered-marked' ? `${i + 1}✓` : String(i + 1),
+                  children: st === 's-answered-marked'
+                    ? [String(i + 1), jsx('span', { key: 't', className: 'tick', children: '✓' })]
+                    : String(i + 1),
                 })
               }) }),
             ] })
