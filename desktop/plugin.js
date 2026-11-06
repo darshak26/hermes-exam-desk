@@ -74,6 +74,7 @@ const CSS = `
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 24px;font-size:15px;line-height:1.6;overflow:auto}
 .cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
+.cbt-actions .nav{flex-wrap:nowrap;margin-left:auto}
 .cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr) 24px}
 .cbt-shell.pal-collapsed .cbt-pal-inner{display:none}
 .cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
@@ -725,9 +726,11 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       jsx('button', { key: 'sm', type: 'button', onClick: () => void act('saveMark'), children: marked.includes(curIdResolved) ? 'Save & Unmark' : 'Save & Mark for Review' }),
       jsx('button', { key: 'cr', type: 'button', onClick: () => void act('clear'), children: 'Clear Response' }),
       jsx('button', { key: 'mn', type: 'button', onClick: () => void act('markNext'), children: marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark for Review & Next' }),
-      jsx('span', { key: 'sp', style: { flex: 1 } }),
-      jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), children: '<< Back' }),
-      jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), children: 'Next >>' }),
+      // nav pair travels as one unit: wrapped alone it must not split Back from Next
+      jsxs('span', { key: 'nav', className: 'row nav', children: [
+        jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), children: '<< Back' }),
+        jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), children: 'Next >>' }),
+      ] }),
     ] }),
     showPaper && jsxs('div', {
       style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
