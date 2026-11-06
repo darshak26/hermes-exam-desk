@@ -162,16 +162,22 @@ const CSS = `
 /* options span the reading column so their right edge matches the question text */
 .cbt .opt{text-align:left;max-width:100%}
 .cbt .cbt-qbody p{max-width:none}
+/* The shell's tracks are declared once and each variant only overrides the parts
+   it changes. Composing them this way is what keeps "palette hidden" and "single
+   section" from fighting: written as whole templates, a 4-area variant applied on
+   top of a 3-row one leaves the leftover 1fr on an empty row, which pushes the
+   question to the bottom of the window. */
 .cbt-shell{display:grid;height:100%;min-height:0;
-  grid-template-columns:minmax(0,1fr) 358px;
+  --cols:minmax(0,1fr) 358px;
   /* auto (not fixed px) rows: in a narrow pane the head wraps to two lines and the
      action row wraps to two, and a fixed row clips the overflow off the pane. */
-  grid-template-rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
-  grid-template-areas:"head head" "tabs pal" "body pal" "act pal";}
+  --rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
+  --areas:"head head" "tabs pal" "body pal" "act pal";
+  grid-template-columns:var(--cols);grid-template-rows:var(--rows);grid-template-areas:var(--areas);}
 /* A single-section paper has nothing to switch between, so the tab row is not
    rendered and its band must not be reserved either. */
-.cbt-shell.single-sec{grid-template-rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);
-  grid-template-areas:"head head" "body pal" "act pal";}
+.cbt-shell.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);
+  --areas:"head head" "body pal" "act pal";}
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
 .cbt .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
@@ -196,7 +202,8 @@ const CSS = `
 .cbt-actions button{text-align:left;justify-content:flex-start}
 /* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
    the screen edge. The header toggle (always in the same place) brings it back. */
-.cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
+.cbt-shell.pal-collapsed{--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act"}
+.cbt-shell.pal-collapsed.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);--areas:"head" "body" "act"}
 .cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cbt .submit-head{border-color:color-mix(in srgb,var(--ui-accent) 55%,var(--ui-stroke-secondary));font-weight:600}
@@ -223,9 +230,9 @@ const CSS = `
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
 /* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
    question keeps its full width instead of being squeezed by a fixed 358px column. */
-.cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act";
-  grid-template-rows:auto auto minmax(0,1fr) auto}
-.cbt-shell.narrow.single-sec{grid-template-areas:"head" "body" "act";grid-template-rows:auto minmax(0,1fr) auto}
+.cbt-shell.narrow{position:relative;--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act";
+  --rows:auto auto minmax(0,1fr) auto}
+.cbt-shell.narrow.single-sec{--areas:"head" "body" "act";--rows:auto minmax(0,1fr) auto}
 .cbt .pal-sec-head{display:flex;align-items:baseline;gap:8px;margin:12px 12px 6px}
 .cbt .pal-sec-head strong{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary)}
 .cbt .pal-sec-head span{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary);margin-left:auto}
