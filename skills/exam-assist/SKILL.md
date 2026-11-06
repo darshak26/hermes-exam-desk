@@ -2,7 +2,7 @@
 name: exam-assist
 description: Answer mid-exam doubts using the cbt live question context.
 version: 0.1.0
-author: Swapnil Dilip Padmane, Hermes Agent
+author: Swapnil Padmane (darshak26)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:

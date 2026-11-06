@@ -1,6 +1,8 @@
 # cbt-exam
 
-Exam-agnostic CBT practice panel for Hermes Desktop. A question pack is data — the
+Exam-agnostic CBT practice panel for Hermes Desktop. Built with Hermes Agent:
+the panel, the backend and both skills were written in an agent session, and the
+commit history is the record of that work. A question pack is data — the
 pattern (sections, attempt limits, marking) lives in JSON, so a new exam is a new
 file, not new code.
 

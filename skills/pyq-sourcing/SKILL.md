@@ -2,7 +2,7 @@
 name: pyq-sourcing
 description: Source PYQ papers and exam patterns into cbt-exam packs.
 version: 0.1.0
-author: Swapnil Dilip Padmane, Hermes Agent
+author: Swapnil Padmane (darshak26)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
