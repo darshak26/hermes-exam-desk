@@ -595,26 +595,32 @@ const SOURCE_PROMPT = 'Load the skill cbt-exam:pyq-sourcing and help me add a pa
   + 'Ask me which exam and which year first — one question at a time — then find the '
   + 'official paper, validate it and file it.'
 
-// Stage, then send if the chat will take a send: a fresh chat ignores submit() until
-// its first turn exists, so this opens one and retries briefly instead of dropping
-// the turn on the floor.
+// Send the turn straight into a chat — never through the composer draft, so the
+// prompt cannot end up sitting in the input box as well as being sent. The retry
+// window is long on purpose: a fresh chat mounts its composer asynchronously, and
+// giving up early is what used to fall back to pasting the text.
 async function launchSourcing() {
   goToChat()
   await new Promise(done => setTimeout(done, 250))
-  if (!host.state.activeSessionId.get()) {
-    try { host.newChat?.() } catch { /* older desktop */ }
-    await new Promise(done => setTimeout(done, 350))
+  const hadSession = !!host.state.activeSessionId.get()
+  if (!hadSession) {
+    try { host.newChat?.() } catch { /* older desktop without newChat */ }
+    await new Promise(done => setTimeout(done, 500))
   }
-  await stageInChat(SOURCE_PROMPT)
-  // 'new' is the documented address for the draft that has no session yet — the
-  // primary composer while it shows none. Passing null (the active composer) is
-  // what failed closed before.
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 30; i++) {
     const addr = host.state.activeSessionId.get() || 'new'
-    try { if (host.composer.submit?.(addr, SOURCE_PROMPT)) return true } catch { /* keep the draft */ }
+    try {
+      if (host.composer.submit?.(addr, SOURCE_PROMPT)) {
+        // belt and braces: a surface that echoed the text into its own draft would
+        // otherwise leave a duplicate waiting for Enter
+        try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
+        return true
+      }
+    } catch { /* composer not mounted yet */ }
     await new Promise(done => setTimeout(done, 250))
   }
-  return false      // the draft is staged; one Enter finishes it
+  host.notify?.({ kind: 'error', message: 'Could not start the sourcing chat — the composer never mounted.' })
+  return false
 }
 
 async function primeAssistedChat(attemptId) {
