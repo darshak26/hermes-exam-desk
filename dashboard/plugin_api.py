@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 
 _pkg = Path(__file__).resolve().parents[1] / "cbt_exam"

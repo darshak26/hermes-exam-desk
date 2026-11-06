@@ -145,6 +145,55 @@ class PackIntegrity(Base):
         self.assertEqual(pack_mod.validate_pack(p), [])      # warnings are not errors
 
 
+class ProvenanceRule(Base):
+    """The rule is "you can say where this came from", not "there is a URL"."""
+
+    def test_a_self_written_question_needs_a_note_not_a_url(self):
+        p = base_pack()
+        p.pop("source_url", None)
+        for q in p["questions"]:
+            q.pop("source_url", None)
+            q["provenance"] = "written by the teacher, 2026"
+        self.assertEqual(pack_mod.validate_pack(p), [])
+
+    def test_a_question_with_neither_is_still_refused(self):
+        p = base_pack()
+        p["questions"][0].pop("source_url", None)
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("source_url or a provenance note" in e for e in errs), errs)
+
+    def test_bundled_demo_pack_is_valid_and_lint_clean(self):
+        demo = json.loads((Path(__file__).resolve().parents[1] / "packs" / "demo-basics.json").read_text())
+        self.assertEqual(pack_mod.validate_pack(demo), [])
+        self.assertEqual(pack_mod.lint_pack(demo), [])
+
+
+class SeedPacks(Base):
+    """A fresh install must not open on an empty panel."""
+
+    def test_seed_copies_the_demo_once_and_never_overwrites(self):
+        import importlib.util
+        root = Path(__file__).resolve().parents[1]
+        spec = importlib.util.spec_from_file_location("cbt_init_under_test", root / "__init__.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with tempfile.TemporaryDirectory() as tmp:
+            old = os.environ.get("CBT_EXAM_DATA_DIR")
+            os.environ["CBT_EXAM_DATA_DIR"] = tmp
+            try:
+                mod._seed_packs()
+                target = Path(tmp) / "packs" / "demo-basics.json"
+                self.assertTrue(target.exists())
+                target.write_text('{"mine": true}')
+                mod._seed_packs()                      # second start
+                self.assertEqual(target.read_text(), '{"mine": true}')
+            finally:
+                if old is None:
+                    os.environ.pop("CBT_EXAM_DATA_DIR", None)
+                else:
+                    os.environ["CBT_EXAM_DATA_DIR"] = old
+
+
 class AnswerSemantics(Base):
     def test_whitespace_nat_answer_is_a_clear_not_a_wrong_answer(self):
         """0.2.0: " " counted as answered and scored -1."""

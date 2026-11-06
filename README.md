@@ -14,13 +14,51 @@ Three parts:
 
 ## Install
 
+> **The repo is private while it is being built.** Installing from it needs access —
+> authenticate first (`gh auth login`, or an SSH key GitHub knows), or clone it and
+> install from the local path (`hermes plugins install file:///path/to/hermes-cbt-exam`).
+> Nothing below is reachable for someone without that access.
+
+Two halves, and they install in different places — this trips people up, so read both.
+
+**1. The agent half** (API routes, pack store, the two skills) goes where Hermes runs:
+
 ```bash
 hermes plugins install https://github.com/darshak26/hermes-cbt-exam
-hermes plugins enable cbt-exam          # add to plugins.enabled in config.yaml
+hermes plugins enable cbt-exam
 ```
 
-Restart the gateway once so the agent half loads; the desktop app picks up
-`desktop/plugin.js` on its own reload.
+The skills load on the next gateway start. `hermes gateway restart` is the clean way;
+if you are mid-conversation and would rather not drop it, the panel works with the
+Python half alone and the AI evaluation appears after the restart.
+
+**2. The desktop half** (the panel itself) is a separate switch. It ships **disabled
+on purpose** — a dropped package stays inert until you say otherwise:
+
+- **Hermes on this machine:** it is already copied to
+  `~/.hermes/desktop-plugins/cbt-exam/`. Open **Capabilities → Plugins**, find
+  *CBT Exams* under Desktop, and enable it.
+- **Hermes on another machine** (a VPS, with the desktop app on your laptop): the
+  app's copy does not exist yet — the Plugins page shows *unavailable (remote
+  backend)*. Install again from the app with **Desktop** as the target
+  (*Install from Git* in the same page, or a `hermes://plugin/install?repo=…` link
+  with the desktop component checked). Enabling it on the server does not help; the
+  panel runs in the app's renderer.
+
+Then open **CBT Exams** in the sidebar, or ⌘K → *Open CBT Exams*.
+
+## First run
+
+Nothing in the panel needs a model. A bundled 6-question demo paper is seeded on
+first start so the panel is not empty — two sections, one multi-select, one
+numerical, marking on. Use it to see how the timer, palette and result page behave,
+then delete it.
+
+For real papers, click **Source more papers**: it opens a chat and the agent runs
+`cbt-exam:pyq-sourcing` — it asks which exam and which year (one question at a time),
+finds the official paper, extracts the questions, validates and files them. That
+needs web tools enabled on the agent; without them, write a pack by hand against
+`skills/pyq-sourcing/references/pack-schema.md` and drop it in the packs directory.
 
 ## Packs
 

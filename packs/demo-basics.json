@@ -1,0 +1,127 @@
+{
+ "schema": "cbt-pack/1",
+ "exam_id": "demo-basics",
+ "title": "Demo paper \u2014 how this panel works",
+ "body": "bundled sample",
+ "language": "en",
+ "provenance": "bundled demo, written for this plugin \u2014 not a previous-year paper. Delete it once you have sourced a real one.",
+ "pattern": {
+  "duration_minutes": 15,
+  "sections": [
+   {
+    "id": "A",
+    "title": "Warm-up",
+    "question_count": 3,
+    "attempt_limit": null,
+    "marks_correct": 1,
+    "marks_wrong": -0.25,
+    "marks_unanswered": 0
+   },
+   {
+    "id": "B",
+    "title": "Mixed types",
+    "question_count": 3,
+    "attempt_limit": null,
+    "marks_correct": 2,
+    "marks_wrong": -0.5,
+    "marks_unanswered": 0
+   }
+  ]
+ },
+ "questions": [
+  {
+   "id": "A-01",
+   "section": "A",
+   "type": "mcq",
+   "topic": "Cell biology",
+   "text": "Which organelle is the main site of ATP synthesis in a eukaryotic cell?",
+   "options": [
+    "Mitochondrion",
+    "Ribosome",
+    "Golgi apparatus",
+    "Lysosome"
+   ],
+   "answer": 0,
+   "explanation": "Oxidative phosphorylation happens on the inner mitochondrial membrane.",
+   "provenance": "bundled demo question, written for this plugin"
+  },
+  {
+   "id": "A-02",
+   "section": "A",
+   "type": "mcq",
+   "topic": "Acids and bases",
+   "text": "A solution of pH 3 is how many times more acidic than a solution of pH 5?",
+   "options": [
+    "2\u00d7 as acidic",
+    "10\u00d7 as acidic",
+    "100\u00d7 as acidic",
+    "1000\u00d7 as acidic"
+   ],
+   "answer": 2,
+   "explanation": "pH is logarithmic: two pH units = a hundredfold difference in hydrogen ion concentration.",
+   "provenance": "bundled demo question, written for this plugin"
+  },
+  {
+   "id": "A-03",
+   "section": "A",
+   "type": "mcq",
+   "topic": "Nucleic acids",
+   "text": "Which base is found in RNA but not in DNA?",
+   "options": [
+    "Uracil",
+    "Adenine",
+    "Guanine",
+    "Cytosine"
+   ],
+   "answer": 0,
+   "explanation": "RNA pairs uracil with adenine where DNA uses thymine.",
+   "provenance": "bundled demo question, written for this plugin"
+  },
+  {
+   "id": "B-01",
+   "section": "B",
+   "type": "msq",
+   "topic": "Nucleic acids",
+   "text": "Select every component of a nucleotide.",
+   "options": [
+    "Phosphate group",
+    "Pentose sugar",
+    "Nitrogenous base",
+    "Amino acid"
+   ],
+   "answer": [
+    0,
+    1,
+    2
+   ],
+   "explanation": "A nucleotide is sugar + base + phosphate; amino acids build proteins, not nucleotides.",
+   "provenance": "bundled demo question, written for this plugin"
+  },
+  {
+   "id": "B-02",
+   "section": "B",
+   "type": "nat",
+   "topic": "Human genetics",
+   "text": "How many chromosomes are in a normal human somatic cell?",
+   "answer": 46,
+   "explanation": "23 pairs: 22 autosomal pairs plus one sex chromosome pair.",
+   "provenance": "bundled demo question, written for this plugin"
+  },
+  {
+   "id": "B-03",
+   "section": "B",
+   "type": "mcq",
+   "topic": "Exam arithmetic",
+   "text": "A 180-minute paper has 60 equally weighted questions. What is the average time per question, in minutes?",
+   "options": [
+    "2 minutes",
+    "3 minutes",
+    "4 minutes",
+    "5 minutes"
+   ],
+   "answer": 1,
+   "explanation": "180 divided by 60 is 3 minutes per question.",
+   "provenance": "bundled demo question, written for this plugin"
+  }
+ ]
+}

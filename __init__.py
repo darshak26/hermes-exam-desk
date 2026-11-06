@@ -5,11 +5,13 @@ plugin `ctx` under a canonical `sys.modules` name, because `dashboard/plugin_api
 is imported as a *separate* module instance by the HTTP mount while running in this
 same process.
 """
+import os
+import shutil
 import sys
 import types
 from pathlib import Path
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 BRIDGE = "cbt_exam_ctx_bridge"
 
 
@@ -23,9 +25,38 @@ def register(ctx):
             if child.is_dir() and skill_md.exists():
                 ctx.register_skill(child.name, skill_md)
 
-    # 2) LLM bridge — the HTTP module looks this up lazily (see plugin_api._llm).
+    # 2) A first-run paper. Without one the panel opens on an empty list and the only
+    #    way forward is the agent sourcing a real paper — a bad first five minutes for
+    #    someone who just installed this. Never overwrites: an existing file of the
+    #    same name is the user's.
+    _seed_packs()
+
+    # 3) LLM bridge — the HTTP module looks this up lazily (see plugin_api._llm).
     module = sys.modules.get(BRIDGE)
     if module is None:
         module = types.ModuleType(BRIDGE)
         sys.modules[BRIDGE] = module
     setattr(module, "ctx", ctx)     # plain ModuleType: attribute set via setattr on purpose
+
+
+def _seed_packs() -> None:
+    """Copy `packs/*.json` from the package into the plugin's data dir, once each."""
+    seed = Path(__file__).parent / "packs"
+    if not seed.is_dir():
+        return
+    try:
+        override = os.environ.get("CBT_EXAM_DATA_DIR")
+        if override:
+            root = Path(override)
+        else:
+            from plugins.plugin_storage import plugin_data_dir
+            root = Path(plugin_data_dir("cbt-exam"))
+        target = root / "packs"
+        target.mkdir(parents=True, exist_ok=True)
+        for src in sorted(seed.glob("*.json")):
+            dst = target / src.name
+            if not dst.exists():
+                shutil.copyfile(src, dst)
+    except Exception:
+        # seeding is a convenience; it must never take registration down with it
+        pass

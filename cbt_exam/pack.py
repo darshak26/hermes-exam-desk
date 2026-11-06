@@ -220,8 +220,10 @@ def validate_pack(pack):
             errs.append(f"{tag}: type must be one of {QTYPES}")
         if not str(q.get("text", "")).strip():
             errs.append(f"{tag}: empty text")
-        if not q.get("source_url"):
-            errs.append(f"{tag}: source_url is required (provenance rule)")
+        # Traceability, not a URL field: a paper someone wrote themselves has no link
+        # to cite, so an explicit provenance note satisfies the same rule.
+        if not (q.get("source_url") or q.get("provenance")):
+            errs.append(f"{tag}: needs source_url or a provenance note")
         if "difficulty" in q and q["difficulty"] not in DIFFICULTIES:
             errs.append(f"{tag}: difficulty must be one of {DIFFICULTIES}")
         opts = q.get("options")
@@ -291,8 +293,8 @@ def validate_pack(pack):
             errs.append(f"section {s.get('id')!r}: question_count {s.get('question_count')} != actual {actual}")
     if not str(pack.get("provenance", "")).strip():
         errs.append("pack-level provenance string is required")
-    if not pack.get("source_url"):
-        errs.append("pack-level source_url is required")
+    if not (pack.get("source_url") or pack.get("provenance")):
+        errs.append("pack-level source_url or provenance is required")
     return errs
 
 
