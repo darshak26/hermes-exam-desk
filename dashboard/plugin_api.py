@@ -216,12 +216,25 @@ def submit(aid: str):
 @router.post("/attempts/{aid}/abandon")
 def abandon(aid: str):
     """Throw away a live attempt: no grading, no answer key, an escape hatch for a
-    sitting you don't want to finish (the clock otherwise runs for hours)."""
+    sitting you don't want to finish (the clock otherwise runs for hours).
+
+    Deliberately does not go through _load(): abandoning must still work when the
+    paper itself has been deleted, which is exactly when a stray live attempt is
+    most likely to exist (its pack is gone, so it can never be graded or resumed)."""
     with store_mod.attempt_lock(aid):
-        a, pack = _load(aid, touch=False)
+        try:
+            a = store_mod.get_attempt(aid)
+        except KeyError:
+            raise HTTPException(404, "no such attempt")
+        except ValueError as e:
+            raise HTTPException(500, f"attempt file is unreadable: {e}")
         if a["status"] == "in_progress":
             a = store_mod.abandon_attempt(a)
-        return _view(a, pack)
+        try:
+            pack_view = store_mod.get_pack_view(a["exam_id"])
+        except (KeyError, ValueError):
+            pack_view = None
+        return {"attempt": a, "pack": pack_view, "remaining_seconds": 0.0}
 
 
 @router.delete("/attempts/{aid}")

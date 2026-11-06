@@ -266,6 +266,20 @@ class DeleteTests(unittest.TestCase):
     def test_delete_unknown_attempt_is_404(self):
         self.assertEqual(client.delete("/attempts/a-doesnotexist").status_code, 404)
 
+    def test_abandon_works_after_the_paper_is_deleted(self):
+        """Deleting a paper strands its live attempts: they can never be graded or
+        resumed, so the escape hatch has to work without the pack in hand."""
+        aid = make_attempt()
+        packs = DATA / "packs"
+        for f in packs.glob("*.json"):
+            f.unlink()
+        r = client.post(f"/attempts/{aid}/abandon")
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(body["attempt"]["status"], "abandoned")
+        self.assertIsNone(body["pack"])
+        self.assertEqual(client.delete(f"/attempts/{aid}").status_code, 200)
+
     def test_prune_keeps_submitted_and_live(self):
         done = self.finished()
         live = make_attempt()
