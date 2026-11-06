@@ -425,12 +425,17 @@ async function stageInChat(text) {
   host.composer.focus(null)
 }
 
-async function primeAssistedChat(attemptId) {
+// Staging text is useless if the composer is not on screen — every caller that
+// wants the user to send something goes to the chat first, then stages.
+async function goToChatAndStage(text) {
   goToChat()
-  const prime = 'Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
-    + attemptId + '). Answer my doubts using the live question context file.'
-  await new Promise(done => setTimeout(done, 300))     // let goToChat mount its composer
-  await stageInChat(prime)
+  await new Promise(done => setTimeout(done, 300))     // let the chat mount its composer
+  await stageInChat(text)
+}
+
+async function primeAssistedChat(attemptId) {
+  await goToChatAndStage('Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
+    + attemptId + '). Answer my doubts using the live question context file.')
 }
 
 // One door for "start a paper", shared by the instructions page and Retake: it
@@ -683,7 +688,9 @@ function CbtHome({ onStart, onResume, onViewResult }) {
     } catch (e) { host.notifyError?.(`Could not load pack: ${e?.message || e}`) }
   }
   const source = async () => {
-    await stageInChat('Load the skill cbt-exam:pyq-sourcing and source <EXAM NAME> <YEAR> previous-year questions into the CBT plugin.')
+    // Sourcing is an agent job, not a form: hand the user a prompt with the two
+    // blanks to fill and let the skill do the fetching, validation and filing.
+    await goToChatAndStage('Load the skill cbt-exam:pyq-sourcing and source <EXAM NAME> <YEAR> previous-year questions into the CBT plugin.')
   }
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
@@ -695,7 +702,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx('span', { className: 'muted', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
       jsx('button', { type: 'button', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
-      jsx('button', { type: 'button', onClick: source, children: 'Source more papers' }),
+      jsx('button', { type: 'button', title: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', onClick: source, children: 'Source more papers' }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'muted', children: 'loading packs…' })
