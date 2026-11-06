@@ -588,6 +588,33 @@ async function goToChatAndStage(text) {
   await stageInChat(text)
 }
 
+// One click to add a paper. A plugin cannot push a skill into a live session, and
+// plugin skills are namespaced and absent from the agent's skill index, so the turn
+// has to name it exactly: an unnamed "add a paper" would never find it.
+const SOURCE_PROMPT = 'Load the skill cbt-exam:pyq-sourcing and help me add a paper. '
+  + 'Ask me which exam and which year first — one question at a time — then find the '
+  + 'official paper, validate it and file it.'
+
+// Stage, then send if the chat will take a send: a fresh chat ignores submit() until
+// its first turn exists, so this opens one and retries briefly instead of dropping
+// the turn on the floor.
+async function launchSourcing() {
+  goToChat()
+  await new Promise(done => setTimeout(done, 250))
+  if (!host.state.activeSessionId.get()) {
+    try { host.newChat?.() } catch { /* older desktop */ }
+    await new Promise(done => setTimeout(done, 350))
+  }
+  await stageInChat(SOURCE_PROMPT)
+  for (let i = 0; i < 4; i++) {
+    const sid = host.state.activeSessionId.get() ?? null
+    if (!sid) break
+    try { host.composer.submit?.(sid, SOURCE_PROMPT); return true } catch { /* keep the draft */ }
+    await new Promise(done => setTimeout(done, 200))
+  }
+  return false      // the draft is staged; one Enter finishes it
+}
+
 async function primeAssistedChat(attemptId) {
   await goToChatAndStage('Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
     + attemptId + '). Answer my doubts using the live question context file.')
@@ -872,11 +899,9 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       onStart(full, mode)
     } catch (e) { host.notifyError?.(`Could not load pack: ${e?.message || e}`) }
   }
-  const source = async () => {
-    // Sourcing is an agent job, not a form: hand the user a prompt with the two
-    // blanks to fill and let the skill do the fetching, validation and filing.
-    await goToChatAndStage('Load the skill cbt-exam:pyq-sourcing and source <EXAM NAME> <YEAR> previous-year questions into the CBT plugin.')
-  }
+  // Sourcing is an agent job, not a form — but the turn it starts must not be a
+  // template the user has to edit before sending.
+  const source = () => { void launchSourcing() }
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length

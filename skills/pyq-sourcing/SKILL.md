@@ -21,6 +21,41 @@ Turn an exam + year into a validated `cbt-pack/1` JSON installed in the cbt-exam
 
 Don't use for: writing study notes, explaining concepts, or non-CBT (pen-and-paper) exams.
 
+## The interview (how a run usually starts)
+
+The CBT panel's "Source more papers" button sends a turn that names this skill and
+nothing else — no exam, no year. That is deliberate: the conversation is the form.
+Open with ONE question, never a checklist:
+
+1. **Which exam?** Take a name, an abbreviation, or a description ("the DBT one").
+   If the answer is vague, offer the two or three most likely candidates — prefer
+   exams already in the packs directory, since those have a known pattern to reuse.
+2. **Which year?** If they don't know, fetch the conducting body's own paper listing
+   and offer the years it actually publishes. Never propose a year you have not seen
+   linked from the official site.
+3. **Which source?** Only when both exist: "official paper + answer key, or official
+   paper only?" One line, not a paragraph.
+
+Never re-ask something the opening turn already contained — if it says "GAT-B 2024",
+skip to question 3. Once you have exam, year and source preference, run the
+procedure below without further questions unless step 1 or 2 says STOP.
+
+## Fidelity gate before filing
+
+`validate_pack.py` checks *shape*, not content: a pack can PASS with every option
+reading `Option 3`, `11001 _ .`, or `-Irr`. Before filing, open three random
+questions and read them as a student would. Any of these means stop and report
+rather than file:
+
+- options that are page numbers, question ids, or stray punctuation
+- a stem ending mid-sentence, or one question's text inside another's
+- math that cannot be parsed back into an expression
+- more `WARN:` lines than questions you would actually answer
+
+If the source PDF has no text layer (question bodies rendered as images), extraction
+is OCR and math and figures degrade first — say so in the report, name the questions
+affected, and let the user decide whether to keep the pack.
+
 ## Prerequisites
 
 - The `cbt-exam` plugin exists as a package on this machine (`~/.hermes/plugins/cbt-exam/`).
