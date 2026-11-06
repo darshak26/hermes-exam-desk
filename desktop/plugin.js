@@ -1,272 +1,174 @@
 // cbt-exam — exam-agnostic CBT practice panel (route /cbt)
-import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient } from '@hermes/plugin-sdk'
+import {
+  host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient,
+  Badge, Button, Codicon, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  EmptyState, Kbd, SegmentedControl, Tip, icons,
+} from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 
 const CSS = `
-.cbt{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary,#222);font:13px/1.5 var(--font-sans,system-ui)}
-/* Exam convention: violet = flagged for review. The theme accent is neutral grey in
-   most themes here, so marked gets its own hue. It is a fixed violet mixed toward the
-   theme foreground, which keeps it legible on both light and dark instead of being a
-   literal that only works in one. */
-.cbt{--cbt-mark:color-mix(in srgb, #8b5cf6 82%, var(--ui-text-primary, #161616))}
+/* Tokens only. Chrome (buttons, badges, dialogs, tips, kbd, segmented controls)
+   comes from the app's primitives; this sheet owns layout and this plugin's own
+   surfaces, and never re-specifies a primitive's padding, radius or colour. */
+.cbt{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary);font:13px/1.5 var(--font-sans,system-ui)}
 .cbt *{box-sizing:border-box}
-.cbt .muted{color:var(--ui-text-secondary,#666)}
-/* Spacing scale: 4 8 12 16 24 32. Every padding/gap/margin below is a step or a
-   half-step of it; horizontal text starts on one left edge: 20px page gutter,
-   table cells carry only a right gutter so column text stays on that edge. */
-/* page container: block flow, so a stray button is never stretched to full width */
-.cbt.pad{display:block;padding:24px;overflow:auto}
-.cbt h2{font-size:17px;line-height:1.35;font-weight:600;margin:0 0 16px}
-.cbt.pad > .row.head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.cbt.pad > .row.head h2{margin:0}
-.cbt.pad > .row.head *{overflow-wrap:anywhere}
-.cbt .muted + .muted{margin-top:4px}
-.cbt table{border-collapse:collapse;width:100%}
-.cbt th,.cbt td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--ui-stroke-secondary,#ccc);font-size:12.5px;vertical-align:middle}
-.cbt th:last-child,.cbt td:last-child{padding-right:0;text-align:right}
-.cbt td:last-child .row,.cbt td:last-child{justify-content:flex-end}
-.cbt td:last-child .row{flex-wrap:nowrap}
-.cbt th{color:var(--ui-text-secondary,#666);font-weight:600;padding-top:0}
-.cbt td .row{gap:8px}
-.cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
-.cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
-/* a tinted outline still reads as "hovered" — the app's solid pairing is what makes
-   a button look like THE action: --dt-primary-solid with its own foreground */
-.cbt button.primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
-.cbt button.primary:hover:not(:disabled){filter:brightness(1.12)}
-.cbt button:disabled{opacity:.5;cursor:default}
-.cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
-.cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
-.cbt .cbt-icon-btn:active{background:var(--ui-control-active-background,rgba(127,127,127,.24))}
-.cbt .cbt-icon-btn:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
-.cbt .cbt-icon-btn .codicon{font-size:14px;line-height:1}
-.cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.cbt .badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px;line-height:1;white-space:nowrap}
-.cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
-.cbt .badge.fill{border-color:var(--ui-accent);color:var(--ui-text-primary);background:color-mix(in srgb,var(--ui-accent) 24%,transparent);font-weight:600}
-.cbt .seg{display:inline-flex;border:1px solid var(--ui-stroke-secondary);border-radius:6px;overflow:hidden}
-.cbt .seg button{border:0;border-radius:0;height:26px;padding:0 12px;color:var(--ui-text-secondary)}
-.cbt .seg button + button{border-left:1px solid var(--ui-stroke-secondary)}
-.cbt .seg button.on{background:color-mix(in srgb,var(--ui-accent) 26%,transparent);color:var(--ui-text-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--ui-accent)}
-.cbt td.num{font-variant-numeric:tabular-nums}
-.cbt .badge.err{border-color:var(--ui-red, var(--ui-danger, #f87171));color:var(--ui-red, var(--ui-danger, #f87171))}
-.cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
-.cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
-.cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
-.cbt button.badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
-.cbt .warn-list{margin:8px 0 0;font-size:12px;color:var(--ui-text-secondary)}
-/* result headline + review diff */
-.cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
-.cbt .score.pos{color:var(--ui-success, #10b981)}
-.cbt .score.neg{color:var(--ui-red, var(--ui-danger, #f87171))}
-.cbt .sub{margin:0 0 12px}
-.cbt .review-row{border-top:1px solid var(--ui-stroke-secondary)}
-.cbt .review-row > .row{padding:10px 8px;margin:0 -8px;border-radius:6px}
-.cbt .review-row > .row:hover{background:color-mix(in srgb,currentColor 5%,transparent)}
-.cbt .review-row > .row:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
-.cbt .ans{display:flex;gap:10px;align-items:baseline;margin:0 0 6px}
-.cbt .ans .k{min-width:104px;font-weight:600}
-.cbt .ans .miss{color:var(--ui-red, var(--ui-danger, #f87171))}
-.cbt .ans .hit{color:var(--ui-success, #10b981)}
-/* live save feedback in the action bar */
-.cbt .save-state{font-size:12px;color:var(--ui-text-secondary)}
-.cbt .save-state.ok{color:var(--ui-success, #10b981)}
-.cbt .save-state.err{color:var(--ui-red, var(--ui-danger, #f87171))}
-/* countdown urgency */
-.cbt strong.timer{font-variant-numeric:tabular-nums;white-space:nowrap}
-.cbt strong.timer.low{color:var(--ui-warning, #d97706)}
-.cbt strong.timer.crit{color:var(--ui-red, var(--ui-danger, #f87171))}
-/* question-paper modal: the header must stay put while the paper scrolls */
-.cbt .modal-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;
-  margin:-20px -20px 12px;padding:12px 20px;background:var(--ui-surface-background,#fff);
-  border-bottom:1px solid var(--ui-stroke-secondary)}
-.cbt .kbd{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
-.cbt .dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:60}
-.cbt .dlg-box{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);width:min(560px,92%);max-height:80vh;overflow:auto;border-radius:10px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-.cbt .dlg-box .modal-head{margin:0;padding:14px 20px;border-bottom:1px solid var(--ui-stroke-secondary)}
-.cbt .dlg-body{padding:16px 20px 20px}
-/* fixed layout + one width for every count column: the header sits over its number
-   instead of hugging the left edge of a column that overflows the dialog */
-.cbt .dlg-box table{table-layout:fixed;width:100%}
-.cbt .dlg-box th,.cbt .dlg-box td{padding:8px 8px 8px 0;white-space:normal}
-.cbt .dlg-box th.num,.cbt .dlg-box td.num{text-align:right;width:84px;font-variant-numeric:tabular-nums}
-.cbt .dlg-box th:last-child,.cbt .dlg-box td:last-child{padding-right:0}
-/* one paper = one card: title, numbers, then its own history */
-.cbt .card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:16px;margin:0 0 16px}
-.cbt .card-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
-.cbt .card-actions{flex:0 0 auto}
-.cbt .card-body{margin-top:12px;border-top:1px solid var(--ui-stroke-secondary);padding-top:12px}
-.cbt .stat{display:flex;gap:12px;font-size:12px;color:var(--ui-text-secondary);margin-top:6px;align-items:baseline}
-.cbt .stat > span + span::before{content:'·';margin-right:12px;color:var(--ui-text-quaternary)}
-.cbt button.ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
-.cbt button.ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
-.cbt button.ghost.danger{margin-left:8px}
-.cbt button.ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
-.cbt .card table th{padding-top:0}
-.cbt .card caption{padding-top:8px}
-.cbt .legend{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;row-gap:3px;font-size:11.5px;color:var(--ui-text-secondary);margin:0 0 12px}
-.cbt .legend .item{display:flex;align-items:center;gap:7px;min-width:0;height:16px}
-.cbt .legend .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cbt .legend .n{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary)}
-.cbt .legend .sw{flex:0 0 auto;margin-right:0}
-.cbt .lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin:10px 0}
-.cbt .lg .item{display:flex;align-items:center}
-.cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
-.cbt .sw.err{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 18%,transparent)}
-.cbt .sw.ok{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 18%,transparent)}
-.cbt .sw.acc{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent)}
-.cbt .sw.current{box-shadow:0 0 0 2px var(--ui-accent);border-color:transparent;background:transparent}
-.cbt .sw.acc2{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent);position:relative}
-.cbt .sw.acc2::after{content:'✓';position:absolute;inset:0;font-size:9px;line-height:11px;text-align:center;color:var(--ui-success, #10b981);font-weight:700}
-.cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
-.cbt p{margin:0 0 16px;max-width:70ch}
-.cbt p.note{margin:0 0 8px}
-.cbt h4{font-size:12.5px;margin:16px 0 8px;font-weight:600}
-.cbt h4:first-child{margin-top:0}
-.cbt .list{margin:0 0 16px;padding-left:18px}
-.cbt .list li{margin:0 0 6px}
-.cbt p:last-child{margin-bottom:0}
-.cbt input[type=text]{font:inherit;color:inherit;background:var(--ui-surface-background,#fff);border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:6px 10px;min-width:280px}
-.cbt .opt{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:8px;margin:0 0 10px;cursor:pointer;background:var(--ui-surface-background,#fff);line-height:1.5}
-.cbt .opt input{margin:2px 0 0}
-.cbt .opt-body{display:flex;flex-direction:column;gap:8px;min-width:0}
-/* figures and data tables from the paper itself */
-.cbt .media-fig{margin:0 0 16px}
-/* a figure taller than the viewport would hide the stem it belongs to */
-.cbt .media-fig img{display:block;max-width:100%;max-height:min(60vh,520px);width:auto;height:auto;object-fit:contain;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-surface-background,#fff);cursor:zoom-in}
-.cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.82);cursor:zoom-out}
-.cbt .zoom img{max-width:100%;max-height:calc(100% - 56px);object-fit:contain;border-radius:8px;background:var(--ui-surface-background,#fff)}
-/* scoped a level deeper than .cbt .icon-btn, which otherwise wins on colour and
-   leaves a white glyph on a transparent button */
-.cbt .zoom .zoom-close{position:absolute;top:14px;right:14px;width:30px;height:30px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);color:#fff}
-.cbt .zoom .zoom-close:hover:not(:disabled){background:rgba(255,255,255,.3);color:#fff}
-.cbt .zoom .zoom-close .codicon{font-size:16px}
-.cbt .zoom-hint{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:12px;color:#fff;opacity:.8}
-.cbt .zoom-hint .kbd{border-color:rgba(255,255,255,.35);color:#fff}
-.cbt .media-wrap{max-width:100%;overflow-x:auto}
-.cbt .media-missing{display:flex;gap:8px;align-items:center;justify-content:center;min-height:120px;padding:16px;border:1px dashed var(--ui-stroke-secondary);border-radius:8px;color:var(--ui-text-secondary);font-size:12px;text-align:center}
-.cbt .media-fig figcaption{margin-top:6px;font-size:12px;color:var(--ui-text-secondary)}
-.cbt .media-note{font-size:13px;color:var(--ui-text-secondary)}
-.cbt .media-table{width:auto;max-width:100%;margin:0 0 16px;border-collapse:collapse;font-size:13px}
-.cbt .media-table caption{caption-side:top;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding:0 0 6px}
-.cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap}
-.cbt .media-table th{background:color-mix(in srgb,currentColor 5%,transparent);font-weight:600;text-align:left}
-.cbt .opt .media-fig{margin:0}
-/* a figure inside an option is a thumbnail; a missing one must not blow the option
-   card up to twice its neighbours' height */
-.cbt .opt .media-missing{min-height:0;padding:8px 10px;font-size:11.5px;justify-content:flex-start}
-.cbt .opt .media-fig img{max-height:170px;width:auto}
-.cbt .media-table td:first-child{white-space:nowrap}
+.cbt .muted,.cbt .cbt-sub{color:var(--ui-text-secondary)}
+.cbt .cbt-sub{font-size:12px}
+.cbt .cbt-inline{display:inline}
+.cbt .cbt-clickable{cursor:pointer}
+.cbt .cbt-label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);margin-top:8px}
+.cbt .cbt-row{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.cbt .cbt-gap-sm{gap:6px}
+.cbt h2{font-size:17px;line-height:1.35;font-weight:600;margin:0 0 12px}
+.cbt h3{font-size:13px;font-weight:600;margin:24px 0 8px}
+.cbt h4{font-size:12px;font-weight:600;margin:16px 0 6px;color:var(--ui-text-secondary)}
+.cbt p{margin:0 0 12px}
+.cbt .cbt-list,.cbt ul.list{margin:0 0 12px;padding-left:20px;color:var(--ui-text-primary)}
+.cbt .cbt-list li,.cbt ul.list li{margin:0 0 6px}
+/* the page root is both .cbt and .cbt-page, so it cannot be a descendant selector */
+.cbt.cbt-page{display:block;padding:20px clamp(20px,4vw,56px);overflow:auto}
+.cbt.cbt-page > *{max-width:1040px}
+.cbt .cbt-head-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.cbt .cbt-head-row h2{margin:0}
+.cbt .cbt-keys{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt .cbt-loading{display:flex;align-items:center;gap:6px;color:var(--ui-text-secondary)}
+.cbt .cbt-error{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:8px 0}
+
+/* tables: one left edge, right gutter only, tabular figures for counts */
+.cbt table{width:100%;border-collapse:collapse}
+.cbt th,.cbt td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12.5px;vertical-align:middle}
+.cbt th{font-weight:600;color:var(--ui-text-secondary);padding-top:0}
+.cbt th:last-child,.cbt td:last-child{padding-right:0}
+.cbt .num{text-align:right;font-variant-numeric:tabular-nums}
+.cbt .right{text-align:right}
+.cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
+.cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
+
+/* home: a paper and its history */
+.cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
+.cbt .cbt-card-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between}
+.cbt .cbt-card-title{min-width:0;display:flex;flex-direction:column;gap:4px}
+.cbt .cbt-card-title h3{margin:0;font-size:14px}
+.cbt .cbt-card-actions{flex:0 0 auto}
+.cbt .cbt-card-body{margin-top:12px}
+.cbt .cbt-stat-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin-top:4px}
+.cbt .cbt-warn-count{display:inline-flex;align-items:center;gap:4px;color:var(--ui-text-warn,var(--ui-text-secondary))}
+
+/* score */
+.cbt .cbt-score{font-size:34px;line-height:1.1;font-weight:600;font-variant-numeric:tabular-nums}
+.cbt .cbt-score.pos{color:var(--ui-success)}
+.cbt .cbt-score.neg{color:var(--ui-red)}
+
+/* the paper */
+.cbt .cbt-qtext{font-size:16px;margin:0 0 16px}
+.cbt .opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--ui-stroke-secondary);border-radius:6px;margin-bottom:8px;cursor:pointer}
+.cbt .opt:hover{background:var(--chrome-action-hover)}
 .cbt .opt.sel{border-color:var(--ui-accent)}
-/* options span the reading column so their right edge matches the question text */
-.cbt .opt{text-align:left;max-width:100%}
-.cbt .cbt-qbody p{max-width:none}
-/* The shell's tracks are declared once and each variant only overrides the parts
-   it changes. Composing them this way is what keeps "palette hidden" and "single
-   section" from fighting: written as whole templates, a 4-area variant applied on
-   top of a 3-row one leaves the leftover 1fr on an empty row, which pushes the
-   question to the bottom of the window. */
+.cbt .opt-body{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap}
+.cbt .cbt-review-body{padding:8px 0 12px 20px;max-width:820px}
+.cbt .cbt-ans{display:flex;gap:8px;font-size:13px;margin-top:4px}
+.cbt .cbt-ans-k{color:var(--ui-text-secondary);min-width:110px}
+.cbt .hit{color:var(--ui-success)}
+.cbt .miss{color:var(--ui-red)}
+.cbt .cbt-pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ui-text-secondary);margin:6px 0 0}
+.cbt .cbt-paper-q{margin:8px 0}
+.cbt .cbt-paper-q p{font-size:13px;margin:0}
+
+/* shell */
 .cbt-shell{display:grid;height:100%;min-height:0;
   --cols:minmax(0,1fr) 358px;
-  /* auto (not fixed px) rows: in a narrow pane the head wraps to two lines and the
-     action row wraps to two, and a fixed row clips the overflow off the pane. */
   --rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
   --areas:"head head" "tabs pal" "body pal" "act pal";
   grid-template-columns:var(--cols);grid-template-rows:var(--rows);grid-template-areas:var(--areas);}
-/* A single-section paper has nothing to switch between, so the tab row is not
-   rendered and its band must not be reserved either. */
 .cbt-shell.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);
   --areas:"head head" "body pal" "act pal";}
-.cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
-.cbt .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
-.cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
-.cbt .cbt-chip.s-not-answered{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 16%,transparent)}
-.cbt .cbt-chip.s-answered{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 16%,transparent)}
-.cbt .cbt-chip.s-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent)}
-.cbt .cbt-chip.s-answered-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent)}
-.cbt .cbt-chip .tick{color:var(--ui-success, #10b981);font-weight:700;font-size:9px;margin-left:1px;vertical-align:1px}
-.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt-actions{padding:10px 20px;border-top:1px solid var(--ui-stroke-secondary);background:var(--ui-surface-background,#fff);container-type:inline-size}
-.act-bar{display:flex;gap:12px;row-gap:10px;align-items:center;flex-wrap:wrap}
-.cbt .act-group{display:flex;gap:8px;align-items:center;min-width:0}
-.cbt .act-group.nav{margin-left:auto}
-.cbt-actions .ask{display:flex;flex-direction:column;gap:2px;min-width:0}
-.cbt .cbt-actions button{height:30px;gap:6px;padding:0 9px}
-.cbt .cbt-actions button .codicon{font-size:14px;opacity:.9}
-.cbt .cbt-actions button.on{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-text-primary);font-weight:600}
-.cbt .cbt-actions button.clear{color:var(--ui-text-secondary)}
-.cbt .cbt-actions button.clear:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
-.cbt-actions button{text-align:left;justify-content:flex-start}
-/* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
-   the screen edge. The header toggle (always in the same place) brings it back. */
 .cbt-shell.pal-collapsed{--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act"}
 .cbt-shell.pal-collapsed.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);--areas:"head" "body" "act"}
-.cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
-.cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cbt .submit-head{border-color:color-mix(in srgb,var(--ui-accent) 55%,var(--ui-stroke-secondary));font-weight:600}
-.cbt .submit-head:hover:not(:disabled){background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
-.cbt .cbt-tabs{display:flex;align-items:center;gap:8px;padding:6px 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
-/* Sections are a small mutually-exclusive set, so they are a segmented control:
-   one soft track, the current section raised inside it. Two classes deep so no
-   base-button rule can re-box a segment into a pill. */
-.cbt .cbt-sectrack{display:inline-flex;gap:2px;padding:2px;border-radius:7px;background:var(--ui-bg-quaternary, rgba(127,127,127,.12));flex:0 0 auto}
-.cbt .cbt-sectrack button{height:26px;border:0;border-radius:5px;padding:0 10px;font-size:12px;line-height:1;background:transparent;color:var(--ui-text-secondary);gap:6px;flex:0 0 auto}
-.cbt .cbt-sectrack button:hover:not(:disabled){background:color-mix(in srgb, currentColor 8%, transparent);color:var(--ui-text-primary)}
-.cbt .cbt-sectrack button.on{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.16)}
-.cbt .cbt-sectrack button.on:hover:not(:disabled){background:var(--ui-surface-background,#fff)}
-.cbt .cbt-sectrack .count{font-variant-numeric:tabular-nums;opacity:.65;font-weight:400}
-.cbt .cbt-sectrack button.on .count{opacity:.8}
-.cbt-pal{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--ui-stroke-secondary)}
-.cbt-pal-head{padding:12px 12px 8px}
-.cbt-pal-scroll{flex:1;overflow:auto}
-.cbt-pal-group{margin:8px 0}
-.cbt-pal-group h4{font-size:11px;margin:12px 12px 6px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.cbt .icon-btn{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-secondary);flex:0 0 auto}
-.cbt .icon-btn:hover:not(:disabled){background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-text-primary)}
-.cbt .icon-btn .codicon{font-size:14px;line-height:1}
-.cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
-/* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
-   question keeps its full width instead of being squeezed by a fixed 358px column. */
-.cbt-shell.narrow{position:relative;--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act";
-  --rows:auto auto minmax(0,1fr) auto}
-.cbt-shell.narrow.single-sec{--areas:"head" "body" "act";--rows:auto minmax(0,1fr) auto}
-.cbt .pal-sec-head{display:flex;align-items:baseline;gap:8px;margin:12px 12px 6px}
-.cbt .pal-sec-head strong{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary)}
-.cbt .pal-sec-head span{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary);margin-left:auto}
-.cbt .pal-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.cbt .pal-title strong{font-size:12px}
-.cbt .pal-title .muted{font-size:11px;font-variant-numeric:tabular-nums}
-.cbt .save-slot{min-width:52px;display:inline-flex;justify-content:flex-start;font-size:12px;margin-left:-6px}
-.cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:auto;width:min(340px,88%);max-height:min(560px,calc(100% - 150px));overflow:auto;z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
-/* 10 columns need 358px; the drawer is 340 — 8 columns fit with padding. */
-.cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
-.cbt-pal-close{display:none}
-.cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-close{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border-radius:4px;flex:0 0 auto}
-.cbt-shell.narrow .cbt-qbody{padding:16px 16px 20px}
-.cbt-shell.narrow .cbt-head{padding:0 12px;gap:8px}
-.cbt-shell.narrow .cbt-head-title{flex:1 1 auto}
-/* Narrow: the footer becomes a 6-column grid. Each row of buttons fills the width
-   exactly (3+3, 2+2+2, 3+3), so there is no ragged trailing edge, and every row is
-   flush with both sides of the bar. */
-/* 690px is the measured one-row budget: ~577px of buttons + group gaps + the
-   save indicator. Below it the row would wrap ragged, so it becomes a 6-column
-   grid whose rows each fill the width exactly (3+3 · 2+2+2 · 3+3). */
+.cbt-head{display:flex;align-items:center;gap:8px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.cbt .timer{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600}
+.cbt .timer.low{color:var(--ui-text-warn,var(--ui-accent))}
+.cbt .timer.crit{color:var(--ui-red)}
+.cbt .cbt-tabs{padding:0 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
+.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
+.cbt .cbt-qbody p{max-width:none}
+
+/* palette */
+.cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%;border-left:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-pal-head{padding:12px}
+.cbt .pal-title{display:flex;align-items:center;gap:8px}
+.cbt .pal-title strong{font-size:13px}
+.cbt .cbt-pal-scroll{overflow:auto;min-height:0;flex:1;padding:0 12px 12px}
+.cbt .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:8px 0}
+.cbt .pal-sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 4px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt .cbt-chip{height:26px;min-width:28px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;gap:1px;font:inherit;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary);background:transparent;color:var(--ui-text-secondary);cursor:pointer}
+.cbt .cbt-chip:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
+.cbt .cbt-chip.s-not-answered{border-color:var(--ui-red);background:color-mix(in srgb,var(--ui-red) 16%,transparent)}
+.cbt .cbt-chip.s-answered{border-color:var(--ui-success);background:color-mix(in srgb,var(--ui-success) 16%,transparent);color:var(--ui-text-primary)}
+.cbt .cbt-chip.s-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent);color:var(--ui-text-primary)}
+.cbt .cbt-chip.s-answered-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent);color:var(--ui-text-primary)}
+.cbt .cbt-chip .tick{color:var(--ui-success);font-weight:700;font-size:9px}
+.cbt{--cbt-mark:color-mix(in srgb,#8b5cf6 82%,var(--ui-text-primary))}
+.cbt .legend{display:flex;flex-direction:column;gap:4px;margin:8px 0 0;font-size:11.5px;color:var(--ui-text-secondary)}
+.cbt .legend .item{display:flex;align-items:center;gap:6px}
+.cbt .legend .sw{width:11px;height:11px;border-radius:3px;border:1px solid var(--ui-stroke-secondary);flex:0 0 auto;position:relative}
+.cbt .legend .sw.err{border-color:var(--ui-red);background:color-mix(in srgb,var(--ui-red) 16%,transparent)}
+.cbt .legend .sw.ok{border-color:var(--ui-success);background:color-mix(in srgb,var(--ui-success) 16%,transparent)}
+.cbt .legend .sw.acc{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 20%,transparent)}
+.cbt .legend .sw.acc2{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent)}
+.cbt .legend .sw.acc2::after{content:'✓';position:absolute;inset:0;font-size:8px;line-height:11px;text-align:center;color:var(--ui-success)}
+.cbt .legend .sw.current{box-shadow:0 0 0 2px var(--ui-accent)}
+.cbt .legend .n{margin-left:auto;font-variant-numeric:tabular-nums}
+
+/* action bar: one row when the bar is wide enough, a filled grid when it is not */
+.cbt-actions{padding:10px 20px;border-top:1px solid var(--ui-stroke-secondary);container-type:inline-size}
+.act-bar{display:flex;gap:12px;row-gap:10px;align-items:center;flex-wrap:wrap}
+.act-group{display:flex;gap:8px;align-items:center;min-width:0}
+.act-group.nav{margin-left:auto}
+.cbt .save-slot{min-width:52px;display:inline-flex;align-items:center;font-size:12px}
+.cbt .save-state{color:var(--ui-text-secondary)}
+.cbt .save-state.ok{color:var(--ui-success)}
+.cbt .save-state.err{color:var(--ui-red)}
 @container (max-width: 690px) {
   .act-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
   .act-bar .act-group{display:contents}
   .act-bar .act-group.nav{margin-left:0}
-  .act-bar button{width:100%;height:34px;min-width:0!important;justify-content:center;padding:0 6px}
+  .act-bar button{width:100%;min-width:0!important;justify-content:center}
   .act-bar button[data-span="2"]{grid-column:span 2}
   .act-bar button[data-span="3"]{grid-column:span 3}
-  /* out of flow: taking a grid row would grow the bar on every save */
   .cbt-actions{position:relative}
-  .act-bar .save-slot{position:absolute;left:20px;bottom:calc(100% + 4px);margin:0;padding:3px 10px;border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:var(--ui-surface-background,#fff);box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:2}
+  .act-bar .save-slot{position:absolute;left:20px;bottom:calc(100% + 4px);margin:0;padding:2px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:var(--ui-surface-background);box-shadow:var(--shadow-nous,none);z-index:2}
 }
-/* the save state floats above the bar instead of taking a grid row, otherwise the
-   footer grows 42px every time you save */
+
+/* figures, tables and notes inside a question */
+.cbt .media-fig{margin:0 0 16px}
+.cbt .media-fig img{display:block;max-width:100%;max-height:min(60vh,520px);height:auto;border:1px solid var(--ui-stroke-secondary);border-radius:6px;cursor:zoom-in}
+.cbt .media-fig figcaption{font-size:12px;color:var(--ui-text-secondary);margin-top:6px}
+.cbt .media-missing{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px dashed var(--ui-stroke-secondary);border-radius:6px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt .media-wrap{max-width:100%;overflow-x:auto}
+.cbt .media-table{border-collapse:collapse;margin:0 0 16px;font-size:12.5px}
+.cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cbt .media-table caption{caption-side:bottom;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding-top:6px}
+.cbt .media-note{font-size:12px;color:var(--ui-text-secondary);border-left:2px solid var(--ui-stroke-secondary);padding-left:12px;margin:0 0 16px}
+.cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--ui-scrim,rgba(0,0,0,.8));cursor:zoom-out}
+.cbt .zoom img{max-width:100%;max-height:calc(100% - 56px);object-fit:contain;border-radius:6px}
+.cbt .zoom .zoom-close{position:absolute;top:14px;right:14px}
+.cbt .zoom-hint{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:12px;color:#fff;opacity:.85}
+
+/* narrow: a pane, or a page dragged short */
+.cbt-shell.narrow{position:relative;--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act";--rows:auto auto minmax(0,1fr) auto}
+.cbt-shell.narrow.single-sec{--areas:"head" "body" "act";--rows:auto minmax(0,1fr) auto}
+.cbt-shell.narrow .cbt-head{padding:0 12px}
+.cbt-shell.narrow .cbt-qbody{padding:16px 16px 20px}
+.cbt-shell.narrow .cbt-tabs{padding:0 12px}
+.cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:auto;width:min(340px,88%);max-height:min(560px,calc(100% - 150px));overflow:auto;z-index:30;background:var(--ui-surface-background);border-left:1px solid var(--ui-stroke-secondary);box-shadow:var(--shadow-nous,none)}
+.cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
+
+@media (prefers-reduced-motion: reduce){
+  .cbt *{transition:none!important;animation:none!important}
+}
 `;
 
 async function rest(path, opts) {
@@ -404,7 +306,18 @@ const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
 
 // the app ships the codicon set app-wide; icons here are for scanning, the label
 // still carries the meaning
-const icon = name => jsx('i', { key: name, className: `codicon codicon-${name}`, 'aria-hidden': 'true' })
+// The app's own icon set, addressed by the names this file already uses. Explicit
+// rather than dynamic so a typo fails here instead of rendering nothing.
+const ICON_FOR = {
+  save: 'Save', bookmark: 'Bookmark', bookmarkOn: 'BookmarkFilled',
+  'chevron-left': 'ChevronLeft', 'chevron-right': 'ChevronRight',
+  clear: 'X', 'clear-all': 'X', check: 'Check', trash: 'Trash2', close: 'X', book: 'Book',
+  alert: 'AlertTriangle', clock: 'Clock', refresh: 'RefreshCw',
+}
+function icon(name, className) {
+  const C = icons[ICON_FOR[name] || 'Check']
+  return jsx(C, { className, 'aria-hidden': 'true' })
+}
 
 // A figure's src is either an http(s) URL or a path inside the pack's asset dir.
 // Relative ones come back through the plugin's own route, so the browser fetches
@@ -415,6 +328,8 @@ function mediaSrc(examId, src) {
   const path = clean.split('/').filter(Boolean).map(encodeURIComponent).join('/')
   return `/api/plugins/cbt-exam/packs/${encodeURIComponent(examId)}/assets/${path}`
 }
+
+// A figure that 404s (or is unreadable) otherwise collapses to a broken-image
 
 // A figure that 404s (or is unreadable) otherwise collapses to a broken-image
 // sliver; show a placeholder with the alt text so the question still makes sense.
@@ -432,22 +347,26 @@ function MediaFigure({ src, alt, caption }) {
   return jsxs('figure', { className: 'media-fig', children: [
     failed
       ? jsxs('div', { className: 'media-missing', children: [
-          jsx('i', { className: 'codicon codicon-file-media', 'aria-hidden': 'true' }),
+          jsx(Codicon, { name: 'file-media', size: 14 }),
           jsx('span', { children: alt ? `Figure unavailable — ${alt}` : 'Figure unavailable' }),
         ] })
-      : jsx('img', {
-          src, alt: alt || '', loading: 'lazy',
-          title: alt ? `${alt} — click to enlarge` : 'Click to enlarge',
-          onError: () => setFailed(true),
-          onClick: e => { e.preventDefault(); e.stopPropagation(); setZoom(true) },
-        }),
+      : jsx(Tip, { label: alt ? `${alt} — click to enlarge` : 'Click to enlarge', children:
+          jsx('img', {
+            src, alt: alt || '', loading: 'lazy',
+            onError: () => setFailed(true),
+            onClick: e => { e.preventDefault(); e.stopPropagation(); setZoom(true) },
+          }) }),
     caption ? jsx('figcaption', { children: caption }) : null,
     zoom
       ? jsxs('div', {
           className: 'zoom', onClick: () => setZoom(false), role: 'dialog', 'aria-modal': 'true', 'aria-label': alt || 'Figure',
           children: [
             jsx('img', { src, alt: alt || '' }),
-            jsx('button', { type: 'button', className: 'zoom-close icon-btn', title: 'Close', 'aria-label': 'Close figure', onClick: () => setZoom(false), children: jsx('i', { className: 'codicon codicon-close', 'aria-hidden': 'true' }) }),
+            jsx(Button, {
+              type: 'button', variant: 'floating', size: 'icon-sm', className: 'zoom-close',
+              'aria-label': 'Close figure', onClick: () => setZoom(false),
+              children: jsx(Codicon, { name: 'close', size: 16 }),
+            }),
             jsxs('div', { className: 'zoom-hint', children: ['Click anywhere or press ', jsx('span', { className: 'kbd', children: 'Esc' }), ' to close'] }),
           ],
         })
@@ -517,11 +436,11 @@ const LEGEND = [
 function legendNode(counts) {
   return jsx('div', { className: 'legend', children: [
     ...LEGEND.map(([cls, label, hint], i) =>
-      jsxs('span', { key: label, className: 'item', title: hint, children: [
+      jsx(Tip, { label: hint, children: jsxs('span', { className: 'item', children: [
         jsx('span', { className: `sw ${cls}` }),
         jsx('span', { className: 'lbl', children: label }),
         counts ? jsx('span', { className: 'n', children: counts[i] }) : null,
-      ] })),
+      ] }) }, label)),
     jsxs('span', { className: 'item', children: [
       jsx('span', { className: 'sw current' }),
       jsx('span', { className: 'lbl', children: 'Current' }),
@@ -595,15 +514,14 @@ function useAppTitlebarToggle() {
 function SidebarButton() {
   const appHasToggle = useAppTitlebarToggle()
   if (!ctxRunAction || appHasToggle) return null
-  return jsx('button', {
-    type: 'button',
-    className: 'cbt-icon-btn',
-    title: 'Show / hide the sidebar (Ctrl+B)',
-    'aria-label': 'Show or hide the sidebar',
-    onClick: () => { void ctxRunAction('view.toggleSidebar') },
-    // the app's own titlebar glyph (20px codicon set is loaded app-wide), so the
-    // stand-in is indistinguishable from the button it replaces
-    children: jsx('i', { className: 'codicon codicon-layout-sidebar-left', 'aria-hidden': 'true' }),
+  return jsx(Tip, {
+    label: 'Show or hide the sidebar (Ctrl+B)',
+    children: jsx(Button, {
+      type: 'button', variant: 'ghost', size: 'icon-sm', 'aria-label': 'Show or hide the sidebar',
+      onClick: () => { void ctxRunAction('view.toggleSidebar') },
+      // the app's own titlebar glyph, so the stand-in matches the button it replaces
+      children: jsx(Codicon, { name: 'layout-sidebar-left', size: 14 }),
+    }),
   })
 }
 
@@ -625,11 +543,13 @@ function Countdown({ left, onExpire, compact = false }) {
   // Comfortable → low (5 min) → critical (1 min). Colour is the only thing that
   // changes, so the eye picks it up late in a paper without a layout shift.
   const urgency = done ? ' crit' : shown <= 60 ? ' crit' : shown <= 300 ? ' low' : ''
-  return jsx('strong', {
-    className: `timer${urgency}`,
-    'aria-live': 'off',
-    title: done ? 'Time is up — submitting the paper' : 'Time left in this attempt',
-    children: done ? (compact ? 'Time up' : 'Time up — submitting…') : (compact ? fmtHMS(shown) : `Remaining Time: ${fmtHMS(shown)}`),
+  return jsx(Tip, {
+    label: done ? 'Time is up — submitting the paper' : 'Time left in this attempt',
+    children: jsx('strong', {
+      className: `timer${urgency}`,
+      'aria-live': 'off',
+      children: done ? (compact ? 'Time up' : 'Time up — submitting…') : (compact ? fmtHMS(shown) : `Remaining Time: ${fmtHMS(shown)}`),
+    }),
   })
 }
 
@@ -674,11 +594,17 @@ async function startAttempt(pack, mode) {
 }
 
 // A load failure with no next step is a dead end; every one of them gets a Retry.
+// The app has no inline error banner primitive (only the full ErrorState page), so
+// an inline failure is a destructive badge plus the retry next to it.
 function ErrorBox({ what, onRetry }) {
-  return jsxs('div', { className: 'row', children: [
-    jsx('span', { className: 'badge err', children: `${what} failed` }),
-    jsx('span', { className: 'muted', children: 'The plugin backend did not answer — is cbt-exam enabled and the gateway up?' }),
-    onRetry ? jsx('button', { type: 'button', onClick: onRetry, children: 'Retry' }) : null,
+  return jsxs('div', { className: 'cbt-error', children: [
+    jsxs('div', { className: 'cbt-row', children: [
+      jsx(Badge, { variant: 'destructive', size: 'xs', children: `${what} failed` }),
+      jsx('span', { className: 'cbt-sub', children: 'The plugin backend did not answer — is cbt-exam enabled and the gateway up?' }),
+    ] }),
+    onRetry
+      ? jsx(Button, { type: 'button', variant: 'outline', size: 'sm', onClick: onRetry, children: 'Retry' })
+      : null,
   ] })
 }
 
@@ -707,44 +633,46 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
       if (id) onBegin(id)              // exam mode, or a desktop without the pane API
     } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
   }
-  return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row head', children: [
+  const marks = marksLabel(pack.pattern.sections[0] || {}, pack.pattern)
+  return jsxs('div', { className: 'cbt cbt-page', children: [
+    jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
-      jsx('span', { className: `badge ${mode === 'assisted' ? 'assisted' : ''}`, children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
     ] }),
-    jsx('div', { className: 'muted', children: `Duration ${hours ? hours + ' h ' : ''}${mins} min · ${pack.questions.length} questions · ${types.map(t => QTYPE_LABEL[t] || t).join(' + ')}` }),
-    jsx('h3', { children: 'Pattern & marking' }),
-    jsxs('table', { children: [
+    jsx('p', { className: 'cbt-sub', children: `Duration ${hours ? hours + ' h ' : ''}${mins} min · ${pack.questions.length} questions · ${types.map(t => QTYPE_LABEL[t] || t).join(' + ')}${marks ? ` · ${marks}` : ''}` }),
+    jsx('h3', { children: 'Pattern' }),
+    jsxs('table', { className: 'cbt-table', children: [
       jsx('thead', { children: jsx('tr', { children: ['Section', 'Questions', 'To attempt', 'Marks'].map(h => jsx('th', { key: h, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => jsxs('tr', { key: s.id, children: [
         jsx('td', { children: s.title }),
-        jsx('td', { children: String(s.question_count) }),
-        jsx('td', { children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' }),
-        jsx('td', { children: marksLabel(s, pack.pattern) }),
-      ] })) }) ] }),
+        jsx('td', { className: 'num', children: String(s.question_count) }),
+        jsx('td', { className: 'num', children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' }),
+        jsx('td', { className: 'num', children: marksLabel(s, pack.pattern) }),
+      ] })) }),
+    ] }),
     jsx('h3', { children: 'How the paper works' }),
-    jsx('ul', { className: 'list', children: [
+    jsx('ul', { className: 'cbt-list', children: [
       'Select an answer, then Save to stay or Save & Next to move on. Leaving a question without saving keeps the pick on screen but does not record it.',
       'Only answers are evaluated — marking a question for review without answering it does not score.',
-      'The palette shows each question’s state; click a number to jump there.',
+      'The question map shows each question’s state; click a number to jump there.',
       `The timer starts when you begin and runs ${hours ? hours + ' h ' : ''}${mins} min. At zero the paper submits itself.`,
       mode === 'assisted'
         ? 'The paper opens in a pane beside your chat, so you can ask doubts while you work.'
         : 'Full page, nothing else competing for the screen. Start an assisted attempt instead if you want the chat beside the paper.',
     ].map((t, i) => jsx('li', { key: i, children: t })) }),
-    jsx('div', { className: 'row', style: { marginTop: 24 }, children: [
-      jsx('button', { type: 'button', className: 'primary', disabled: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
-      jsx('button', { type: 'button', disabled: starting, onClick: onBack, children: 'Back' }),
+    jsxs('div', { className: 'cbt-row', style: { marginTop: 24 }, children: [
+      jsx(Button, { variant: 'default', size: 'default', loading: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
+      jsx(Button, { variant: 'ghost', size: 'default', disabled: starting, onClick: onBack, children: 'Back' }),
     ] }),
-    jsx('div', { className: 'muted', style: { marginTop: 8, fontSize: 12 }, children: [
+    jsxs('div', { className: 'cbt-keys', children: [
       'Keys inside the paper: ',
-      jsx('span', { className: 'kbd', children: '1–9' }), ' answer · ',
-      jsx('span', { className: 'kbd', children: '←/→' }), ' move · ',
-      jsx('span', { className: 'kbd', children: 'S' }), ' save · ',
-      jsx('span', { className: 'kbd', children: 'M' }), ' mark · ',
-      jsx('span', { className: 'kbd', children: 'Enter' }), ' save & next · ',
-      jsx('span', { className: 'kbd', children: 'Esc' }), ' close paper',
+      jsx(Kbd, { children: '1–9' }), ' answer · ',
+      jsx(Kbd, { children: '←/→' }), ' move · ',
+      jsx(Kbd, { children: 'S' }), ' save · ',
+      jsx(Kbd, { children: 'M' }), ' mark · ',
+      jsx(Kbd, { children: 'Enter' }), ' save & next · ',
+      jsx(Kbd, { children: 'Esc' }), ' close paper',
     ] }),
   ] })
 }
@@ -806,106 +734,116 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
     marks.length ? marks.join(' · ') : null,
   ].filter(Boolean).join(' · ')
 
-  return jsxs('section', { className: 'card', children: [
-    jsxs('div', { className: 'card-head', children: [
-      jsxs('div', { style: { minWidth: 0 }, children: [
-        jsxs('div', { className: 'row', children: [
-          jsx('h3', { style: { margin: 0 }, children: pack.title || pack.exam_id }),
-          pack.invalid ? jsx('span', { className: 'badge err', children: 'invalid' }) : null,
+  return jsxs('section', { className: 'cbt-card', children: [
+    jsxs('div', { className: 'cbt-card-head', children: [
+      jsxs('div', { className: 'cbt-card-title', children: [
+        jsxs('div', { className: 'cbt-row', children: [
+          jsx('h3', { children: pack.title || pack.exam_id }),
+          pack.invalid ? jsx(Badge, { variant: 'destructive', children: 'invalid' }) : null,
           pack.warnings?.length
-            ? jsx('button', {
-                type: 'button', className: 'badge err',
-                'aria-expanded': showWarn,
-                title: showWarn ? 'Hide the warnings' : 'Show what was flagged',
-                onClick: () => setShowWarn(v => !v),
-                children: `${pack.warnings.length} warning${pack.warnings.length === 1 ? '' : 's'}`,
-              })
+            ? jsx(Tip, { label: showWarn ? 'Hide the warnings' : 'Show what was flagged', children:
+                jsx(Button, {
+                  variant: 'outline', size: 'micro', 'aria-expanded': showWarn,
+                  onClick: () => setShowWarn(v => !v),
+                  children: jsxs('span', { className: 'cbt-warn-count', children: [
+                    icon('alert', 'size-3'),
+                    `${pack.warnings.length} warning${pack.warnings.length === 1 ? '' : 's'}`,
+                  ] }),
+                }) })
             : null,
         ] }),
-        jsx('div', { className: 'muted', children: pack.invalid
+        jsx('div', { className: 'cbt-sub', children: pack.invalid
           ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
           : meta }),
-        pack.provenance && !pack.invalid ? jsx('div', { className: 'muted', style: { fontSize: 12 }, children: pack.provenance }) : null,
+        pack.provenance && !pack.invalid ? jsx('div', { className: 'cbt-sub', children: pack.provenance }) : null,
         // open warnings push the card down instead of reflowing the title row
         showWarn && pack.warnings?.length
-          ? jsx('ul', { className: 'list warn-list', children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) })
+          ? jsx('ul', { className: 'cbt-list', children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) })
           : null,
         attempts.length
-          ? jsxs('div', { className: 'row stat', children: [
+          ? jsxs('div', { className: 'cbt-stat-row', children: [
               jsx('span', { children: `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}` }),
-              discarded ? jsx('span', { children: `${discarded} discarded` }) : null,
-              best != null ? jsx('span', { children: `best score ${fmtScore(best)}` }) : null,
-              last ? jsx('span', { children: `last ${relTime(last)}` }) : null,
-              live.length ? jsx('span', { className: 'badge fill', children: 'live now' }) : null,
+              discarded ? jsx('span', { children: `· ${discarded} discarded` }) : null,
+              best != null ? jsx('span', { children: `· best ${fmtScore(best)}` }) : null,
+              last ? jsx('span', { children: `· last ${relTime(last)}` }) : null,
             ] })
           : null,
       ] }),
-      jsx('div', { className: 'card-actions', children: pack.invalid ? null : jsxs('span', { className: 'row', children: [
+      jsx('div', { className: 'cbt-card-actions', children: pack.invalid ? null : jsxs('div', { className: 'cbt-row', children: [
         live.length
-          ? jsx('button', { type: 'button', className: 'primary', onClick: () => onResume(live[0].id, live[0].mode), children: 'Resume' })
+          ? jsx(Button, { variant: 'default', size: 'sm', onClick: () => onResume(live[0].id, live[0].mode), children: 'Resume' })
           : null,
-        jsx('button', {
-          type: 'button', className: live.length ? '' : 'primary',
-          title: 'Side pane beside the chat — ask doubts while you answer',
-          onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
-        }),
-        jsx('button', {
-          type: 'button', title: 'Full page, no chat, no hints',
-          onClick: () => onStart(pack, 'exam'), children: 'Start exam',
-        }),
+        jsx(Tip, { label: 'Side pane beside the chat — ask doubts while you answer', children:
+          jsx(Button, {
+            variant: live.length ? 'secondary' : 'default', size: 'sm',
+            onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
+          }) }),
+        jsx(Tip, { label: 'Full page, no chat, no hints', children:
+          jsx(Button, {
+            variant: 'secondary', size: 'sm',
+            onClick: () => onStart(pack, 'exam'), children: 'Start exam',
+          }) }),
       ] }) }),
     ] }),
     attempts.length
-      ? jsxs('div', { className: 'card-body', children: [
-          jsxs('div', { className: 'row', style: { marginBottom: 8 }, children: [
-            jsx('button', {
-              type: 'button', className: 'ghost', 'aria-expanded': isOpen,
+      ? jsxs('div', { className: 'cbt-card-body', children: [
+          jsxs('div', { className: 'cbt-row', style: { marginBottom: 8 }, children: [
+            jsx(Button, {
+              variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
               onClick: () => setOpen(!isOpen),
-              children: isOpen ? '▾ Hide history' : `▸ History · ${ordered.length}`,
+              children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
+                isOpen ? 'Hide history' : `History · ${ordered.length}`],
             }),
             jsx('span', { style: { flex: 1 } }),
             discarded
-              ? jsx('button', {
-                  type: 'button', className: 'ghost',
+              ? jsx(Button, {
+                  variant: 'ghost', size: 'sm',
                   onClick: () => setShowDiscarded(v => !v),
                   children: showDiscarded ? 'Hide discarded' : `Show ${discarded} discarded`,
                 })
               : null,
             discarded && showDiscarded
-              ? jsx('button', { type: 'button', className: 'ghost', disabled: busy, title: 'Delete every discarded attempt of this paper', onClick: () => void clearDiscarded(), children: 'Clear discarded' })
+              ? jsx(Tip, { label: 'Delete every discarded attempt of this paper', children:
+                  jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(), children: 'Clear discarded' }) })
               : null,
           ] }),
-          isOpen ? jsxs('table', { children: [
+          isOpen ? jsxs('table', { className: 'cbt-table', children: [
             jsx('thead', { children: jsx('tr', { children: ['Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
             jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
-              jsx('td', { children: jsx('span', { className: `badge ${a.mode === 'assisted' ? 'assisted' : ''}`, children: MODE_LABEL[a.mode] || a.mode }) }),
-              jsx('td', { children: jsx('span', { className: `badge ${a.status === 'in_progress' ? 'fill' : STATUS_CLS[a.status] || 'mut'}`, children: STATUS_LABEL[a.status] || a.status }) }),
-              jsx('td', { className: a.score == null ? 'muted num' : 'num', title: a.score == null ? 'not scored' : `score ${fmtScore(a.score)}`, children: fmtScore(a.score) }),
-              jsx('td', { className: 'muted', title: fmtWhen(a.submitted_at || a.started_at), children: relTime(a.submitted_at || a.started_at) }),
-              jsx('td', { children: confirmDel === a.id
-                ? jsxs('span', { className: 'row', children: [
-                    jsx('span', { className: 'muted', children: 'Delete this attempt?' }),
-                    jsx('button', { type: 'button', disabled: busy, onClick: () => void del(a.id), children: busy ? 'Deleting…' : 'Delete' }),
-                    jsx('button', { type: 'button', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
+              jsx('td', { children: jsx(Badge, { variant: 'outline', size: 'xs', children: MODE_LABEL[a.mode] || a.mode }) }),
+              jsx('td', { children: jsx(Badge, {
+                variant: a.status === 'in_progress' ? 'default' : a.status === 'submitted' ? 'muted' : 'outline',
+                size: 'xs',
+                children: STATUS_LABEL[a.status] || a.status,
+              }) }),
+              jsx('td', { className: a.score == null ? 'num muted' : 'num', children: fmtScore(a.score) }),
+              jsx('td', { className: 'muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
+              jsx('td', { className: 'right', children: confirmDel === a.id
+                ? jsxs('div', { className: 'cbt-row', children: [
+                    jsx('span', { className: 'cbt-sub', children: 'Delete this attempt?' }),
+                    jsx(Button, { variant: 'destructive', size: 'xs', disabled: busy, onClick: () => void del(a.id), children: busy ? 'Deleting…' : 'Delete' }),
+                    jsx(Button, { variant: 'ghost', size: 'xs', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
                   ] })
-                : jsxs('span', { className: 'row', children: [
+                : jsxs('div', { className: 'cbt-row', children: [
                     a.status === 'in_progress'
-                      ? jsx('button', { type: 'button', className: 'primary', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
+                      ? jsx(Button, { variant: 'default', size: 'xs', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
                       : a.status === 'abandoned'
-                        ? jsx('button', { type: 'button', title: 'This attempt was thrown away — nothing was graded', onClick: () => onViewResult(a.id), children: 'Details' })
-                        : jsx('button', { type: 'button', onClick: () => onViewResult(a.id), children: 'Result' }),
-                    jsx('button', { type: 'button', className: 'ghost danger', title: 'Delete this attempt permanently', onClick: () => setConfirmDel(a.id), children: 'Delete' }),
+                        ? jsx(Tip, { label: 'This attempt was thrown away — nothing was graded', children:
+                            jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => onViewResult(a.id), children: 'Details' }) })
+                        : jsx(Button, { variant: 'outline', size: 'xs', onClick: () => onViewResult(a.id), children: 'Result' }),
+                    jsx(Tip, { label: 'Delete this attempt permanently', children:
+                      jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }),
                   ] }) }),
             ] })) }),
             hidden > 0
-              ? jsx('caption', { style: { captionSide: 'bottom', textAlign: 'left' }, children: jsx('button', {
-                  type: 'button', className: 'ghost', onClick: () => setShowAll(true),
+              ? jsx('caption', { className: 'cbt-caption', children: jsx(Button, {
+                  variant: 'ghost', size: 'xs', onClick: () => setShowAll(true),
                   children: `Show ${hidden} more`,
                 }) })
               : null,
           ] }) : null,
         ] })
-      : jsx('div', { className: 'muted', style: { marginTop: 8 }, children: 'No attempts yet.' }),
+      : jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: 'No attempts yet.' }),
   ] })
 }
 
@@ -926,23 +864,24 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
-  return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row head', children: [
+  return jsxs('div', { className: 'cbt cbt-page', children: [
+    jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: 'CBT Exams' }),
-      jsx('span', { className: 'muted', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
+      jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
-      jsx('button', { type: 'button', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
-      jsx('button', { type: 'button', title: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', onClick: source, children: 'Source more papers' }),
+      jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
+      jsx(Tip, { label: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', children:
+        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Source more papers' }) }),
     ] }),
     packs.isLoading
-      ? jsx('div', { className: 'muted', children: 'loading packs…' })
+      ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
       : packs.isError
         ? jsx(ErrorBox, { what: 'Loading packs', onRetry: () => packs.refetch() })
         : (packList.length === 0
           ? jsxs('div', { children: [
-              jsx('p', { className: 'muted', children: 'No papers yet. Ask the agent to source a previous-year paper — it files itself here once validated.' }),
-              jsx('button', { type: 'button', onClick: source, children: 'Source a paper' }),
+              jsx(EmptyState, { title: 'No papers yet', description: 'Ask the agent to source a previous-year paper — it files itself here once validated.' }),
+              jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Source a paper' }),
             ] })
           : packList.map(p => jsx(ExamCard, {
               key: p.exam_id,
@@ -977,57 +916,56 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
     marked: n.marked + s.marked + s.answered_marked,
     blank: n.blank + s.not_answered + s.not_visited,
   }), { total: 0, answered: 0, marked: 0, blank: 0 })
-  return jsx('div', {
-    className: 'dlg', role: 'presentation', onClick: onCancel,
-    children: jsxs('div', {
-      className: 'dlg-box', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Submit the paper',
-      onClick: e => e.stopPropagation(),
+  return jsx(Dialog, {
+    open: true,
+    onOpenChange: open => { if (!open) onCancel() },
+    children: jsxs(DialogContent, {
+      className: 'cbt-dlg', 'aria-describedby': undefined,
       children: [
-        jsxs('div', { className: 'modal-head', children: [
-          jsx('strong', { children: 'Submit the paper?' }),
-          jsx('span', { className: 'muted', style: { fontSize: 12 }, children: 'this cannot be undone' }),
-          jsx('span', { style: { flex: 1 } }),
-          jsx('span', { className: 'kbd', children: 'Esc' }),
-          jsx('button', {
-            type: 'button', className: 'icon-btn', title: 'Close without submitting',
-            'aria-label': 'Close without submitting', onClick: onCancel,
-            children: icon('close'),
-          }),
+        jsxs(DialogHeader, { children: [
+          jsx(DialogTitle, { children: 'Submit the paper?' }),
+          jsx(DialogDescription, { children: 'This cannot be undone.' }),
         ] }),
-        jsxs('div', { className: 'dlg-body', children: [
-        jsxs('div', { className: 'row', style: { marginBottom: 14 }, children: [
-          jsx('span', { className: 'badge', children: `${totals.total} questions` }),
-          jsx('span', { className: 'badge ok', children: `${totals.answered} answered` }),
+        jsxs('div', { className: 'cbt-row cbt-gap-sm', children: [
+          jsx(Badge, { variant: 'outline', children: `${totals.total} questions` }),
+          jsx(Badge, { variant: 'success', children: `${totals.answered} answered` }),
           totals.marked
-            ? jsx('span', { className: 'badge acc', title: 'Flagged for review — a flagged question can also be answered', children: `${totals.marked} marked` })
+            ? jsx(Tip, { label: 'Flagged for review — a flagged question can also be answered', children:
+                jsx(Badge, { variant: 'muted', children: `${totals.marked} marked` }) })
             : null,
-          totals.blank ? jsx('span', { className: 'badge err', children: `${totals.blank} unanswered` }) : null,
+          totals.blank ? jsx(Badge, { variant: 'destructive', children: `${totals.blank} unanswered` }) : null,
         ] }),
-        jsxs('table', { children: [
+        jsxs('table', { className: 'cbt-table', children: [
           jsx('thead', { children: jsx('tr', { children: [
             jsx('th', { children: 'Section' }),
             jsx('th', { className: 'num', children: 'Answered' }),
-            jsx('th', { className: 'num', title: 'Flagged for review — can also be answered, so it does not add up with the other columns', children: 'Marked' }),
-            jsx('th', { className: 'num', title: 'Visited but no answer saved', children: 'Blank' }),
-            jsx('th', { className: 'num', title: 'Never opened', children: 'Not visited' }),
+            jsx('th', { className: 'num', children: jsx(Tip, { label: 'Flagged for review — can also be answered, so it does not add up with the other columns', children: jsx('span', { children: 'Marked' }) }) }),
+            jsx('th', { className: 'num', children: jsx(Tip, { label: 'Visited but no answer saved', children: jsx('span', { children: 'Blank' }) }) }),
+            jsx('th', { className: 'num', children: jsx(Tip, { label: 'Never opened', children: jsx('span', { children: 'Not visited' }) }) }),
           ] }) }),
           jsx('tbody', { children: stats.map(x => jsxs('tr', { key: x.id, children: [
-            jsx('td', { children: [x.title, x.limit ? jsx('span', { className: 'muted', children: ` · first ${x.limit} count` }) : null] }),
+            jsx('td', { children: [x.title, x.limit ? jsx('span', { className: 'cbt-sub', children: ` · first ${x.limit} count` }) : null] }),
             jsx('td', { className: 'num', children: String(x.answered + x.answered_marked) }),
             jsx('td', { className: 'num', children: String(x.marked + x.answered_marked) }),
             jsx('td', { className: 'num', children: String(x.not_answered) }),
             jsx('td', { className: 'num', children: String(x.not_visited) }),
           ] })) }),
         ] }),
-        jsx('p', { className: 'muted', style: { marginTop: 12, marginBottom: 0 }, children: unanswered
+        jsx('p', { className: 'cbt-sub', children: unanswered
           ? `${unanswered} unanswered (blank + not visited) will score 0 — a blank never carries a negative mark.`
           : 'Every question has an answer saved.' }),
-        jsxs('div', { className: 'row', style: { marginTop: 20 }, children: [
-          jsx('button', { type: 'button', className: 'primary', disabled: submitting, onClick: onSubmit, children: [icon('check'), submitting ? 'Submitting…' : 'Submit paper'] }),
-          jsx('button', { type: 'button', disabled: submitting, autoFocus: true, onClick: onCancel, children: 'Keep answering' }),
+        jsxs(DialogFooter, { children: [
+          jsx(Button, {
+            variant: 'default', size: 'default', loading: submitting, onClick: onSubmit,
+            children: [icon('check', 'size-3.5'), submitting ? 'Submitting…' : 'Submit paper'],
+          }),
+          jsx(Button, { variant: 'secondary', size: 'default', disabled: submitting, autoFocus: true, onClick: onCancel, children: 'Keep answering' }),
           jsx('span', { style: { flex: 1 } }),
-          jsx('button', { type: 'button', className: 'danger', disabled: submitting, title: 'Throw this attempt away — it is not graded', onClick: onDiscard, children: [icon('trash'), 'Discard'] }),
-        ] }),
+          jsx(Tip, { label: 'Throw this attempt away — it is not graded', children:
+            jsx(Button, {
+              variant: 'destructive', size: 'default', disabled: submitting, onClick: onDiscard,
+              children: [icon('trash', 'size-3.5'), 'Discard'],
+            }) }),
         ] }),
       ],
     }),
@@ -1114,8 +1052,8 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     const saved = curQid ? q.data.attempt.answers?.[curQid] : undefined
     setSel(saved === undefined || saved === null ? null : saved)
   }, [curQid, savedForShown])
-  if (q.isLoading) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'loading…' }) })
-  if (q.isError) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'could not load attempt' }) })
+  if (q.isLoading) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
+  if (q.isError) return jsx('div', { className: 'cbt cbt-page', children: jsx(ErrorBox, { what: 'Loading attempt', onRetry: () => q.refetch() }) })
   const { attempt, pack } = q.data
   const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
   const sections = pack.pattern.sections
@@ -1195,12 +1133,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     }
   }
   if (attempt.status !== 'in_progress') {
-    return jsxs('div', { className: 'cbt pad', children: [
+    return jsxs('div', { className: 'cbt cbt-page', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx('p', { className: 'muted', children: 'This attempt is submitted.' }),
-      jsxs('div', { className: 'row', children: [
-        jsx('button', { type: 'button', className: 'primary', onClick: () => onResult(attemptId), children: 'Open result' }),
-        onHome ? jsx('button', { type: 'button', onClick: () => onHome(), children: 'Home' }) : null,
+      jsx('p', { className: 'cbt-sub', children: 'This attempt is submitted.' }),
+      jsxs('div', { className: 'cbt-row', children: [
+        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onResult(attemptId), children: 'Open result' }),
+        onHome ? jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'Home' }) : null,
       ] }),
     ] })
   }
@@ -1298,59 +1236,60 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     jsx(ScrollToTop, { dep: curIdResolved, targetRef: bodyRef }),
     jsxs('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       inPane ? null : jsx(SidebarButton, {}),
-      jsx('strong', { className: 'cbt-head-title', title: pack.title || pack.exam_id, children: pack.title || pack.exam_id }),
-      isNarrow ? null : jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      jsx(Tip, { label: pack.title || pack.exam_id, children:
+        jsx('strong', { className: 'cbt-head-title', children: pack.title || pack.exam_id }) }),
+      isNarrow ? null : jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
       isNarrow
-        ? jsx('button', { type: 'button', className: 'icon-btn', title: 'Question paper', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: jsx('i', { className: 'codicon codicon-book', 'aria-hidden': 'true' }) })
-        : jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
+        ? jsx(Tip, { label: 'Question paper', children:
+            jsx(Button, { variant: 'ghost', size: 'icon-sm', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: icon('book', 'size-4') }) })
+        : jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowPaper(v => !v), children: [icon('book', 'size-4'), 'Question Paper'] }),
       // The terminal action belongs in the persistent chrome: it used to sit in the
       // question map, so folding the map took submitting away with it.
-      jsx('button', {
-        type: 'button', className: 'submit-head',
-        disabled: submitting || confirming,
-        'aria-label': 'Submit the paper',
-        title: confirming ? 'Confirmation is open below' : 'Review the counts, then submit the paper',
-        onClick: () => { setConfirming(true); setPalCollapsed(true) },
-        children: [icon('check'), 'Submit'],
-      }),
+      jsx(Tip, { label: confirming ? 'Confirmation is open' : 'Review the counts, then submit the paper', children:
+        jsx(Button, {
+          variant: 'default', size: 'sm',
+          disabled: submitting || confirming,
+          'aria-label': 'Submit the paper',
+          onClick: () => { setConfirming(true); setPalCollapsed(true) },
+          children: [icon('check', 'size-4'), 'Submit'],
+        }) }),
       jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
       // the panel toggle is the last thing in the header — it governs the panel on
       // the right, so it sits on the right of everything else
-      jsx('button', {
-        type: 'button', className: 'icon-btn',
-        'aria-expanded': !palCollapsed,
-        title: palCollapsed ? 'Show the question map' : 'Hide the question map',
-        onClick: () => setPalCollapsed(v => !v),
-        children: jsx('i', { className: 'codicon codicon-layout-sidebar-right', 'aria-hidden': 'true' }),
-      }),
+      jsx(Tip, { label: palCollapsed ? 'Show the question map' : 'Hide the question map', children:
+        jsx(Button, {
+          variant: 'ghost', size: 'icon-sm',
+          'aria-expanded': !palCollapsed,
+          'aria-label': palCollapsed ? 'Show the question map' : 'Hide the question map',
+          onClick: () => setPalCollapsed(v => !v),
+          children: jsx(Codicon, { name: 'layout-sidebar-right', size: 14 }),
+        }) }),
     ] }),
-    multiSection ? jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: jsx('div', { className: 'cbt-sectrack', children: sections.map(s => {
-      const qs = secQs(s.id)
-      const done = qs.filter(x => {
-        const v = answered[x.id]
-        return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
-      }).length
-      return jsx('button', {
-        key: s.id, type: 'button', className: s.id === activeSecId ? 'on' : '',
-        title: `${s.title}: ${done} of ${qs.length} answered`,
-        onClick: () => jumpSection(s.id),
-        children: [
-          jsx('span', { key: 't', children: s.title }),
-          jsx('span', { key: 'c', className: 'count', children: `${done}/${qs.length}` }),
-        ],
-      })
-    }) }) }) : null,
+    multiSection ? jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children:
+      jsx(SegmentedControl, {
+        value: activeSecId,
+        onChange: sid => jumpSection(sid),
+        sizing: 'content',
+        options: sections.map(sec => {
+          const qs = secQs(sec.id)
+          const done = qs.filter(x => {
+            const v = answered[x.id]
+            return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
+          }).length
+          return { id: sec.id, label: `${sec.title} ${done}/${qs.length}` }
+        }),
+      }) }) : null,
     jsx('div', { ref: bodyRef, className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
-      jsxs('div', { className: 'row', style: { gap: 10, marginBottom: 12 }, children: [
-        jsx('span', { className: 'muted', children: `Question ${qIndex} of ${pack.questions.length} · ${QTYPE_LABEL[cur.type] || cur.type}` }),
+      jsxs('div', { className: 'cbt-row cbt-gap-sm', style: { marginBottom: 12 }, children: [
+        jsx('span', { className: 'cbt-sub', children: `Question ${qIndex} of ${pack.questions.length} · ${QTYPE_LABEL[cur.type] || cur.type}` }),
         cur.type !== 'nat'
-          ? jsx('span', { className: 'muted', children: `+${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` })
+          ? jsx('span', { className: 'cbt-sub', children: `+${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` })
           : null,
-        marked.includes(curIdResolved) ? jsx('span', { className: 'badge acc', children: 'Marked' }) : null,
-        jsx('span', { className: `badge ${curAnswered ? 'ok' : 'mut'}`, children: curAnswered ? 'Answered' : 'Not answered' }),
+        marked.includes(curIdResolved) ? jsx(Badge, { variant: 'muted', size: 'xs', children: 'Marked' }) : null,
+        jsx(Badge, { variant: curAnswered ? 'success' : 'outline', size: 'xs', children: curAnswered ? 'Answered' : 'Not answered' }),
       ] }),
-      jsx('p', { style: { fontSize: 16, marginTop: 0, marginBottom: 16 }, children: cur.text }),
+      jsx('p', { className: 'cbt-qtext', children: cur.text }),
       mediaNode(cur.media, pack.exam_id, 'q'),
       cur.type === 'nat'
         ? jsx('input', {
@@ -1368,13 +1307,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
               jsx('strong', { children: 'Question map' }),
               jsx('span', { className: 'muted', children: `${secCounts[2] + secCounts[4]} of ${secQs(activeSecId).length} answered` }),
               jsx('span', { style: { flex: 1 } }),
-              jsx('button', {
-                type: 'button', className: 'icon-btn',
-                title: 'Hide the question map',
-                'aria-label': 'Hide the question map',
-                onClick: () => setPalCollapsed(true),
-                children: jsx('i', { className: 'codicon codicon-close', 'aria-hidden': 'true' }),
-              }),
+              jsx(Tip, { label: 'Hide the question map', children:
+                jsx(Button, {
+                  variant: 'ghost', size: 'icon-xs', 'aria-label': 'Hide the question map',
+                  onClick: () => setPalCollapsed(true),
+                  children: icon('close', 'size-3.5'),
+                }) }),
             ] }),
             legendNode(secCounts),
             secMeta.attempt_limit
@@ -1398,7 +1336,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
                   key: x.id, type: 'button',
                   className: `cbt-chip ${st}`,
                   style: x.id === curIdResolved ? { outline: '2px solid var(--ui-accent)', outlineOffset: '1px' } : undefined,
-                  title: `Question ${i + 1}`,
+                  'aria-label': `Question ${i + 1} of ${s.title}`,
                   onClick: () => goTo(x.id),
                   children: st === 's-answered-marked'
                     ? [String(i + 1), jsx('span', { key: 't', className: 'tick', children: '✓' })]
@@ -1414,25 +1352,31 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: jsx('div', { className: 'act-bar', children: [
       // Three groups, in the order you use them: answer · review · navigate.
       jsxs('span', { key: 'g-answer', className: 'act-group', children: [
-        jsx('button', { key: 'sv', type: 'button', 'data-span': '3', onClick: () => void act('saveStay'), title: 'Save the answer and stay (S)', children: [icon('save'), 'Save'] }),
-        jsx('button', { key: 'sn', type: 'button', className: 'primary', 'data-span': '3', onClick: () => void act('saveNext'), title: 'Save and move to the next question (Enter)', children: [icon('save'), 'Save & Next'] }),
+        jsx(Tip, { key: 'sv-t', label: 'Save the answer and stay (S)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', loading: saveState === 'saving',
+            onClick: () => void act('saveStay'), children: [icon('save', 'size-4'), 'Save'] }) }),
+        jsx(Tip, { key: 'sn-t', label: 'Save and move to the next question (Enter)', children:
+          jsx(Button, { variant: 'default', size: 'sm', 'data-span': '3', loading: saveState === 'saving',
+            onClick: () => void act('saveNext'), children: [icon('save', 'size-4'), 'Save & Next'] }) }),
       ] }),
       jsxs('span', { key: 'g-review', className: 'act-group', children: [
-        jsx('button', {
-          key: 'sm', type: 'button', className: marked.includes(curIdResolved) ? 'on' : '', 'data-span': '2', style: { minWidth: 96 },
-          title: 'Flag this question for review — stays here (M)',
-          onClick: () => void act('saveMark'),
-          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
-        }),
-        jsx('button', {
-          key: 'mn', type: 'button', 'data-span': '2', style: { minWidth: 150 },
-          title: 'Flag for review and move on',
-          onClick: () => void act('markNext'),
-          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
-        }),
-        jsx('button', { key: 'cr', type: 'button', className: 'clear', 'data-span': '2', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: [icon('clear-all'), 'Clear'] }),
+        jsx(Tip, { key: 'sm-t', label: marked.includes(curIdResolved) ? 'Remove the review flag — stays here (M)' : 'Flag this question for review — stays here (M)', children:
+          jsx(Button, {
+            variant: marked.includes(curIdResolved) ? 'chip' : 'secondary', size: 'sm', 'data-span': '2',
+            'aria-pressed': marked.includes(curIdResolved),
+            onClick: () => void act('saveMark'),
+            children: [icon(marked.includes(curIdResolved) ? 'bookmarkOn' : 'bookmark', 'size-4'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
+          }) }),
+        jsx(Tip, { key: 'mn-t', label: 'Flag for review and move on', children:
+          jsx(Button, {
+            variant: 'secondary', size: 'sm', 'data-span': '2',
+            onClick: () => void act('markNext'),
+            children: [icon('bookmark', 'size-4'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
+          }) }),
+        jsx(Tip, { key: 'cr-t', label: 'Remove the saved answer for this question', children:
+          jsx(Button, { variant: 'ghost', size: 'sm', 'data-span': '2',
+            onClick: () => void act('clear'), children: [icon('clear', 'size-4'), 'Clear'] }) }),
       ] }),
-      // fixed-width slot: the indicator appearing must not shift the nav group
       saveState
         ? jsx('span', {
             key: 'ss', className: 'save-slot', role: 'status',
@@ -1444,8 +1388,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         : null,
       // nav pair travels as one unit and sits at the far right
       jsxs('span', { key: 'nav', className: 'act-group nav', children: [
-        jsx('button', { key: 'bk', type: 'button', 'data-span': '3', onClick: () => void act('back'), title: 'Previous question (←)', children: [icon('chevron-left'), 'Back'] }),
-        jsx('button', { key: 'nx', type: 'button', 'data-span': '3', onClick: () => void act('next'), title: 'Next question (→)', children: ['Next', icon('chevron-right')] }),
+        jsx(Tip, { key: 'bk-t', label: 'Previous question (←)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3',
+            onClick: () => void act('back'), children: [icon('chevron-left', 'size-4'), 'Back'] }) }),
+        jsx(Tip, { key: 'nx-t', label: 'Next question (→)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3',
+            onClick: () => void act('next'), children: ['Next', icon('chevron-right', 'size-4')] }) }),
       ] }),
     ] }) }),
     confirming && jsx(SubmitDialog, {
@@ -1454,31 +1402,25 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       onSubmit: () => void doSubmit(),
       onDiscard: () => void doDiscard(),
     }),
-    showPaper && jsxs('div', {
-      style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 },
-      onClick: () => setShowPaper(false),
-      role: 'presentation',
-      children: [jsx('div', {
-        role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Question paper',
-        style: { background: 'var(--ui-surface-background)', color: 'var(--ui-text-primary)', maxWidth: 760, width: '90%', maxHeight: '80%', overflow: 'auto', borderRadius: 8, padding: 20 },
-        onClick: e => e.stopPropagation(),
+    showPaper && jsx(Dialog, {
+      open: true,
+      onOpenChange: open => { if (!open) setShowPaper(false) },
+      children: jsxs(DialogContent, {
+        className: 'cbt-dlg cbt-paper',
         children: [
-          jsx('div', { className: 'row modal-head', children: [
-            jsx('strong', { children: pack.title || pack.exam_id }),
-            jsx('span', { className: 'muted', style: { fontSize: 12 }, children: 'read-only copy' }),
-            jsx('span', { style: { flex: 1 } }),
-            jsx('span', { className: 'kbd', children: 'Esc' }),
-            jsx('button', { type: 'button', onClick: () => setShowPaper(false), children: 'Close' }),
+          jsxs(DialogHeader, { children: [
+            jsx(DialogTitle, { children: pack.title || pack.exam_id }),
+            jsx(DialogDescription, { children: 'A read-only copy of the paper. Close with Esc.' }),
           ] }),
           ...sections.map(s => jsxs('div', { key: s.id, children: [
             jsx('h3', { children: s.title }),
-            ...secQs(s.id).map((x, i) => jsxs('div', { key: x.id, style: { margin: '8px 0' }, children: [
-              jsx('p', { style: { margin: 0, fontSize: 13 }, children: [jsx('strong', { children: `${i + 1}. ` }), x.text] }),
+            ...secQs(s.id).map((x, i) => jsxs('div', { key: x.id, className: 'cbt-paper-q', children: [
+              jsx('p', { children: [jsx('strong', { children: `${i + 1}. ` }), x.text] }),
               mediaNode(x.media, pack.exam_id, `paper-${x.id}`),
             ] })),
           ] })),
         ],
-      })],
+      }),
     }),
   ] })
 }
@@ -1553,18 +1495,17 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     const a = q.data?.attempt
     void stageInChat(`Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the cbt-exam plugin result page.`)
   }
-  if (q.isLoading) return jsx('div', { className: 'cbt pad', children: jsx('div', { className: 'muted', children: 'loading…' }) })
-  if (q.isError) return jsx('div', { className: 'cbt pad', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })
-  if (!q.data) return jsx('div', { className: 'cbt pad', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })
+  if (q.isLoading) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
+  if (q.isError || !q.data) return jsx('div', { className: 'cbt cbt-page', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })
   const { attempt, pack } = q.data
   if (attempt.status !== 'submitted' || !attempt.result) {
     const why = attempt.status === 'abandoned'
       ? 'This attempt was discarded — it was never graded and its answer key is not shown.'
       : 'This attempt is still in progress — resume it to finish.'
-    return jsxs('div', { className: 'cbt pad', children: [
+    return jsxs('div', { className: 'cbt cbt-page', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx('p', { className: 'muted', children: why }),
-      jsx('button', { type: 'button', onClick: () => onHome(), children: 'Back to home' }),
+      jsx('p', { className: 'cbt-sub', children: why }),
+      jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onHome(), children: 'Back to home' }),
     ] })
   }
   const r = attempt.result
@@ -1572,29 +1513,35 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
   const total = (r.totals.correct || 0) + (r.totals.wrong || 0) + (r.totals.skipped || 0) + (r.totals.not_counted || 0)
   const pct = total ? Math.round((1000 * (r.totals.correct || 0)) / total) / 10 : 0
-  return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row head', children: [
+  return jsxs('div', { className: 'cbt cbt-page', children: [
+    jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: MODE_LABEL[attempt.mode] || attempt.mode }),
-      jsx('span', { className: 'muted', title: fmtWhen(attempt.submitted_at), children: `submitted ${relTime(attempt.submitted_at)}` }),
+      jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[attempt.mode] || attempt.mode }),
+      jsx(Tip, { label: fmtWhen(attempt.submitted_at), children:
+        jsx('span', { className: 'cbt-sub', children: `submitted ${relTime(attempt.submitted_at)}` }) }),
       jsx('span', { style: { flex: 1 } }),
-      onRetake ? jsx('button', { type: 'button', className: 'primary', title: `New ${MODE_LABEL[attempt.mode] || attempt.mode} attempt on this paper`, onClick: () => onRetake(pack, attempt.mode), children: 'Retake' }) : null,
-      jsx('button', { type: 'button', onClick: () => onHome(), children: 'All exams' }),
+      onRetake ? jsx(Tip, { label: `New ${MODE_LABEL[attempt.mode] || attempt.mode} attempt on this paper`, children:
+        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, attempt.mode), children: 'Retake' }) }) : null,
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
     ] }),
-    jsx('div', { className: 'muted', style: { fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', marginTop: 8 }, children: 'Score' }),
-    jsx('div', { className: `score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+    jsx('div', { className: 'cbt-label', children: 'Score' }),
+    jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
     jsxs('div', { className: 'row sub', children: [
-      jsx('span', { className: 'muted', children: `${r.totals.correct} of ${total} correct · ${pct}%` }),
+      jsx('span', { className: 'cbt-sub', children: `${r.totals.correct} of ${total} correct · ${pct}%` }),
       (() => {
         // marking can be set on the pattern or overridden per section; show the one
         // that actually applied to this paper
         const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
-        return w < 0 ? jsx('span', { className: 'muted', children: `· ${w} per wrong answer` }) : null
+        return w < 0 ? jsx('span', { className: 'cbt-sub', children: `· ${w} per wrong answer` }) : null
       })(),
       jsx('span', { style: { flex: 1 } }),
       ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
-        jsxs('span', { key: k, className: `badge ${VERDICT_CLS[k]}`, title: VERDICT_LABEL[k], children: [`${VERDICT_LABEL[k]} `, jsx('strong', { children: String(r.totals[k]) })] })),
+        jsx(Badge, {
+          key: k, size: 'xs',
+          variant: k === 'correct' ? 'success' : k === 'wrong' ? 'destructive' : k === 'skipped' ? 'muted' : 'outline',
+          children: `${VERDICT_LABEL[k]} ${r.totals[k]}`,
+        })),
     ] }),
     pack.pattern.sections.length > 1 ? jsx('h3', { children: 'Sections' }) : null,
     pack.pattern.sections.length > 1 && jsxs('table', { children: [
@@ -1612,47 +1559,50 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       }) }) ] }),
     jsx('h3', { children: 'AI evaluation' }),
     evalBusy
-      ? jsx('div', { className: 'row muted', children: [
-          jsx('i', { className: 'codicon codicon-loading codicon-modifier-spin', 'aria-hidden': 'true' }),
+      ? jsxs('div', { className: 'cbt-row cbt-sub', children: [
+          jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
           'Analysing your attempt — this calls the model once and takes a few seconds.',
         ] })
       : evalError
         ? jsxs('div', { children: [
-            jsxs('div', { className: 'row', children: [
-              jsx('span', { className: 'badge err', children: 'AI evaluation failed' }),
-              jsx('button', { type: 'button', onClick: () => void runEval(false), children: 'Retry' }),
-              jsx('button', { type: 'button', onClick: discuss, children: 'Discuss with the agent instead' }),
+            jsxs('div', { className: 'cbt-row', children: [
+              jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
+              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
+              jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss with the agent instead' }),
             ] }),
             jsxs('details', { style: { marginTop: 8 }, children: [
-              jsx('summary', { className: 'muted', style: { cursor: 'pointer', fontSize: 12 }, children: 'What the model said' }),
-              jsx('pre', { className: 'muted', style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, margin: '6px 0 0' }, children: evalError }),
+              jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
+              jsx('pre', { className: 'cbt-pre', children: evalError }),
             ] }),
           ] })
         : attempt.evaluation
           ? jsxs('div', { children: [
               evaluationCard(attempt.evaluation.data),
-              jsxs('div', { className: 'row', style: { marginTop: 12 }, children: [
-                jsx('span', { className: 'muted', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
+              jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
+                jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                 jsx('span', { style: { flex: 1 } }),
-                jsx('button', { type: 'button', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
-                jsx('button', { type: 'button', onClick: discuss, children: 'Discuss in chat' }),
+                jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
+                jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
               ] }),
             ] })
-          : jsxs('div', { className: 'row', children: [
-              jsx('span', { className: 'muted', children: 'No evaluation yet.' }),
-              jsx('button', { type: 'button', onClick: () => void runEval(false), children: 'Analyse this attempt' }),
-              jsx('button', { type: 'button', onClick: discuss, children: 'Discuss in chat' }),
+          : jsxs('div', { className: 'cbt-row', children: [
+              jsx('span', { className: 'cbt-sub', children: 'No evaluation yet.' }),
+              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Analyse this attempt' }),
+              jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
             ] }),
-    jsxs('div', { className: 'row', style: { marginTop: 24 }, children: [
+    jsxs('div', { className: 'cbt-row', style: { marginTop: 24 }, children: [
       jsx('h3', { style: { margin: 0 }, children: 'Review' }),
-      jsx('span', { className: 'muted', children: `${rows.length} shown` }),
+      jsx('span', { className: 'cbt-sub', children: `${rows.length} shown` }),
       jsx('span', { style: { flex: 1 } }),
-      jsx('div', { className: 'seg', children: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) =>
-        jsx('button', {
-          key: f, type: 'button', className: filter === f ? 'on' : '', 'aria-pressed': filter === f,
-          onClick: () => setFilter(f),
-          children: f === 'all' ? `${label} ${r.questions.length}` : `${label} ${r.totals[f] ?? 0}`,
-        })) }),
+      jsx(SegmentedControl, {
+        value: filter,
+        onChange: f => setFilter(f),
+        sizing: 'content',
+        options: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) => ({
+          id: f,
+          label: f === 'all' ? `${label} ${r.questions.length}` : `${label} ${r.totals[f] ?? 0}`,
+        })),
+      }),
     ] }),
     jsx('div', { style: { marginTop: 8 }, children: rows.map(row => {
       const qq = qmap[row.id]
@@ -1661,40 +1611,43 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       const skipped = row.verdict === 'skipped'
       return jsxs('div', { key: row.id, className: 'review-row', children: [
         jsx('div', {
-          className: 'row', role: 'button', tabIndex: 0, 'aria-expanded': expanded,
+          className: 'cbt-row cbt-review-head', role: 'button', tabIndex: 0, 'aria-expanded': expanded,
           onClick: () => setOpen(expanded ? null : row.id),
           onKeyDown: e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(expanded ? null : row.id) }
           },
-          style: { cursor: 'pointer' },
           children: [
+            jsx(Codicon, { name: expanded ? 'chevron-down' : 'chevron-right', size: 12 }),
             jsx('strong', { children: row.id }),
-            jsx('span', { className: `badge ${VERDICT_CLS[row.verdict]}`, children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}` }),
-            isMarked ? jsx('span', { className: 'badge acc', children: 'Marked' }) : null,
-            jsx('span', { className: 'muted', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
+            jsx(Badge, {
+              size: 'xs',
+              variant: row.verdict === 'correct' ? 'success' : row.verdict === 'wrong' ? 'destructive' : row.verdict === 'skipped' ? 'muted' : 'outline',
+              children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}`,
+            }),
+            isMarked ? jsx(Badge, { size: 'xs', variant: 'muted', children: 'Marked' }) : null,
+            jsx('span', { className: 'cbt-sub', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
             jsx('span', { style: { flex: 1 } }),
-            jsx('span', { className: 'muted', children: expanded ? '▾' : '▸' }),
           ],
         }),
-        expanded && jsxs('div', { style: { marginTop: 4, marginBottom: 12, maxWidth: 820 }, children: [
+        expanded && jsxs('div', { className: 'cbt-review-body', children: [
           jsx('p', { children: qq.text }),
           mediaNode(qq.media, pack.exam_id, `rev-${row.id}`),
-          (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'muted', children: [
+          (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'cbt-sub', children: [
             `${String.fromCharCode(65 + i)}) ${o}`,
             qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.exam_id, `rev-${row.id}-o${i}`) : null,
           ] })),
-          jsxs('div', { className: 'ans', style: { marginTop: 8 }, children: [
-            jsx('span', { className: 'k', children: 'Your answer' }),
+          jsxs('div', { className: 'cbt-ans', children: [
+            jsx('span', { className: 'cbt-ans-k', children: 'Your answer' }),
             jsx('span', {
               className: skipped ? 'muted' : row.verdict === 'correct' ? 'hit' : 'miss',
               children: skipped ? 'not answered' : fmtAns(qq, attempt.answers[row.id]),
             }),
           ] }),
-          jsxs('div', { className: 'ans', children: [
-            jsx('span', { className: 'k', children: 'Correct answer' }),
+          jsxs('div', { className: 'cbt-ans', children: [
+            jsx('span', { className: 'cbt-ans-k', children: 'Correct answer' }),
             jsx('span', { className: 'hit', children: fmtAns(qq, qq.answer) }),
           ] }),
-          qq.explanation ? jsx('p', { className: 'muted', style: { marginTop: 8 }, children: qq.explanation }) : null,
+          qq.explanation ? jsx('p', { className: 'cbt-sub', children: qq.explanation }) : null,
         ] }),
       ] })
     }) }),
@@ -1784,10 +1737,13 @@ function TimerChip() {
   })
   const a = q.data?.attempt
   if (!id || !a || a.status !== 'in_progress') return null
-  return jsx('button', {
-    type: 'button',
-    onClick: () => host.navigate('/cbt'),
-    children: `⏱ ${fmtHMS(q.data.remaining_seconds)}`,
+  return jsx(Tip, {
+    label: 'Open the running attempt',
+    children: jsx(Button, {
+      variant: 'ghost', size: 'micro', 'aria-label': 'Open the running attempt',
+      onClick: () => host.navigate('/cbt'),
+      children: [jsx(Codicon, { key: 'c', name: 'watch', size: 12 }), fmtHMS(q.data.remaining_seconds)],
+    }),
   })
 }
 
