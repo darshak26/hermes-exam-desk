@@ -1,5 +1,5 @@
 // cbt-exam — exam-agnostic CBT practice panel (route /cbt)
-import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient } from '@hermes/plugin-sdk'
+import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient, Button, Tip } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 
@@ -29,13 +29,13 @@ const CSS = `
 .cbt td:last-child .row{flex-wrap:nowrap}
 .cbt th{color:var(--ui-text-secondary,#666);font-weight:600;padding-top:0}
 .cbt td .row{gap:8px}
-.cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
-.cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
+.cbt button:not([data-slot]){font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
+.cbt button:not([data-slot]):hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
 /* a tinted outline still reads as "hovered" — the app's solid pairing is what makes
    a button look like THE action: --dt-primary-solid with its own foreground */
-.cbt button.primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
-.cbt button.primary:hover:not(:disabled){filter:brightness(1.12)}
-.cbt button:disabled{opacity:.5;cursor:default}
+.cbt button:not([data-slot]).primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
+.cbt button:not([data-slot]).primary:hover:not(:disabled){filter:brightness(1.12)}
+.cbt button:not([data-slot]):disabled{opacity:.5;cursor:default}
 .cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
 .cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
 .cbt .cbt-icon-btn:active{background:var(--ui-control-active-background,rgba(127,127,127,.24))}
@@ -54,7 +54,7 @@ const CSS = `
 .cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
 .cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
-.cbt button.badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
+.cbt button:not([data-slot]).badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
 .cbt .warn-list{margin:8px 0 0;font-size:12px;color:var(--ui-text-secondary)}
 /* result headline + review diff */
 .cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
@@ -99,10 +99,10 @@ const CSS = `
 .cbt .card-body{margin-top:12px;border-top:1px solid var(--ui-stroke-secondary);padding-top:12px}
 .cbt .stat{display:flex;gap:12px;font-size:12px;color:var(--ui-text-secondary);margin-top:6px;align-items:baseline}
 .cbt .stat > span + span::before{content:'·';margin-right:12px;color:var(--ui-text-quaternary)}
-.cbt button.ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
-.cbt button.ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
-.cbt button.ghost.danger{margin-left:8px}
-.cbt button.ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
+.cbt button:not([data-slot]).ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt button:not([data-slot]).ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
+.cbt button:not([data-slot]).ghost.danger{margin-left:8px}
+.cbt button:not([data-slot]).ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
 .cbt .card table th{padding-top:0}
 .cbt .card caption{padding-top:8px}
 .cbt .legend{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;row-gap:3px;font-size:11.5px;color:var(--ui-text-secondary);margin:0 0 12px}
@@ -177,17 +177,15 @@ const CSS = `
 .cbt .cbt-chip.s-answered-marked{border-color:var(--cbt-mark);background:color-mix(in srgb,var(--cbt-mark) 22%,transparent)}
 .cbt .cbt-chip .tick{color:var(--ui-success, #10b981);font-weight:700;font-size:9px;margin-left:1px;vertical-align:1px}
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt-actions{display:flex;gap:16px;row-gap:10px;align-items:center;padding:10px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary);background:var(--ui-surface-background,#fff)}
+.cbt-actions{padding:10px 20px;border-top:1px solid var(--ui-stroke-secondary);background:var(--ui-surface-background,#fff);container-type:inline-size}
+.act-bar{display:flex;gap:12px;row-gap:10px;align-items:center;flex-wrap:wrap}
 .cbt .act-group{display:flex;gap:8px;align-items:center;min-width:0}
 .cbt .act-group.nav{margin-left:auto}
 .cbt-actions .ask{display:flex;flex-direction:column;gap:2px;min-width:0}
-.cbt .cbt-actions button{height:30px;gap:6px;padding:0 9px}
-.cbt .cbt-actions button .codicon{font-size:14px;opacity:.9}
-.cbt .cbt-actions button.on{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-text-primary);font-weight:600}
-.cbt .cbt-actions button.clear{color:var(--ui-text-secondary)}
-.cbt .cbt-actions button.clear:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
+.cbt .cbt-actions .codicon{font-size:14px;opacity:.9}
+.cbt .cbt-actions button{white-space:nowrap}
+.cbt button:not([data-slot]).danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt button:not([data-slot]).danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
 /* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
    the screen edge. The header toggle (always in the same place) brings it back. */
@@ -227,7 +225,27 @@ const CSS = `
 .cbt-shell.narrow .cbt-qbody{padding:16px 16px 20px}
 .cbt-shell.narrow .cbt-head{padding:0 12px;gap:8px}
 .cbt-shell.narrow .cbt-head-title{flex:1 1 auto}
-.cbt-shell.narrow .cbt-actions{padding:12px 16px}
+/* Narrow: the footer becomes a 6-column grid. Each row of buttons fills the width
+   exactly (3+3, 2+2+2, 3+3), so there is no ragged trailing edge, and every row is
+   flush with both sides of the bar. */
+/* Below ~800px of bar the buttons cannot sit in one row, so the row becomes a
+   6-column grid whose rows each fill the width exactly (3+3 · 2+2+2 · 3+3). */
+/* 690px is the measured one-row budget: 577px of buttons + group gaps + the
+   save indicator. Below it the row would wrap ragged, so it becomes the grid. */
+@container (max-width: 690px) {
+  .act-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+  .act-bar .act-group{display:contents}
+  .act-bar .act-group.nav{margin-left:0}
+  .act-bar button{width:100%;min-width:0!important;justify-content:center}
+  .act-bar button[data-span="2"]{grid-column:span 2}
+  .act-bar button[data-span="3"]{grid-column:span 3}
+  /* out of flow: taking a grid row would grow the bar by 30px on every save */
+  .cbt-actions{position:relative}
+  .act-bar .save-slot{position:absolute;left:20px;bottom:calc(100% + 4px);margin:0;padding:3px 10px;border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:var(--ui-surface-background,#fff);box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:2}
+}
+/* the save state floats above the bar instead of taking a grid row, otherwise the
+   footer grows 42px every time you save */
+
 `;
 
 async function rest(path, opts) {
@@ -716,13 +734,17 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
 function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
   const qc = useQueryClient()
   const live = attempts.filter(a => a.status === 'in_progress')
-  const [open, setOpen] = useState(live.length > 0)
+  // attempts arrive after the first render, so "open when there is history" cannot be
+  // an initial value — it would be computed against an empty list and stay closed.
+  // null = follow the data; a click pins the user's choice.
+  const [open, setOpen] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [busy, setBusy] = useState(false)
   const [showWarn, setShowWarn] = useState(false)
 
+  const isOpen = open === null ? attempts.length > 0 : open
   const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
   const rank = a => (a.status === 'in_progress' ? 0 : 1)
   const ordered = [...kept].sort((x, y) =>
@@ -816,9 +838,9 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
       ? jsxs('div', { className: 'card-body', children: [
           jsxs('div', { className: 'row', style: { marginBottom: 8 }, children: [
             jsx('button', {
-              type: 'button', className: 'ghost', 'aria-expanded': open,
-              onClick: () => setOpen(v => !v),
-              children: open ? '▾ Hide history' : `▸ History · ${ordered.length}`,
+              type: 'button', className: 'ghost', 'aria-expanded': isOpen,
+              onClick: () => setOpen(!isOpen),
+              children: isOpen ? '▾ Hide history' : `▸ History · ${ordered.length}`,
             }),
             jsx('span', { style: { flex: 1 } }),
             discarded
@@ -832,7 +854,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
               ? jsx('button', { type: 'button', className: 'ghost', disabled: busy, title: 'Delete every discarded attempt of this paper', onClick: () => void clearDiscarded(), children: 'Clear discarded' })
               : null,
           ] }),
-          open ? jsxs('table', { children: [
+          isOpen ? jsxs('table', { children: [
             jsx('thead', { children: jsx('tr', { children: ['Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
             jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
               jsx('td', { children: jsx('span', { className: `badge ${a.mode === 'assisted' ? 'assisted' : ''}`, children: MODE_LABEL[a.mode] || a.mode }) }),
@@ -1364,43 +1386,52 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
 
       ] }),
     ] }),
-    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: [
+    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: jsx('div', { className: 'act-bar', children: [
       // Three groups, in the order you use them: answer · review · navigate.
+      // The app's own Button carries variants/sizes so the bar matches the
+      // surrounding chrome instead of a hand-tuned height of its own.
       jsxs('span', { key: 'g-answer', className: 'act-group', children: [
-        jsx('button', { key: 'sv', type: 'button', onClick: () => void act('saveStay'), title: 'Save the answer and stay (S)', children: [icon('save'), 'Save'] }),
-        jsx('button', { key: 'sn', type: 'button', className: 'primary', onClick: () => void act('saveNext'), title: 'Save and move to the next question (Enter)', children: [icon('save'), 'Save & Next'] }),
+        jsx(Tip, { key: 'sv-t', label: 'Save the answer and stay (S)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', loading: saveState === 'saving', onClick: () => void act('saveStay'), children: [icon('save'), 'Save'] }) }),
+        jsx(Tip, { key: 'sn-t', label: 'Save and move to the next question (Enter)', children:
+          jsx(Button, { variant: 'default', size: 'sm', 'data-span': '3', loading: saveState === 'saving', onClick: () => void act('saveNext'), children: [icon('save'), 'Save & Next'] }) }),
       ] }),
       jsxs('span', { key: 'g-review', className: 'act-group', children: [
-        jsx('button', {
-          key: 'sm', type: 'button', className: marked.includes(curIdResolved) ? 'on' : '', style: { minWidth: 96 },
-          title: 'Flag this question for review — stays here (M)',
-          onClick: () => void act('saveMark'),
-          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
-        }),
-        jsx('button', {
-          key: 'mn', type: 'button', style: { minWidth: 150 },
-          title: 'Flag for review and move on',
-          onClick: () => void act('markNext'),
-          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
-        }),
-        jsx('button', { key: 'cr', type: 'button', className: 'clear', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: [icon('discard'), 'Clear'] }),
+        jsx(Tip, { key: 'sm-t', label: marked.includes(curIdResolved) ? 'Remove the review flag — stays here (M)' : 'Flag this question for review — stays here (M)', children:
+          jsx(Button, {
+            variant: 'secondary', size: 'sm', 'data-span': '2',
+            style: marked.includes(curIdResolved) ? { boxShadow: 'inset 0 0 0 1px var(--cbt-mark)', color: 'var(--cbt-mark)' } : undefined,
+            'aria-pressed': marked.includes(curIdResolved),
+            onClick: () => void act('saveMark'),
+            children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
+          }) }),
+        jsx(Tip, { key: 'mn-t', label: 'Flag for review and move on', children:
+          jsx(Button, {
+            variant: 'secondary', size: 'sm', 'data-span': '2',
+            onClick: () => void act('markNext'),
+            children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
+          }) }),
+        jsx(Tip, { key: 'cr-t', label: 'Remove the saved answer for this question', children:
+          jsx(Button, { variant: 'ghost', size: 'sm', 'data-span': '2', onClick: () => void act('clear'), children: [icon('clear-all'), 'Clear'] }) }),
       ] }),
       // fixed-width slot: the indicator appearing must not shift the nav group
-      jsx('span', {
-        key: 'ss', className: 'save-slot', role: 'status',
-        children: saveState
-          ? jsx('span', {
+      saveState
+        ? jsx('span', {
+            key: 'ss', className: 'save-slot', role: 'status',
+            children: jsx('span', {
               className: `save-state${saveState === 'saved' ? ' ok' : saveState === 'err' ? ' err' : ''}`,
               children: saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Not saved — retry',
-            })
-          : null,
-      }),
+            }),
+          })
+        : null,
       // nav pair travels as one unit and sits at the far right
       jsxs('span', { key: 'nav', className: 'act-group nav', children: [
-        jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), title: 'Previous question (←)', children: [icon('chevron-left'), 'Back'] }),
-        jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), title: 'Next question (→)', children: ['Next', icon('chevron-right')] }),
+        jsx(Tip, { key: 'bk-t', label: 'Previous question (←)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', onClick: () => void act('back'), children: [icon('chevron-left'), 'Back'] }) }),
+        jsx(Tip, { key: 'nx-t', label: 'Next question (→)', children:
+          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', onClick: () => void act('next'), children: ['Next', icon('chevron-right')] }) }),
       ] }),
-    ] }),
+    ] }) }),
     confirming && jsx(SubmitDialog, {
       stats: submitStats, unanswered: unansweredTotal, submitting,
       onCancel: () => setConfirming(false),
