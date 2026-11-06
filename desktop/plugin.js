@@ -606,11 +606,13 @@ async function launchSourcing() {
     await new Promise(done => setTimeout(done, 350))
   }
   await stageInChat(SOURCE_PROMPT)
-  for (let i = 0; i < 4; i++) {
-    const sid = host.state.activeSessionId.get() ?? null
-    if (!sid) break
-    try { host.composer.submit?.(sid, SOURCE_PROMPT); return true } catch { /* keep the draft */ }
-    await new Promise(done => setTimeout(done, 200))
+  // 'new' is the documented address for the draft that has no session yet — the
+  // primary composer while it shows none. Passing null (the active composer) is
+  // what failed closed before.
+  for (let i = 0; i < 5; i++) {
+    const addr = host.state.activeSessionId.get() || 'new'
+    try { if (host.composer.submit?.(addr, SOURCE_PROMPT)) return true } catch { /* keep the draft */ }
+    await new Promise(done => setTimeout(done, 250))
   }
   return false      // the draft is staged; one Enter finishes it
 }
