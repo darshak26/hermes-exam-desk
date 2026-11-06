@@ -26,7 +26,10 @@ const CSS = `
 .cbt td .row{gap:8px}
 .cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
 .cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
-.cbt button.primary{border-color:var(--ui-accent);color:var(--ui-text-primary);font-weight:600;background:color-mix(in srgb,var(--ui-accent) 20%,transparent)}
+/* a tinted outline still reads as "hovered" — the app's solid pairing is what makes
+   a button look like THE action: --dt-primary-solid with its own foreground */
+.cbt button.primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
+.cbt button.primary:hover:not(:disabled){filter:brightness(1.12)}
 .cbt button:disabled{opacity:.5;cursor:default}
 .cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
 .cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
@@ -146,9 +149,18 @@ const CSS = `
 .cbt .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
+.cbt-actions{display:flex;gap:16px;row-gap:10px;align-items:center;padding:10px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary);background:var(--ui-surface-background,#fff)}
+.cbt .act-group{display:flex;gap:8px;align-items:center;min-width:0}
+.cbt .act-group.nav{margin-left:auto}
+.cbt-actions .ask{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cbt .cbt-actions button{height:30px;gap:6px;padding:0 9px}
+.cbt .cbt-actions button .codicon{font-size:14px;opacity:.9}
+.cbt .cbt-actions button.on{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-text-primary);font-weight:600}
+.cbt .cbt-actions button.clear{color:var(--ui-text-secondary)}
+.cbt .cbt-actions button.clear:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt .cbt-actions button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt .cbt-actions button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
-.cbt-actions .nav{flex-wrap:nowrap;margin-left:auto}
 /* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
    the screen edge. The header toggle (always in the same place) brings it back. */
 .cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
@@ -177,8 +189,7 @@ const CSS = `
 .cbt .pal-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .cbt .pal-title strong{font-size:12px}
 .cbt .pal-title .muted{font-size:11px;font-variant-numeric:tabular-nums}
-.cbt .cbt-actions button[data-fixed]{min-width:172px;justify-content:flex-start}
-.cbt .save-slot{min-width:76px;display:inline-flex;justify-content:flex-start;font-size:12px}
+.cbt .save-slot{min-width:52px;display:inline-flex;justify-content:flex-start;font-size:12px;margin-left:-6px}
 .cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:auto;width:min(340px,88%);max-height:min(560px,calc(100% - 150px));overflow:auto;z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
 /* 10 columns need 358px; the drawer is 340 — 8 columns fit with padding. */
 .cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
@@ -315,6 +326,10 @@ function ExamPane({ attemptId, onFinished }) {
 }
 
 const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
+
+// the app ships the codicon set app-wide; icons here are for scanning, the label
+// still carries the meaning
+const icon = name => jsx('i', { key: name, className: `codicon codicon-${name}`, 'aria-hidden': 'true' })
 
 // A figure's src is either an http(s) URL or a path inside the pack's asset dir.
 // Relative ones come back through the plugin's own route, so the browser fetches
@@ -1035,11 +1050,11 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       ] }),
     ] })
   }
-  const confirmLines = sections.map(s => {
+  const confirmLines = sections.length > 1 ? sections.map(s => {
     const qs = secQs(s.id)
     const a = qs.filter(x => answered[x.id] !== undefined && answered[x.id] !== null && answered[x.id] !== '' && !(Array.isArray(answered[x.id]) && answered[x.id].length === 0)).length
     return `${s.title}: ${a} answered, ${qs.length - a} not answered`
-  }).join(' · ')
+  }).join(' · ') : ''
   const qIndex = pack.questions.findIndex(x => x.id === curIdResolved) + 1
   const curAnswered = (() => {
     const v = answered[curIdResolved]
@@ -1181,33 +1196,53 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
             ] })
           }) }),
           jsx('div', { className: 'cbt-pal-submit', children: jsx('button', {
-            type: 'button', style: { width: '100%' }, onClick: () => setConfirming(true), children: 'Submit paper',
+            type: 'button', style: { width: '100%' }, disabled: confirming,
+            title: confirming ? 'Confirm or keep answering below' : 'Review the counts, then submit',
+            onClick: () => setConfirming(true),
+            children: confirming ? 'Confirm below…' : 'Submit paper',
           }) }),
         ] }),
 
       ] }),
     ] }),
-    jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: confirming ? [
-      jsx('strong', { key: 'q', children: 'Submit?' }),
-      jsx('span', { key: 's', className: 'muted', children: confirmLines }),
+    jsxs('div', { className: `cbt-actions${confirming ? ' confirming' : ''}`, style: { gridArea: 'act' }, children: confirming ? [
+      jsx('span', { key: 'q', className: 'ask', children: [
+        jsx('strong', { children: 'Submit the paper?' }),
+        confirmLines ? jsx('span', { className: 'muted', children: confirmLines }) : null,
+      ] }),
       unansweredTotal > 0
         ? jsx('span', { key: 'u', className: 'badge err', children: `${unansweredTotal} unanswered` })
         : jsx('span', { key: 'u', className: 'badge ok', children: 'all answered' }),
-      jsx('button', { key: 'y', type: 'button', className: 'primary', disabled: submitting, onClick: () => void doSubmit(), children: submitting ? 'Submitting…' : 'Confirm submit' }),
-      jsx('button', { key: 'n', type: 'button', disabled: submitting, onClick: () => setConfirming(false), title: 'Esc', children: 'Keep answering' }),
       jsx('span', { key: 'sp', style: { flex: 1 } }),
-      jsx('button', { key: 'd', type: 'button', disabled: submitting, onClick: () => void doDiscard(), title: 'Throw this attempt away — it is not graded', children: 'Discard attempt' }),
+      jsxs('span', { key: 'g1', className: 'act-group', children: [
+        jsx('button', { key: 'y', type: 'button', className: 'primary', disabled: submitting, onClick: () => void doSubmit(), children: [icon('check'), submitting ? 'Submitting…' : 'Confirm submit'] }),
+        jsx('button', { key: 'n', type: 'button', disabled: submitting, onClick: () => setConfirming(false), title: 'Keep answering (Esc)', children: 'Keep answering' }),
+      ] }),
+      jsx('button', { key: 'd', type: 'button', className: 'danger', disabled: submitting, onClick: () => void doDiscard(), title: 'Throw this attempt away — it is not graded', children: [icon('trash'), 'Discard'] }),
     ] : [
-      jsx('button', { key: 'sv', type: 'button', onClick: () => void act('saveStay'), title: 'Save answer (S)', children: 'Save' }),
-      jsx('button', { key: 'sn', type: 'button', onClick: () => void act('saveNext'), title: 'Save answer and move on (Enter)', children: 'Save & Next' }),
-      jsx('button', { key: 'sm', type: 'button', 'data-fixed': '', onClick: () => void act('saveMark'), title: 'Save answer and flag for review (M)', children: marked.includes(curIdResolved) ? 'Save & Unmark' : 'Save & Mark for Review' }),
-      jsx('button', { key: 'cr', type: 'button', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: 'Clear Response' }),
-      jsx('button', { key: 'mn', type: 'button', 'data-fixed': '', onClick: () => void act('markNext'), title: 'Flag for review and move on', children: marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark for Review & Next' }),
-      // fixed-width slot: the indicator appearing must not shift the nav buttons
+      // Three groups, in the order you use them: answer · review · navigate.
+      jsxs('span', { key: 'g-answer', className: 'act-group', children: [
+        jsx('button', { key: 'sv', type: 'button', onClick: () => void act('saveStay'), title: 'Save the answer and stay (S)', children: [icon('save'), 'Save'] }),
+        jsx('button', { key: 'sn', type: 'button', className: 'primary', onClick: () => void act('saveNext'), title: 'Save and move to the next question (Enter)', children: [icon('save'), 'Save & Next'] }),
+      ] }),
+      jsxs('span', { key: 'g-review', className: 'act-group', children: [
+        jsx('button', {
+          key: 'sm', type: 'button', className: marked.includes(curIdResolved) ? 'on' : '', style: { minWidth: 96 },
+          title: 'Flag this question for review — stays here (M)',
+          onClick: () => void act('saveMark'),
+          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
+        }),
+        jsx('button', {
+          key: 'mn', type: 'button', style: { minWidth: 150 },
+          title: 'Flag for review and move on',
+          onClick: () => void act('markNext'),
+          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
+        }),
+        jsx('button', { key: 'cr', type: 'button', className: 'clear', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: [icon('discard'), 'Clear'] }),
+      ] }),
+      // fixed-width slot: the indicator appearing must not shift the nav group
       jsx('span', {
-        key: 'ss',
-        className: 'save-slot',
-        role: 'status',
+        key: 'ss', className: 'save-slot', role: 'status',
         children: saveState
           ? jsx('span', {
               className: `save-state${saveState === 'saved' ? ' ok' : saveState === 'err' ? ' err' : ''}`,
@@ -1215,10 +1250,10 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
             })
           : null,
       }),
-      // nav pair travels as one unit: wrapped alone it must not split Back from Next
-      jsxs('span', { key: 'nav', className: 'row nav', children: [
-        jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), title: 'Previous question (←)', children: '<< Back' }),
-        jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), title: 'Next question (→)', children: 'Next >>' }),
+      // nav pair travels as one unit and sits at the far right
+      jsxs('span', { key: 'nav', className: 'act-group nav', children: [
+        jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), title: 'Previous question (←)', children: [icon('chevron-left'), 'Back'] }),
+        jsx('button', { key: 'nx', type: 'button', onClick: () => void act('next'), title: 'Next question (→)', children: ['Next', icon('chevron-right')] }),
       ] }),
     ] }),
     showPaper && jsxs('div', {
