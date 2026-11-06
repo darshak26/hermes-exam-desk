@@ -78,6 +78,7 @@ const CSS = `
 .cbt .sw.err{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 18%,transparent)}
 .cbt .sw.ok{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 18%,transparent)}
 .cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
+.cbt .sw.current{box-shadow:0 0 0 2px var(--ui-accent);border-color:transparent;background:transparent}
 .cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
 .cbt p{margin:0 0 16px;max-width:70ch}
 .cbt p.note{margin:0 0 8px}
@@ -286,10 +287,14 @@ const LEGEND = [
 ]
 
 function legendNode(counts) {
-  return jsx('div', { className: 'lg', children: LEGEND.map(([cls, label], i) =>
-    jsxs('span', { key: label, className: 'item', children: [
-      jsx('span', { className: `sw ${cls}` }), label + (counts ? `: ${counts[i]}` : ''),
-    ] })) })
+  return jsx('div', { className: 'lg', children: [
+    ...LEGEND.map(([cls, label], i) =>
+      jsxs('span', { key: label, className: 'item', children: [
+        jsx('span', { className: `sw ${cls}` }), label + (counts ? `: ${counts[i]}` : ''),
+      ] })),
+    // the ringed chip in the grid is the question you are on — say so once
+    jsxs('span', { className: 'item', children: [jsx('span', { className: 'sw current' }), 'Current'] }),
+  ] })
 }
 
 function fmtWhen(s) {
