@@ -133,13 +133,24 @@ const CSS = `
 .cbt .opt-body{display:flex;flex-direction:column;gap:8px;min-width:0}
 /* figures and data tables from the paper itself */
 .cbt .media-fig{margin:0 0 16px}
-.cbt .media-fig img{display:block;max-width:100%;height:auto;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-surface-background,#fff)}
+/* a figure taller than the viewport would hide the stem it belongs to */
+.cbt .media-fig img{display:block;max-width:100%;max-height:min(60vh,520px);width:auto;height:auto;object-fit:contain;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-surface-background,#fff);cursor:zoom-in}
+.cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.82);cursor:zoom-out}
+.cbt .zoom img{max-width:100%;max-height:calc(100% - 56px);object-fit:contain;border-radius:8px;background:var(--ui-surface-background,#fff)}
+/* scoped a level deeper than .cbt .icon-btn, which otherwise wins on colour and
+   leaves a white glyph on a transparent button */
+.cbt .zoom .zoom-close{position:absolute;top:14px;right:14px;width:30px;height:30px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);color:#fff}
+.cbt .zoom .zoom-close:hover:not(:disabled){background:rgba(255,255,255,.3);color:#fff}
+.cbt .zoom .zoom-close .codicon{font-size:16px}
+.cbt .zoom-hint{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:12px;color:#fff;opacity:.8}
+.cbt .zoom-hint .kbd{border-color:rgba(255,255,255,.35);color:#fff}
+.cbt .media-wrap{max-width:100%;overflow-x:auto}
 .cbt .media-missing{display:flex;gap:8px;align-items:center;justify-content:center;min-height:120px;padding:16px;border:1px dashed var(--ui-stroke-secondary);border-radius:8px;color:var(--ui-text-secondary);font-size:12px;text-align:center}
 .cbt .media-fig figcaption{margin-top:6px;font-size:12px;color:var(--ui-text-secondary)}
 .cbt .media-note{font-size:13px;color:var(--ui-text-secondary)}
 .cbt .media-table{width:auto;max-width:100%;margin:0 0 16px;border-collapse:collapse;font-size:13px}
 .cbt .media-table caption{caption-side:top;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding:0 0 6px}
-.cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;font-variant-numeric:tabular-nums;vertical-align:top}
+.cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap}
 .cbt .media-table th{background:color-mix(in srgb,currentColor 5%,transparent);font-weight:600;text-align:left}
 .cbt .opt .media-fig{margin:0}
 /* a figure inside an option is a thumbnail; a missing one must not blow the option
@@ -370,15 +381,49 @@ function mediaSrc(examId, src) {
 // sliver; show a placeholder with the alt text so the question still makes sense.
 function MediaFigure({ src, alt, caption }) {
   const [failed, setFailed] = useState(false)
+  const [zoom, setZoom] = useState(false)
+  // capture phase: while a figure is enlarged, Esc closes the figure and not the
+  // paper dialog sitting behind it
+  useEffect(() => {
+    if (!zoom) return undefined
+    const onEsc = e => { if (e.key === 'Escape') { e.stopPropagation(); setZoom(false) } }
+    window.addEventListener('keydown', onEsc, true)
+    return () => window.removeEventListener('keydown', onEsc, true)
+  }, [zoom])
   return jsxs('figure', { className: 'media-fig', children: [
     failed
       ? jsxs('div', { className: 'media-missing', children: [
           jsx('i', { className: 'codicon codicon-file-media', 'aria-hidden': 'true' }),
           jsx('span', { children: alt ? `Figure unavailable — ${alt}` : 'Figure unavailable' }),
         ] })
-      : jsx('img', { src, alt: alt || '', loading: 'lazy', onError: () => setFailed(true) }),
+      : jsx('img', {
+          src, alt: alt || '', loading: 'lazy',
+          title: alt ? `${alt} — click to enlarge` : 'Click to enlarge',
+          onError: () => setFailed(true),
+          onClick: e => { e.preventDefault(); e.stopPropagation(); setZoom(true) },
+        }),
     caption ? jsx('figcaption', { children: caption }) : null,
+    zoom
+      ? jsxs('div', {
+          className: 'zoom', onClick: () => setZoom(false), role: 'dialog', 'aria-modal': 'true', 'aria-label': alt || 'Figure',
+          children: [
+            jsx('img', { src, alt: alt || '' }),
+            jsx('button', { type: 'button', className: 'zoom-close icon-btn', title: 'Close', 'aria-label': 'Close figure', onClick: () => setZoom(false), children: jsx('i', { className: 'codicon codicon-close', 'aria-hidden': 'true' }) }),
+            jsxs('div', { className: 'zoom-hint', children: ['Click anywhere or press ', jsx('span', { className: 'kbd', children: 'Esc' }), ' to close'] }),
+          ],
+        })
+      : null,
   ] })
+}
+
+// A long question keeps its scroll position when the paper moves on, which lands
+// you halfway down the next stem. Every question change starts at the top.
+function ScrollToTop({ dep, targetRef }) {
+  useEffect(() => {
+    const el = targetRef.current
+    if (el) el.scrollTop = 0
+  }, [dep])
+  return null
 }
 
 // Question bodies carry more than text: a diagram, a data table, or a note that
@@ -960,6 +1005,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
   // A page can be dragged narrow too (a browser window, a split tab). The pane
   // passed `narrow` in; measuring here means both paths adapt.
   const rootRef = useRef(null)
+  const bodyRef = useRef(null)
   const [selfNarrow, setSelfNarrow] = useState(false)
   useEffect(() => {
     const el = rootRef.current
@@ -1205,6 +1251,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
   }
   return jsxs('div', { ref: rootRef, className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${isNarrow ? ' narrow' : ''}`, children: [
     jsx(ExamKeys, { enabled: true, onKeyDown: onKey }),
+    jsx(ScrollToTop, { dep: curIdResolved, targetRef: bodyRef }),
     jsxs('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       inPane ? null : jsx(SidebarButton, {}),
       jsx('strong', { className: 'cbt-head-title', title: pack.title || pack.exam_id, children: pack.title || pack.exam_id }),
@@ -1247,7 +1294,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         children: `${s.title} · ${done}/${qs.length}`,
       })
     }) }),
-    jsx('div', { className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
+    jsx('div', { ref: bodyRef, className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
       jsxs('div', { className: 'row', style: { gap: 10, marginBottom: 12 }, children: [
         jsx('span', { className: 'muted', children: `Question ${qIndex} of ${pack.questions.length} · ${QTYPE_LABEL[cur.type] || cur.type}` }),
         cur.type !== 'nat'
