@@ -166,6 +166,8 @@ const CSS = `
 .cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
 .cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbt .submit-head{border-color:color-mix(in srgb,var(--ui-accent) 55%,var(--ui-stroke-secondary));font-weight:600}
+.cbt .submit-head:hover:not(:disabled){background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
 .cbt-tabs{display:flex;gap:4px;padding:0 8px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:hidden}
 .cbt-tabs button{height:34px;border:none;border-bottom:2px solid transparent;border-radius:0;padding:0 12px}
 .cbt-tabs button.on{border-bottom-color:var(--ui-accent);color:var(--ui-accent)}
@@ -174,7 +176,6 @@ const CSS = `
 .cbt-pal-scroll{flex:1;overflow:auto}
 .cbt-pal-group{margin:8px 0}
 .cbt-pal-group h4{font-size:11px;margin:12px 12px 6px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.cbt-pal-submit{padding:12px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .icon-btn{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-secondary);flex:0 0 auto}
 .cbt .icon-btn:hover:not(:disabled){background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-text-primary)}
 .cbt .icon-btn .codicon{font-size:14px;line-height:1}
@@ -306,7 +307,14 @@ function ExamPane({ attemptId, onFinished }) {
       if (w > 0) setNarrow(w < 780)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    // belt and braces: a window drag also emits resize, and a stale observer must
+    // never leave the paper laid out for a width it no longer has
+    const onResize = () => {
+      const w = rootRef.current?.getBoundingClientRect().width ?? 0
+      if (w > 0) setSelfNarrow(w < 780)
+    }
+    window.addEventListener('resize', onResize)
+    return () => { ro.disconnect(); window.removeEventListener('resize', onResize) }
   }, [])
   return jsxs('div', {
     ref,
@@ -878,7 +886,14 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       if (w > 0) setSelfNarrow(w < 780)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    // belt and braces: a window drag also emits resize, and a stale observer must
+    // never leave the paper laid out for a width it no longer has
+    const onResize = () => {
+      const w = rootRef.current?.getBoundingClientRect().width ?? 0
+      if (w > 0) setSelfNarrow(w < 780)
+    }
+    window.addEventListener('resize', onResize)
+    return () => { ro.disconnect(); window.removeEventListener('resize', onResize) }
   }, [])
   const isNarrow = narrow || selfNarrow
   useEffect(() => { if (isNarrow) setPalCollapsed(true) }, [isNarrow])
@@ -1107,6 +1122,16 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       isNarrow
         ? jsx('button', { type: 'button', className: 'icon-btn', title: 'Question paper', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: jsx('i', { className: 'codicon codicon-book', 'aria-hidden': 'true' }) })
         : jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
+      // The terminal action belongs in the persistent chrome: it used to sit in the
+      // question map, so folding the map took submitting away with it.
+      jsx('button', {
+        type: 'button', className: 'submit-head',
+        disabled: submitting || confirming,
+        'aria-label': 'Submit the paper',
+        title: confirming ? 'Confirmation is open below' : 'Review the counts, then submit the paper',
+        onClick: () => { setConfirming(true); setPalCollapsed(true) },
+        children: [icon('check'), 'Submit'],
+      }),
       jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
       // the panel toggle is the last thing in the header — it governs the panel on
       // the right, so it sits on the right of everything else
@@ -1194,12 +1219,6 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
                 })
               }) }),
             ] })
-          }) }),
-          jsx('div', { className: 'cbt-pal-submit', children: jsx('button', {
-            type: 'button', style: { width: '100%' }, disabled: confirming,
-            title: confirming ? 'Confirm or keep answering below' : 'Review the counts, then submit',
-            onClick: () => setConfirming(true),
-            children: confirming ? 'Confirm below…' : 'Submit paper',
           }) }),
         ] }),
 
