@@ -35,6 +35,22 @@ const CSS = `
 .cbt .cbt-loading{display:flex;align-items:center;gap:6px;color:var(--ui-text-secondary)}
 .cbt .cbt-error{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:8px 0}
 
+/* Dialogs are portalled to the document body, so they are NOT inside .cbt and every
+   .cbt-scoped rule above stops at the dialog edge. These rules hang off .cbt-dlg
+   itself, or the content would inherit the browser's centred table defaults. */
+.cbt-dlg [data-slot="dialog-description"]{margin:0 0 14px}
+.cbt-dlg .cbt-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0}
+.cbt-dlg .cbt-sub{color:var(--ui-text-secondary);font-size:12px}
+.cbt-dlg p{margin:0}
+.cbt-dlg p + p{margin-top:8px}
+.cbt-dlg table{width:100%;border-collapse:collapse;table-layout:fixed;margin:16px 0 14px}
+.cbt-dlg th,.cbt-dlg td{text-align:left;padding:9px 12px 9px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12.5px}
+.cbt-dlg th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary);padding-bottom:8px}
+.cbt-dlg th:last-child,.cbt-dlg td:last-child{padding-right:0}
+.cbt-dlg .num{text-align:right;font-variant-numeric:tabular-nums;width:86px}
+.cbt-dlg .cbt-paper-q{margin:8px 0}
+.cbt-dlg .cbt-paper-q p{font-size:13px;margin:0}
+
 /* tables: one left edge, right gutter only, tabular figures for counts */
 .cbt table{width:100%;border-collapse:collapse}
 .cbt th,.cbt td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12.5px;vertical-align:middle}
