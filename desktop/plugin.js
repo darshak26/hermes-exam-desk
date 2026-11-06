@@ -26,7 +26,7 @@ const CSS = `
 .cbt td .row{gap:8px}
 .cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
 .cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
-.cbt button.primary{border-color:var(--ui-accent);color:var(--ui-accent);font-weight:600;background:color-mix(in srgb,var(--ui-accent) 12%,transparent)}
+.cbt button.primary{border-color:var(--ui-accent);color:var(--ui-text-primary);font-weight:600;background:color-mix(in srgb,var(--ui-accent) 20%,transparent)}
 .cbt button:disabled{opacity:.5;cursor:default}
 .cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
 .cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
@@ -36,20 +36,20 @@ const CSS = `
 .cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cbt .badge{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px}
 .cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
-.cbt .badge.fill{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent);font-weight:600}
+.cbt .badge.fill{border-color:var(--ui-accent);color:var(--ui-text-primary);background:color-mix(in srgb,var(--ui-accent) 24%,transparent);font-weight:600}
 .cbt .seg{display:inline-flex;border:1px solid var(--ui-stroke-secondary);border-radius:6px;overflow:hidden}
 .cbt .seg button{border:0;border-radius:0;height:26px;padding:0 12px;color:var(--ui-text-secondary)}
 .cbt .seg button + button{border-left:1px solid var(--ui-stroke-secondary)}
-.cbt .seg button.on{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-accent);font-weight:600}
+.cbt .seg button.on{background:color-mix(in srgb,var(--ui-accent) 26%,transparent);color:var(--ui-text-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--ui-accent)}
 .cbt td.num{font-variant-numeric:tabular-nums}
-.cbt .badge.err{border-color:var(--ui-error-foreground);color:var(--ui-error-foreground)}
-.cbt .badge.ok{border-color:var(--ui-success-foreground);color:var(--ui-success-foreground)}
+.cbt .badge.err{border-color:var(--ui-red, var(--ui-danger, #f87171));color:var(--ui-red, var(--ui-danger, #f87171))}
+.cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
 .cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
 /* result headline + review diff */
 .cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
-.cbt .score.pos{color:var(--ui-success-foreground)}
-.cbt .score.neg{color:var(--ui-error-foreground)}
+.cbt .score.pos{color:var(--ui-success, #10b981)}
+.cbt .score.neg{color:var(--ui-red, var(--ui-danger, #f87171))}
 .cbt .sub{margin:0 0 12px}
 .cbt .review-row{border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .review-row > .row{padding:10px 8px;margin:0 -8px;border-radius:6px}
@@ -57,16 +57,16 @@ const CSS = `
 .cbt .review-row > .row:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
 .cbt .ans{display:flex;gap:10px;align-items:baseline;margin:0 0 6px}
 .cbt .ans .k{min-width:104px;font-weight:600}
-.cbt .ans .miss{color:var(--ui-error-foreground)}
-.cbt .ans .hit{color:var(--ui-success-foreground)}
+.cbt .ans .miss{color:var(--ui-red, var(--ui-danger, #f87171))}
+.cbt .ans .hit{color:var(--ui-success, #10b981)}
 /* live save feedback in the action bar */
 .cbt .save-state{font-size:12px;color:var(--ui-text-secondary)}
-.cbt .save-state.ok{color:var(--ui-success-foreground)}
-.cbt .save-state.err{color:var(--ui-error-foreground)}
+.cbt .save-state.ok{color:var(--ui-success, #10b981)}
+.cbt .save-state.err{color:var(--ui-red, var(--ui-danger, #f87171))}
 /* countdown urgency */
 .cbt strong.timer{font-variant-numeric:tabular-nums}
-.cbt strong.timer.low{color:var(--ui-accent)}
-.cbt strong.timer.crit{color:var(--ui-error-foreground)}
+.cbt strong.timer.low{color:var(--ui-warning, #d97706)}
+.cbt strong.timer.crit{color:var(--ui-red, var(--ui-danger, #f87171))}
 /* question-paper modal: the header must stay put while the paper scrolls */
 .cbt .modal-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;
   margin:-20px -20px 12px;padding:12px 20px;background:var(--ui-surface-background,#fff);
@@ -75,8 +75,8 @@ const CSS = `
 .cbt .lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin:10px 0}
 .cbt .lg .item{display:flex;align-items:center}
 .cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
-.cbt .sw.err{border-color:var(--ui-error-foreground);background:color-mix(in srgb,var(--ui-error-foreground) 16%,transparent)}
-.cbt .sw.ok{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
+.cbt .sw.err{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 18%,transparent)}
+.cbt .sw.ok{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 18%,transparent)}
 .cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
 .cbt p{margin:0 0 16px;max-width:70ch}
@@ -100,10 +100,10 @@ const CSS = `
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
 .cbt .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
-.cbt .cbt-chip.s-not-answered{border-color:var(--ui-error-foreground);background:color-mix(in srgb,var(--ui-error-foreground) 16%,transparent)}
-.cbt .cbt-chip.s-answered{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
+.cbt .cbt-chip.s-not-answered{border-color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, var(--ui-danger, #f87171)) 16%,transparent)}
+.cbt .cbt-chip.s-answered{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 16%,transparent)}
 .cbt .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
-.cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-accent) 18%,transparent)}
+.cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 24px;font-size:15px;line-height:1.6;overflow:auto}
 .cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
