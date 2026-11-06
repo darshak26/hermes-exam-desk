@@ -37,7 +37,7 @@ const CSS = `
 .cbt .cbt-icon-btn:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
 .cbt .cbt-icon-btn .codicon{font-size:14px;line-height:1}
 .cbt .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.cbt .badge{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px}
+.cbt .badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;border:1px solid var(--ui-stroke-secondary);font-size:11px;line-height:1;white-space:nowrap}
 .cbt .badge.assisted{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
 .cbt .badge.fill{border-color:var(--ui-accent);color:var(--ui-text-primary);background:color-mix(in srgb,var(--ui-accent) 24%,transparent);font-weight:600}
 .cbt .seg{display:inline-flex;border:1px solid var(--ui-stroke-secondary);border-radius:6px;overflow:hidden}
@@ -49,7 +49,7 @@ const CSS = `
 .cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
 .cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
-.cbt button.badge{height:auto;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1.5}
+.cbt button.badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
 .cbt .warn-list{margin:8px 0 0;font-size:12px;color:var(--ui-text-secondary)}
 /* result headline + review diff */
 .cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
@@ -78,9 +78,15 @@ const CSS = `
   border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .kbd{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
 .cbt .dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:60}
-.cbt .dlg-box{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);width:min(560px,92%);max-height:80vh;overflow:auto;border-radius:10px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-.cbt .dlg-box .modal-head{margin:-20px -20px 16px}
-.cbt .dlg-box table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cbt .dlg-box{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);width:min(560px,92%);max-height:80vh;overflow:auto;border-radius:10px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.cbt .dlg-box .modal-head{margin:0;padding:14px 20px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt .dlg-body{padding:16px 20px 20px}
+/* fixed layout + one width for every count column: the header sits over its number
+   instead of hugging the left edge of a column that overflows the dialog */
+.cbt .dlg-box table{table-layout:fixed;width:100%}
+.cbt .dlg-box th,.cbt .dlg-box td{padding:8px 8px 8px 0;white-space:normal}
+.cbt .dlg-box th.num,.cbt .dlg-box td.num{text-align:right;width:84px;font-variant-numeric:tabular-nums}
+.cbt .dlg-box th:last-child,.cbt .dlg-box td:last-child{padding-right:0}
 /* one paper = one card: title, numbers, then its own history */
 .cbt .card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:16px;margin:0 0 16px}
 .cbt .card-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
@@ -887,8 +893,14 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
           jsx('span', { className: 'muted', style: { fontSize: 12 }, children: 'this cannot be undone' }),
           jsx('span', { style: { flex: 1 } }),
           jsx('span', { className: 'kbd', children: 'Esc' }),
+          jsx('button', {
+            type: 'button', className: 'icon-btn', title: 'Close without submitting',
+            'aria-label': 'Close without submitting', onClick: onCancel,
+            children: icon('close'),
+          }),
         ] }),
-        jsxs('div', { className: 'row', style: { marginBottom: 12 }, children: [
+        jsxs('div', { className: 'dlg-body', children: [
+        jsxs('div', { className: 'row', style: { marginBottom: 14 }, children: [
           jsx('span', { className: 'badge', children: `${totals.total} questions` }),
           jsx('span', { className: 'badge ok', children: `${totals.answered} answered` }),
           totals.marked
@@ -899,10 +911,10 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
         jsxs('table', { children: [
           jsx('thead', { children: jsx('tr', { children: [
             jsx('th', { children: 'Section' }),
-            jsx('th', { children: 'Answered' }),
-            jsx('th', { title: 'Flagged for review — can also be answered, so it does not add up with the other columns', children: 'Marked' }),
-            jsx('th', { title: 'Visited but no answer saved', children: 'Blank' }),
-            jsx('th', { title: 'Never opened', children: 'Not visited' }),
+            jsx('th', { className: 'num', children: 'Answered' }),
+            jsx('th', { className: 'num', title: 'Flagged for review — can also be answered, so it does not add up with the other columns', children: 'Marked' }),
+            jsx('th', { className: 'num', title: 'Visited but no answer saved', children: 'Blank' }),
+            jsx('th', { className: 'num', title: 'Never opened', children: 'Not visited' }),
           ] }) }),
           jsx('tbody', { children: stats.map(x => jsxs('tr', { key: x.id, children: [
             jsx('td', { children: [x.title, x.limit ? jsx('span', { className: 'muted', children: ` · first ${x.limit} count` }) : null] }),
@@ -920,6 +932,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
           jsx('button', { type: 'button', disabled: submitting, autoFocus: true, onClick: onCancel, children: 'Keep answering' }),
           jsx('span', { style: { flex: 1 } }),
           jsx('button', { type: 'button', className: 'danger', disabled: submitting, title: 'Throw this attempt away — it is not graded', onClick: onDiscard, children: [icon('trash'), 'Discard'] }),
+        ] }),
         ] }),
       ],
     }),
