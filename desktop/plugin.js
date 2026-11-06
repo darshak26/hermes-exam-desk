@@ -66,7 +66,7 @@ const CSS = `
 .cbt .save-state.ok{color:var(--ui-success, #10b981)}
 .cbt .save-state.err{color:var(--ui-red, var(--ui-danger, #f87171))}
 /* countdown urgency */
-.cbt strong.timer{font-variant-numeric:tabular-nums}
+.cbt strong.timer{font-variant-numeric:tabular-nums;white-space:nowrap}
 .cbt strong.timer.low{color:var(--ui-warning, #d97706)}
 .cbt strong.timer.crit{color:var(--ui-red, var(--ui-danger, #f87171))}
 /* question-paper modal: the header must stay put while the paper scrolls */
@@ -149,9 +149,11 @@ const CSS = `
 .cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
 .cbt-actions .nav{flex-wrap:nowrap;margin-left:auto}
-.cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr) 24px}
-.cbt-shell.pal-collapsed .cbt-pal-inner{display:none}
+/* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
+   the screen edge. The header toggle (always in the same place) brings it back. */
+.cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act"}
 .cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cbt-tabs{display:flex;gap:4px;padding:0 8px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:hidden}
 .cbt-tabs button{height:34px;border:none;border-bottom:2px solid transparent;border-radius:0;padding:0 12px}
 .cbt-tabs button.on{border-bottom-color:var(--ui-accent);color:var(--ui-accent)}
@@ -161,7 +163,6 @@ const CSS = `
 .cbt-pal-group{margin:8px 0}
 .cbt-pal-group h4{font-size:11px;margin:12px 12px 6px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .cbt-pal-submit{padding:12px;border-top:1px solid var(--ui-stroke-secondary)}
-.cbt .cbt-pal-rail{position:absolute;right:0;top:0;height:100%;width:24px;display:flex;flex-direction:column;align-items:center;padding-top:10px;border-left:1px solid var(--ui-stroke-secondary)}
 .cbt .icon-btn{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-secondary);flex:0 0 auto}
 .cbt .icon-btn:hover:not(:disabled){background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-text-primary)}
 .cbt .icon-btn .codicon{font-size:14px;line-height:1}
@@ -170,7 +171,6 @@ const CSS = `
    question keeps its full width instead of being squeezed by a fixed 358px column. */
 .cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act";
   grid-template-rows:auto auto minmax(0,1fr) auto}
-.cbt-shell.narrow .cbt-pal-rail{display:none}
 .cbt .pal-sec-head{display:flex;align-items:baseline;gap:8px;margin:12px 12px 6px}
 .cbt .pal-sec-head strong{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary)}
 .cbt .pal-sec-head span{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary);margin-left:auto}
@@ -185,7 +185,8 @@ const CSS = `
 .cbt-pal-close{display:none}
 .cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-close{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border-radius:4px;flex:0 0 auto}
 .cbt-shell.narrow .cbt-qbody{padding:16px 16px 20px}
-.cbt-shell.narrow .cbt-head{padding:0 16px;gap:8px}
+.cbt-shell.narrow .cbt-head{padding:0 12px;gap:8px}
+.cbt-shell.narrow .cbt-head-title{flex:1 1 auto}
 .cbt-shell.narrow .cbt-actions{padding:12px 16px}
 `;
 
@@ -484,7 +485,7 @@ function SidebarButton() {
 
 // Owns the 1 Hz tick so the exam page (question body + a 100-chip palette) does not
 // re-render every second. `left` comes from the server on each poll and re-anchors.
-function Countdown({ left, onExpire }) {
+function Countdown({ left, onExpire, compact = false }) {
   const [now, setNow] = useState(() => Date.now())
   const anchor = useRef({ at: Date.now(), left: left ?? 0 })
   const expire = useRef(onExpire)
@@ -504,7 +505,7 @@ function Countdown({ left, onExpire }) {
     className: `timer${urgency}`,
     'aria-live': 'off',
     title: done ? 'Time is up — submitting the paper' : 'Time left in this attempt',
-    children: done ? 'Time up — submitting…' : `Remaining Time: ${fmtHMS(shown)}`,
+    children: done ? (compact ? 'Time up' : 'Time up — submitting…') : (compact ? fmtHMS(shown) : `Remaining Time: ${fmtHMS(shown)}`),
   })
 }
 
@@ -850,6 +851,22 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
   const [confirming, setConfirming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [subDone, setSubDone] = useState(false)
+  // A page can be dragged narrow too (a browser window, a split tab). The pane
+  // passed `narrow` in; measuring here means both paths adapt.
+  const rootRef = useRef(null)
+  const [selfNarrow, setSelfNarrow] = useState(false)
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect?.width ?? 0
+      if (w > 0) setSelfNarrow(w < 780)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const isNarrow = narrow || selfNarrow
+  useEffect(() => { if (isNarrow) setPalCollapsed(true) }, [isNarrow])
   const [saveState, setSaveState] = useState(null)      // null | 'saving' | 'saved' | 'err'
   const saveTimer = useRef(0)
   useEffect(() => () => clearTimeout(saveTimer.current), [])
@@ -1065,18 +1082,26 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     else if (k === 'm') { e.preventDefault(); void act('saveMark') }
     else if (k === 'enter') { e.preventDefault(); void act('saveNext') }
   }
-  return jsxs('div', { className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${narrow ? ' narrow' : ''}`, children: [
+  return jsxs('div', { ref: rootRef, className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${isNarrow ? ' narrow' : ''}`, children: [
     jsx(ExamKeys, { enabled: true, onKeyDown: onKey }),
-    jsx('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
+    jsxs('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       inPane ? null : jsx(SidebarButton, {}),
-      jsx('strong', { children: pack.title || pack.exam_id }),
-      jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      jsx('strong', { className: 'cbt-head-title', title: pack.title || pack.exam_id, children: pack.title || pack.exam_id }),
+      isNarrow ? null : jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
-      jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
-      narrow
-        ? jsx('button', { type: 'button', onClick: () => setPalCollapsed(v => !v), children: palCollapsed ? 'Palette' : 'Hide palette' })
-        : null,
-      jsx(Countdown, { left: serverLeft, onExpire: () => { void doSubmit() } }),
+      // One control, always in the same place: the panel toggle sits with the other
+      // header tools instead of living on a rail at the screen edge.
+      jsx('button', {
+        type: 'button', className: 'icon-btn',
+        'aria-expanded': !palCollapsed,
+        title: palCollapsed ? 'Show the question map' : 'Hide the question map',
+        onClick: () => setPalCollapsed(v => !v),
+        children: jsx('i', { className: 'codicon codicon-layout-sidebar-right', 'aria-hidden': 'true' }),
+      }),
+      isNarrow
+        ? jsx('button', { type: 'button', className: 'icon-btn', title: 'Question paper', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: jsx('i', { className: 'codicon codicon-book', 'aria-hidden': 'true' }) })
+        : jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
+      jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
     ] }),
     jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: sections.map(s => {
       const qs = secQs(s.id)
@@ -1110,7 +1135,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
           })
         : cur.options.map((o, i) => optRow(i, o, cur.type)),
     ] }),
-    (!narrow || !palCollapsed) && jsx('div', { className: `cbt-pal${narrow ? ' as-drawer' : ''}`, style: { gridArea: 'pal' }, children: [
+    !palCollapsed && jsx('div', { className: `cbt-pal${isNarrow ? ' as-drawer' : ''}`, style: { gridArea: 'pal' }, children: [
       jsx('div', { className: 'cbt-pal-wrap', children: [
         jsx('div', { className: 'cbt-pal-inner', style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }, children: [
           jsxs('div', { className: 'cbt-pal-head', children: [
@@ -1120,10 +1145,10 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
               jsx('span', { style: { flex: 1 } }),
               jsx('button', {
                 type: 'button', className: 'icon-btn',
-                title: narrow ? 'Close the question map' : 'Hide the question map',
+                title: 'Hide the question map',
                 'aria-label': 'Hide the question map',
                 onClick: () => setPalCollapsed(true),
-                children: jsx('i', { className: `codicon codicon-${narrow ? 'close' : 'chevron-right'}`, 'aria-hidden': 'true' }),
+                children: jsx('i', { className: 'codicon codicon-close', 'aria-hidden': 'true' }),
               }),
             ] }),
             legendNode(secCounts),
@@ -1159,13 +1184,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
             type: 'button', style: { width: '100%' }, onClick: () => setConfirming(true), children: 'Submit paper',
           }) }),
         ] }),
-        palCollapsed
-          ? jsx('div', { className: 'cbt-pal-rail', children: jsx('button', {
-              type: 'button', className: 'icon-btn', title: 'Show the question map', 'aria-label': 'Show the question map',
-              onClick: () => setPalCollapsed(false),
-              children: jsx('i', { className: 'codicon codicon-chevron-left', 'aria-hidden': 'true' }),
-            }) })
-          : null,
+
       ] }),
     ] }),
     jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: confirming ? [
