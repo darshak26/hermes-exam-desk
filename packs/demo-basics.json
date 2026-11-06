@@ -43,7 +43,8 @@
    ],
    "answer": 0,
    "explanation": "Oxidative phosphorylation happens on the inner mitochondrial membrane.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   },
   {
    "id": "A-02",
@@ -59,7 +60,8 @@
    ],
    "answer": 2,
    "explanation": "pH is logarithmic: two pH units = a hundredfold difference in hydrogen ion concentration.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   },
   {
    "id": "A-03",
@@ -75,7 +77,8 @@
    ],
    "answer": 0,
    "explanation": "RNA pairs uracil with adenine where DNA uses thymine.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   },
   {
    "id": "B-01",
@@ -95,7 +98,8 @@
     2
    ],
    "explanation": "A nucleotide is sugar + base + phosphate; amino acids build proteins, not nucleotides.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   },
   {
    "id": "B-02",
@@ -105,7 +109,8 @@
    "text": "How many chromosomes are in a normal human somatic cell?",
    "answer": 46,
    "explanation": "23 pairs: 22 autosomal pairs plus one sex chromosome pair.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   },
   {
    "id": "B-03",
@@ -121,7 +126,9 @@
    ],
    "answer": 1,
    "explanation": "180 divided by 60 is 3 minutes per question.",
-   "provenance": "bundled demo question, written for this plugin"
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
   }
- ]
+ ],
+ "source_url": "https://github.com/darshak26/hermes-cbt-exam/blob/main/packs/demo-basics.json"
 }
