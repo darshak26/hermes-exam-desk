@@ -46,6 +46,8 @@ const CSS = `
 .cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
 .cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
+.cbt button.badge{height:auto;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1.5}
+.cbt .warn-list{margin:8px 0 0;font-size:12px;color:var(--ui-text-secondary)}
 /* result headline + review diff */
 .cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
 .cbt .score.pos{color:var(--ui-success, #10b981)}
@@ -541,6 +543,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [showWarn, setShowWarn] = useState(false)
 
   const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
   const rank = a => (a.status === 'in_progress' ? 0 : 1)
@@ -589,16 +592,23 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
           jsx('h3', { style: { margin: 0 }, children: pack.title || pack.exam_id }),
           pack.invalid ? jsx('span', { className: 'badge err', children: 'invalid' }) : null,
           pack.warnings?.length
-            ? jsxs('details', { className: 'warn', style: { display: 'inline-block' }, children: [
-                jsx('summary', { className: 'badge err', style: { cursor: 'pointer' }, children: `${pack.warnings.length} warnings` }),
-                jsx('ul', { className: 'list', style: { margin: '8px 0 0' }, children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) }),
-              ] })
+            ? jsx('button', {
+                type: 'button', className: 'badge err',
+                'aria-expanded': showWarn,
+                title: showWarn ? 'Hide the warnings' : 'Show what was flagged',
+                onClick: () => setShowWarn(v => !v),
+                children: `${pack.warnings.length} warning${pack.warnings.length === 1 ? '' : 's'}`,
+              })
             : null,
         ] }),
         jsx('div', { className: 'muted', children: pack.invalid
           ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
           : meta }),
         pack.provenance && !pack.invalid ? jsx('div', { className: 'muted', style: { fontSize: 12 }, children: pack.provenance }) : null,
+        // open warnings push the card down instead of reflowing the title row
+        showWarn && pack.warnings?.length
+          ? jsx('ul', { className: 'list warn-list', children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) })
+          : null,
         attempts.length
           ? jsxs('div', { className: 'row stat', children: [
               jsx('span', { children: `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}` }),
