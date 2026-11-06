@@ -87,6 +87,11 @@ const CSS = `
 .cbt button.ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
 .cbt .card table th{padding-top:0}
 .cbt .card caption{padding-top:8px}
+.cbt .legend{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;row-gap:3px;font-size:11.5px;color:var(--ui-text-secondary);margin:0 0 12px}
+.cbt .legend .item{display:flex;align-items:center;gap:7px;min-width:0;height:16px}
+.cbt .legend .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbt .legend .n{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary)}
+.cbt .legend .sw{flex:0 0 auto;margin-right:0}
 .cbt .lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin:10px 0}
 .cbt .lg .item{display:flex;align-items:center}
 .cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
@@ -94,6 +99,7 @@ const CSS = `
 .cbt .sw.ok{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 18%,transparent)}
 .cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt .sw.current{box-shadow:0 0 0 2px var(--ui-accent);border-color:transparent;background:transparent}
+.cbt .sw.acc2{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
 .cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
 .cbt p{margin:0 0 16px;max-width:70ch}
 .cbt p.note{margin:0 0 8px}
@@ -105,8 +111,27 @@ const CSS = `
 .cbt input[type=text]{font:inherit;color:inherit;background:var(--ui-surface-background,#fff);border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:6px 10px;min-width:280px}
 .cbt .opt{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:8px;margin:0 0 10px;cursor:pointer;background:var(--ui-surface-background,#fff);line-height:1.5}
 .cbt .opt input{margin:2px 0 0}
+.cbt .opt-body{display:flex;flex-direction:column;gap:8px;min-width:0}
+/* figures and data tables from the paper itself */
+.cbt .media-fig{margin:0 0 16px}
+.cbt .media-fig img{display:block;max-width:100%;height:auto;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-surface-background,#fff)}
+.cbt .media-missing{display:flex;gap:8px;align-items:center;justify-content:center;min-height:120px;padding:16px;border:1px dashed var(--ui-stroke-secondary);border-radius:8px;color:var(--ui-text-secondary);font-size:12px;text-align:center}
+.cbt .media-fig figcaption{margin-top:6px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt .media-note{font-size:13px;color:var(--ui-text-secondary)}
+.cbt .media-table{width:auto;max-width:100%;margin:0 0 16px;border-collapse:collapse;font-size:13px}
+.cbt .media-table caption{caption-side:top;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding:0 0 6px}
+.cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;font-variant-numeric:tabular-nums;vertical-align:top}
+.cbt .media-table th{background:color-mix(in srgb,currentColor 5%,transparent);font-weight:600;text-align:left}
+.cbt .opt .media-fig{margin:0}
+/* a figure inside an option is a thumbnail; a missing one must not blow the option
+   card up to twice its neighbours' height */
+.cbt .opt .media-missing{min-height:0;padding:8px 10px;font-size:11.5px;justify-content:flex-start}
+.cbt .opt .media-fig img{max-height:170px;width:auto}
+.cbt .media-table td:first-child{white-space:nowrap}
 .cbt .opt.sel{border-color:var(--ui-accent)}
-.cbt .opt{text-align:left;max-width:640px}
+/* options span the reading column so their right edge matches the question text */
+.cbt .opt{text-align:left;max-width:100%}
+.cbt .cbt-qbody p{max-width:none}
 .cbt-shell{display:grid;height:100%;min-height:0;
   grid-template-columns:minmax(0,1fr) 358px;
   /* auto (not fixed px) rows: in a narrow pane the head wraps to two lines and the
@@ -120,7 +145,7 @@ const CSS = `
 .cbt .cbt-chip.s-answered{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 16%,transparent)}
 .cbt .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
 .cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success, #10b981);background:color-mix(in srgb,var(--ui-success, #10b981) 12%,transparent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
-.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 24px;font-size:15px;line-height:1.6;overflow:auto}
+.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
 .cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
 .cbt-actions .nav{flex-wrap:nowrap;margin-left:auto}
@@ -136,13 +161,24 @@ const CSS = `
 .cbt-pal-group{margin:8px 0}
 .cbt-pal-group h4{font-size:11px;margin:12px 12px 6px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .cbt-pal-submit{padding:12px;border-top:1px solid var(--ui-stroke-secondary)}
-.cbt .cbt-pal-toggle{position:absolute;right:0;top:0;height:100%;width:24px}
+.cbt .cbt-pal-rail{position:absolute;right:0;top:0;height:100%;width:24px;display:flex;flex-direction:column;align-items:center;padding-top:10px;border-left:1px solid var(--ui-stroke-secondary)}
+.cbt .icon-btn{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-secondary);flex:0 0 auto}
+.cbt .icon-btn:hover:not(:disabled){background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-text-primary)}
+.cbt .icon-btn .codicon{font-size:14px;line-height:1}
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
 /* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
    question keeps its full width instead of being squeezed by a fixed 358px column. */
 .cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act";
   grid-template-rows:auto auto minmax(0,1fr) auto}
-.cbt-shell.narrow .cbt-pal-toggle{display:none}
+.cbt-shell.narrow .cbt-pal-rail{display:none}
+.cbt .pal-sec-head{display:flex;align-items:baseline;gap:8px;margin:12px 12px 6px}
+.cbt .pal-sec-head strong{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary)}
+.cbt .pal-sec-head span{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary);margin-left:auto}
+.cbt .pal-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cbt .pal-title strong{font-size:12px}
+.cbt .pal-title .muted{font-size:11px;font-variant-numeric:tabular-nums}
+.cbt .cbt-actions button[data-fixed]{min-width:172px;justify-content:flex-start}
+.cbt .save-slot{min-width:76px;display:inline-flex;justify-content:flex-start;font-size:12px}
 .cbt-shell.narrow .cbt-pal.as-drawer{position:absolute;right:0;top:0;bottom:auto;width:min(340px,88%);max-height:min(560px,calc(100% - 150px));overflow:auto;z-index:30;background:var(--ui-surface-background,#fff);border-left:1px solid var(--ui-stroke-secondary);box-shadow:-10px 0 30px rgba(0,0,0,.22)}
 /* 10 columns need 358px; the drawer is 340 — 8 columns fit with padding. */
 .cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
@@ -279,6 +315,56 @@ function ExamPane({ attemptId, onFinished }) {
 
 const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
 
+// A figure's src is either an http(s) URL or a path inside the pack's asset dir.
+// Relative ones come back through the plugin's own route, so the browser fetches
+// them from the same origin — an <img> cannot read the gateway's filesystem.
+function mediaSrc(examId, src) {
+  const clean = String(src || '')
+  if (/^https?:\/\//i.test(clean)) return clean
+  const path = clean.split('/').filter(Boolean).map(encodeURIComponent).join('/')
+  return `/api/plugins/cbt-exam/packs/${encodeURIComponent(examId)}/assets/${path}`
+}
+
+// A figure that 404s (or is unreadable) otherwise collapses to a broken-image
+// sliver; show a placeholder with the alt text so the question still makes sense.
+function MediaFigure({ src, alt, caption }) {
+  const [failed, setFailed] = useState(false)
+  return jsxs('figure', { className: 'media-fig', children: [
+    failed
+      ? jsxs('div', { className: 'media-missing', children: [
+          jsx('i', { className: 'codicon codicon-file-media', 'aria-hidden': 'true' }),
+          jsx('span', { children: alt ? `Figure unavailable — ${alt}` : 'Figure unavailable' }),
+        ] })
+      : jsx('img', { src, alt: alt || '', loading: 'lazy', onError: () => setFailed(true) }),
+    caption ? jsx('figcaption', { children: caption }) : null,
+  ] })
+}
+
+// Question bodies carry more than text: a diagram, a data table, or a note that
+// only makes sense with the figure. Each block renders as its own element so a
+// long paper reads like a paper.
+function mediaNode(blocks, examId, keyPrefix = 'media') {
+  if (!Array.isArray(blocks) || !blocks.length) return null
+  return blocks.map((b, i) => {
+    const key = `${keyPrefix}-${i}`
+    if (b && b.type === 'table') {
+      return jsx('div', { key, className: 'media-wrap', children: jsxs('table', { className: 'media-table', children: [
+        b.caption ? jsx('caption', { children: b.caption }) : null,
+        Array.isArray(b.head) && b.head.length
+          ? jsx('thead', { children: jsx('tr', { children: b.head.map((h, hi) => jsx('th', { key: hi, children: String(h) })) }) })
+          : null,
+        jsx('tbody', { children: (b.rows || []).map((row, ri) =>
+          jsx('tr', { key: ri, children: (row || []).map((cell, ci) => jsx('td', { key: ci, children: String(cell) })) })) }),
+      ] }) })
+    }
+    if (b && b.type === 'text') {
+      return jsx('p', { key, className: 'media-note', children: b.text })
+    }
+    return jsx(MediaFigure, { key, src: mediaSrc(examId, b?.src), alt: b?.alt || '', caption: b?.caption })
+  })
+}
+
+
 // A section may override the pattern's marking. Older agent halves omit the
 // per-section marks entirely (they only shipped attempt_limit), so fall back to
 // the pattern before ever printing "+undefined / undefined" at the user.
@@ -293,22 +379,28 @@ function marksLabel(section, pattern) {
   const fmt = (v) => (v == null ? '?' : v > 0 ? `+${v}` : String(v))
   return `${fmt(m.correct)} / ${fmt(m.wrong)}`
 }
+// Short labels + a right-aligned count in a fixed grid: the key used to reflow
+// every time a count changed width, which is what made the panel feel jumpy.
 const LEGEND = [
-  ['', 'Not Visited'],
-  ['err', 'Not Answered'],
+  ['', 'Not visited'],
+  ['err', 'Not answered'],
   ['ok', 'Answered'],
-  ['acc', 'Marked for Review'],
-  ['acc', 'Answered & Marked (counts)'],
+  ['acc', 'Marked'],
+  ['acc2', 'Answered + marked'],
 ]
 
 function legendNode(counts) {
-  return jsx('div', { className: 'lg', children: [
+  return jsx('div', { className: 'legend', children: [
     ...LEGEND.map(([cls, label], i) =>
       jsxs('span', { key: label, className: 'item', children: [
-        jsx('span', { className: `sw ${cls}` }), label + (counts ? `: ${counts[i]}` : ''),
+        jsx('span', { className: `sw ${cls}` }),
+        jsx('span', { className: 'lbl', children: label }),
+        counts ? jsx('span', { className: 'n', children: counts[i] }) : null,
       ] })),
-    // the ringed chip in the grid is the question you are on — say so once
-    jsxs('span', { className: 'item', children: [jsx('span', { className: 'sw current' }), 'Current'] }),
+    jsxs('span', { className: 'item', children: [
+      jsx('span', { className: 'sw current' }),
+      jsx('span', { className: 'lbl', children: 'Current' }),
+    ] }),
   ] })
 }
 
@@ -913,17 +1005,17 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     goTo(first && first.id)
   }
   const optRow = (i, text, kind) => {
-    if (kind === 'mcq') {
-      const on = sel === i
-      return jsxs('label', { key: i, className: `opt${on ? ' sel' : ''}`, children: [
-        jsx('input', { type: 'radio', name: curIdResolved, checked: on, onChange: () => setSel(i) }),
-        jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
-      ] })
-    }
-    const on = Array.isArray(sel) && sel.includes(i)
+    const on = kind === 'mcq' ? sel === i : (Array.isArray(sel) && sel.includes(i))
+    const figs = cur.option_media?.[i]
+    const input = kind === 'mcq'
+      ? jsx('input', { type: 'radio', name: curIdResolved, checked: on, onChange: () => setSel(i) })
+      : jsx('input', { type: 'checkbox', checked: on, onChange: () => setSel(on ? sel.filter(x => x !== i) : [...(sel || []), i]) })
     return jsxs('label', { key: i, className: `opt${on ? ' sel' : ''}`, children: [
-      jsx('input', { type: 'checkbox', checked: on, onChange: () => setSel(on ? sel.filter(x => x !== i) : [...(sel || []), i]) }),
-      jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
+      input,
+      jsxs('span', { className: 'opt-body', children: [
+        jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
+        figs ? mediaNode(figs, pack.exam_id, `opt${i}`) : null,
+      ] }),
     ] })
   }
   const confirmLines = sections.map(s => {
@@ -1009,6 +1101,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         jsx('span', { className: `badge ${curAnswered ? 'ok' : 'mut'}`, children: curAnswered ? 'Answered' : 'Not answered' }),
       ] }),
       jsx('p', { style: { fontSize: 16, marginTop: 0, marginBottom: 16 }, children: cur.text }),
+      mediaNode(cur.media, pack.exam_id, 'q'),
       cur.type === 'nat'
         ? jsx('input', {
             type: 'text', inputMode: 'decimal', placeholder: 'Your answer',
@@ -1020,40 +1113,59 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     (!narrow || !palCollapsed) && jsx('div', { className: `cbt-pal${narrow ? ' as-drawer' : ''}`, style: { gridArea: 'pal' }, children: [
       jsx('div', { className: 'cbt-pal-wrap', children: [
         jsx('div', { className: 'cbt-pal-inner', style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }, children: [
-          jsx('div', { className: 'cbt-pal-head', children: [
-            narrow
-              ? jsxs('div', { className: 'row', style: { marginBottom: 8 }, children: [
-                  jsx('strong', { style: { fontSize: 12 }, children: 'Palette' }),
-                  jsx('span', { style: { flex: 1 } }),
-                  jsx('button', { type: 'button', className: 'cbt-pal-close', title: 'Close palette', onClick: () => setPalCollapsed(true), children: '✕' }),
-                ] })
-              : null,
+          jsxs('div', { className: 'cbt-pal-head', children: [
+            jsxs('div', { className: 'pal-title', children: [
+              jsx('strong', { children: 'Question map' }),
+              jsx('span', { className: 'muted', children: `${secCounts[2] + secCounts[4]} of ${secQs(activeSecId).length} answered` }),
+              jsx('span', { style: { flex: 1 } }),
+              jsx('button', {
+                type: 'button', className: 'icon-btn',
+                title: narrow ? 'Close the question map' : 'Hide the question map',
+                'aria-label': 'Hide the question map',
+                onClick: () => setPalCollapsed(true),
+                children: jsx('i', { className: `codicon codicon-${narrow ? 'close' : 'chevron-right'}`, 'aria-hidden': 'true' }),
+              }),
+            ] }),
             legendNode(secCounts),
             secMeta.attempt_limit
               ? jsx('div', { style: { fontSize: 12, color: counted >= secMeta.attempt_limit ? 'var(--ui-accent)' : 'var(--ui-text-secondary)' }, children: `Attempted ${counted} / ${secMeta.attempt_limit} counted — further answers in this section don't score` })
               : null,
           ] }),
-          jsx('div', { className: 'cbt-pal-scroll', children: sections.map(s =>
-            jsxs('div', { key: s.id, className: 'cbt-pal-group', children: [
-              jsx('h4', { children: s.title }),
+          jsx('div', { className: 'cbt-pal-scroll', children: sections.map(s => {
+            const qs = secQs(s.id)
+            const done = qs.filter(x => {
+              const v = answered[x.id]
+              return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
+            }).length
+            return jsxs('div', { key: s.id, className: 'cbt-pal-group', children: [
+              jsxs('div', { className: 'pal-sec-head', children: [
+                jsx('strong', { children: s.title }),
+                jsx('span', { children: `${done}/${qs.length}` }),
+              ] }),
               jsx('div', { className: 'cbt-pal-grid', children: secQs(s.id).map((x, i) => {
                 const st = chipState(x.id, answered, visited, marked)
                 return jsx('button', {
                   key: x.id, type: 'button',
                   className: `cbt-chip ${st}`,
                   style: x.id === curIdResolved ? { outline: '2px solid var(--ui-accent)', outlineOffset: '1px' } : undefined,
+                  title: `Question ${i + 1}`,
                   onClick: () => goTo(x.id),
                   children: st === 's-answered-marked' ? `${i + 1}✓` : String(i + 1),
                 })
               }) }),
-            ] })) }),
-          jsx('div', { className: 'cbt-pal-submit', children: jsx('button', { type: 'button', style: { width: '100%' }, onClick: () => setConfirming(true), children: 'Submit' }) }),
+            ] })
+          }) }),
+          jsx('div', { className: 'cbt-pal-submit', children: jsx('button', {
+            type: 'button', style: { width: '100%' }, onClick: () => setConfirming(true), children: 'Submit paper',
+          }) }),
         ] }),
-        jsx('button', {
-          type: 'button', className: 'cbt-pal-toggle',
-          onClick: () => setPalCollapsed(v => !v),
-          children: palCollapsed ? '<' : '>',
-        }),
+        palCollapsed
+          ? jsx('div', { className: 'cbt-pal-rail', children: jsx('button', {
+              type: 'button', className: 'icon-btn', title: 'Show the question map', 'aria-label': 'Show the question map',
+              onClick: () => setPalCollapsed(false),
+              children: jsx('i', { className: 'codicon codicon-chevron-left', 'aria-hidden': 'true' }),
+            }) })
+          : null,
       ] }),
     ] }),
     jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: confirming ? [
@@ -1069,17 +1181,21 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     ] : [
       jsx('button', { key: 'sv', type: 'button', onClick: () => void act('saveStay'), title: 'Save answer (S)', children: 'Save' }),
       jsx('button', { key: 'sn', type: 'button', onClick: () => void act('saveNext'), title: 'Save answer and move on (Enter)', children: 'Save & Next' }),
-      jsx('button', { key: 'sm', type: 'button', onClick: () => void act('saveMark'), title: 'Save answer and flag for review (M)', children: marked.includes(curIdResolved) ? 'Save & Unmark' : 'Save & Mark for Review' }),
+      jsx('button', { key: 'sm', type: 'button', 'data-fixed': '', onClick: () => void act('saveMark'), title: 'Save answer and flag for review (M)', children: marked.includes(curIdResolved) ? 'Save & Unmark' : 'Save & Mark for Review' }),
       jsx('button', { key: 'cr', type: 'button', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: 'Clear Response' }),
-      jsx('button', { key: 'mn', type: 'button', onClick: () => void act('markNext'), title: 'Flag for review and move on', children: marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark for Review & Next' }),
-      saveState
-        ? jsx('span', {
-            key: 'ss',
-            className: `save-state${saveState === 'saved' ? ' ok' : saveState === 'err' ? ' err' : ''}`,
-            role: 'status',
-            children: saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Not saved — retry',
-          })
-        : null,
+      jsx('button', { key: 'mn', type: 'button', 'data-fixed': '', onClick: () => void act('markNext'), title: 'Flag for review and move on', children: marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark for Review & Next' }),
+      // fixed-width slot: the indicator appearing must not shift the nav buttons
+      jsx('span', {
+        key: 'ss',
+        className: 'save-slot',
+        role: 'status',
+        children: saveState
+          ? jsx('span', {
+              className: `save-state${saveState === 'saved' ? ' ok' : saveState === 'err' ? ' err' : ''}`,
+              children: saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Not saved — retry',
+            })
+          : null,
+      }),
       // nav pair travels as one unit: wrapped alone it must not split Back from Next
       jsxs('span', { key: 'nav', className: 'row nav', children: [
         jsx('button', { key: 'bk', type: 'button', onClick: () => void act('back'), title: 'Previous question (←)', children: '<< Back' }),
@@ -1104,8 +1220,9 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
           ] }),
           ...sections.map(s => jsxs('div', { key: s.id, children: [
             jsx('h3', { children: s.title }),
-            ...secQs(s.id).map((x, i) => jsxs('p', { key: x.id, style: { margin: '8px 0', fontSize: 13 }, children: [
-              jsx('strong', { children: `${i + 1}. ` }), x.text,
+            ...secQs(s.id).map((x, i) => jsxs('div', { key: x.id, style: { margin: '8px 0' }, children: [
+              jsx('p', { style: { margin: 0, fontSize: 13 }, children: [jsx('strong', { children: `${i + 1}. ` }), x.text] }),
+              mediaNode(x.media, pack.exam_id, `paper-${x.id}`),
             ] })),
           ] })),
         ],
@@ -1309,7 +1426,11 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         }),
         expanded && jsxs('div', { style: { marginTop: 4, marginBottom: 12, maxWidth: 820 }, children: [
           jsx('p', { children: qq.text }),
-          (qq.options || []).map((o, i) => jsx('div', { key: i, className: 'muted', children: `${String.fromCharCode(65 + i)}) ${o}` })),
+          mediaNode(qq.media, pack.exam_id, `rev-${row.id}`),
+          (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'muted', children: [
+            `${String.fromCharCode(65 + i)}) ${o}`,
+            qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.exam_id, `rev-${row.id}-o${i}`) : null,
+          ] })),
           jsxs('div', { className: 'ans', style: { marginTop: 8 }, children: [
             jsx('span', { className: 'k', children: 'Your answer' }),
             jsx('span', {

@@ -54,6 +54,17 @@ def live_dir():
     return data_root() / "live"
 
 
+def pack_assets_dir(exam_id):
+    """Where a paper's figures live: `packs/<exam_id>.assets/`.
+
+    Kept beside the JSON rather than inside it so a pack stays one readable file
+    and images are served as static bytes, not base64 blobs in the model context.
+    """
+    if not _ID.match(str(exam_id or "")):
+        raise KeyError(f"pack id {exam_id!r} is not a plain id")
+    return packs_dir() / f"{exam_id}.assets"
+
+
 def _file_in(directory, ident, kind):
     """`<directory>/<ident>.json`, refusing anything that is not a plain id.
 

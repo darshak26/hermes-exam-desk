@@ -286,3 +286,40 @@ class DeleteTests(unittest.TestCase):
         r = client.post("/attempts/prune", json={"exam_id": "some-other-exam"})
         self.assertEqual(r.json()["deleted"], 0)
         self.assertIn(dropped, {a["id"] for a in client.get("/attempts").json()["attempts"]})
+
+
+class MediaTests(unittest.TestCase):
+    """Figures live beside the JSON and are served as bytes, never inlined."""
+
+    def setUp(self):
+        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
+        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        seed_pack()
+        self.assets = DATA / "packs" / "gat-b-demo.assets"
+        (self.assets / "figures").mkdir(parents=True, exist_ok=True)
+        (self.assets / "figures" / "gel.png").write_bytes(b"\x89PNG\r\n\x1a\nFAKE")
+
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+
+    def test_serves_a_figure(self):
+        r = client.get("/packs/gat-b-demo/assets/figures/gel.png")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.content.startswith(b"\x89PNG"))
+
+    def test_missing_figure_is_404(self):
+        self.assertEqual(client.get("/packs/gat-b-demo/assets/figures/nope.png").status_code, 404)
+
+    def test_path_traversal_is_refused(self):
+        r = client.get("/packs/gat-b-demo/assets/../../gat-b-demo.json")
+        self.assertIn(r.status_code, (400, 404))
+        self.assertNotIn(b"schema", r.content)
+
+    def test_pack_list_warns_about_a_missing_figure(self):
+        pack = base_pack()
+        pack["questions"][0]["media"] = [{"type": "image", "src": "figures/absent.png", "alt": "gel"}]
+        (DATA / "packs" / "gat-b-demo.json").write_text(json.dumps(pack))
+        warns = client.get("/packs").json()["packs"][0]["warnings"]
+        self.assertTrue(any("missing" in w for w in warns), warns)

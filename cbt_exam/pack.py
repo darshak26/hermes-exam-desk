@@ -15,7 +15,7 @@ Two design rules this module exists to enforce:
 import json
 import math
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 SCHEMA = "cbt-pack/1"
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -98,6 +98,57 @@ def answer_error(q, val):
 # --------------------------------------------------------------------------- #
 # author-time validation
 # --------------------------------------------------------------------------- #
+MEDIA_TYPES = ("image", "table", "text")
+
+
+def _media_error(tag, block, where):
+    """One media block → an error string, or None when it is usable.
+
+    Images are addressed two ways: an http(s) URL the browser fetches, or a path
+    relative to `packs/<exam_id>.assets/`. A relative path may not climb out of
+    that directory — the asset route relies on this too.
+    """
+    if not isinstance(block, dict):
+        return f"{tag}: {where} entries must be objects"
+    kind = block.get("type")
+    if kind not in MEDIA_TYPES:
+        return f"{tag}: {where} type must be one of {MEDIA_TYPES}"
+    if kind == "image":
+        src = block.get("src")
+        if not isinstance(src, str) or not src.strip():
+            return f"{tag}: {where} image needs src"
+        if "://" in src:
+            if not re.match(r"^https?://", src):
+                return f"{tag}: {where} image src must be http(s) or a path relative to <exam>.assets/"
+        elif src.startswith("/") or ".." in PurePosixPath(src).parts or "\\" in src:
+            return f"{tag}: {where} image src must stay inside <exam>.assets/ ({src!r})"
+        if block.get("caption") is not None and not isinstance(block.get("caption"), str):
+            return f"{tag}: {where} image caption must be a string"
+        if block.get("alt") is not None and not isinstance(block.get("alt"), str):
+            return f"{tag}: {where} image alt must be a string"
+        return None
+    if kind == "table":
+        head, rows = block.get("head"), block.get("rows")
+        if head is not None and (not isinstance(head, list) or not all(isinstance(h, str) for h in head)):
+            return f"{tag}: {where} table head must be a list of strings"
+        if not isinstance(rows, list) or not rows:
+            return f"{tag}: {where} table needs a non-empty rows list"
+        width = len(head) if isinstance(head, list) else None
+        for ri, row in enumerate(rows, 1):
+            if not isinstance(row, list):
+                return f"{tag}: {where} table row {ri} must be a list"
+            if width is not None and len(row) != width:
+                return f"{tag}: {where} table row {ri} has {len(row)} cells, head has {width}"
+        if width is None:
+            widths = {len(r) for r in rows if isinstance(r, list)}
+            if len(widths) > 1:
+                return f"{tag}: {where} table rows have uneven cell counts {sorted(widths)}"
+        return None
+    if not str(block.get("text") or "").strip():
+        return f"{tag}: {where} text block needs text"
+    return None
+
+
 def validate_pack(pack):
     """Return a list of human-readable errors; empty list = valid."""
     errs = []
@@ -204,6 +255,34 @@ def validate_pack(pack):
             elif k == "marks_correct" and v < 0:
                 errs.append(f"{tag}: marks_correct override must be >= 0")
 
+        media = q.get("media")
+        if media is not None:
+            if not isinstance(media, list) or not media:
+                errs.append(f"{tag}: media must be a non-empty list of blocks")
+            else:
+                for mi, block in enumerate(media, 1):
+                    why = _media_error(tag, block, f"media #{mi}")
+                    if why:
+                        errs.append(why)
+
+        omedia = q.get("option_media")
+        if omedia is not None:
+            if not isinstance(omedia, list):
+                errs.append(f"{tag}: option_media must be a list parallel to options")
+            elif isinstance(opts, list) and len(omedia) != len(opts):
+                errs.append(f"{tag}: option_media has {len(omedia)} entries for {len(opts)} options")
+            else:
+                for oi, blocks in enumerate(omedia):
+                    if blocks is None:
+                        continue                       # no figure for this option
+                    if not isinstance(blocks, list):
+                        errs.append(f"{tag}: option_media[{oi}] must be a list of blocks or null")
+                        continue
+                    for mi, block in enumerate(blocks, 1):
+                        why = _media_error(tag, block, f"option_media[{oi}] #{mi}")
+                        if why:
+                            errs.append(why)
+
     for s in sections:
         if not isinstance(s, dict):
             continue
@@ -217,7 +296,7 @@ def validate_pack(pack):
     return errs
 
 
-def lint_pack(pack):
+def lint_pack(pack, assets_dir=None):
     """Non-fatal warnings: the pack runs, but the questions look damaged.
 
     This is the OCR guard. Sourced papers arrive with junk options ("11001 . . :")
@@ -241,6 +320,27 @@ def lint_pack(pack):
                 warns.append(f"{qid}: option {chr(65 + i)} looks like OCR debris ({str(o)[:24]!r})")
         if len(str(q.get("text", "")).strip()) < 15:
             warns.append(f"{qid}: question text is very short ({str(q.get('text'))[:30]!r})")
+        omedia = q.get("option_media") or []
+        with_figs = [b for b in omedia if isinstance(b, list) and b]
+        opts_all = q.get("options") or []
+        if with_figs and len(with_figs) != len(opts_all):
+            warns.append(f"{qid}: only {len(with_figs)} of {len(opts_all)} options carry a figure — a question that compares figures needs them on every option, otherwise the odd one out draws the eye")
+        for where, blocks in (("media", q.get("media") or []),
+                              *((f"option_media[{oi}]", b) for oi, b in
+                                enumerate(q.get("option_media") or []))):
+            for block in (blocks if isinstance(blocks, list) else []):
+                if not isinstance(block, dict) or block.get("type") != "image":
+                    continue
+                src = str(block.get("src") or "")
+                if not str(block.get("alt") or "").strip():
+                    warns.append(f"{qid}: {where} image has no alt text — say what it shows")
+                if assets_dir is not None and "://" not in src and src:
+                    try:
+                        found = (Path(assets_dir) / src).is_file()
+                    except OSError:
+                        found = False
+                    if not found:
+                        warns.append(f"{qid}: {where} image {src!r} is missing from {Path(assets_dir).name}/")
     return warns
 
 
@@ -302,7 +402,7 @@ def sanitize_pack(pack):
                                   for q in pack["questions"]]}
 
 
-def summarize(pack):
+def summarize(pack, assets_dir=None):
     return {"exam_id": pack["exam_id"], "title": pack.get("title", pack["exam_id"]),
             "year": pack.get("year"), "body": pack.get("body"),
             "duration_minutes": pack["pattern"]["duration_minutes"],
@@ -313,4 +413,4 @@ def summarize(pack):
                           "marks_correct": s.get("marks_correct"),
                           "marks_wrong": s.get("marks_wrong")} for s in pack["pattern"]["sections"]],
             "provenance": pack.get("provenance"), "source_url": pack.get("source_url"),
-            "warnings": lint_pack(pack)}
+            "warnings": lint_pack(pack, assets_dir)}

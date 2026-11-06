@@ -49,3 +49,43 @@ class PackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MediaPackTests(unittest.TestCase):
+    def test_question_media_round_trips(self):
+        from cbt_exam.pack import validate_pack
+        p = base_pack()
+        p["questions"][0]["media"] = [
+            {"type": "image", "src": "figures/gel.png", "alt": "gel lanes", "caption": "Fig 1"},
+            {"type": "table", "head": ["Lane", "bp"], "rows": [[1, 500], [2, 300]]},
+            {"type": "text", "text": "Assume a 1 kb ladder."},
+        ]
+        self.assertEqual(validate_pack(p), [])
+
+    def test_image_src_cannot_climb_out(self):
+        from cbt_exam.pack import validate_pack
+        p = base_pack()
+        p["questions"][0]["media"] = [{"type": "image", "src": "../../secret.png"}]
+        errs = validate_pack(p)
+        self.assertTrue(any("stay inside" in e for e in errs), errs)
+
+    def test_uneven_table_is_an_error(self):
+        from cbt_exam.pack import validate_pack
+        p = base_pack()
+        p["questions"][0]["media"] = [{"type": "table", "head": ["a", "b"], "rows": [[1, 2], [3]]}]
+        errs = validate_pack(p)
+        self.assertTrue(any("cells" in e for e in errs), errs)
+
+    def test_option_media_must_match_option_count(self):
+        from cbt_exam.pack import validate_pack
+        p = base_pack()
+        p["questions"][0]["option_media"] = [[{"type": "image", "src": "figures/a.png"}]]
+        errs = validate_pack(p)
+        self.assertTrue(any("option_media has" in e for e in errs), errs)
+
+    def test_missing_alt_text_is_a_warning(self):
+        from cbt_exam.pack import lint_pack
+        p = base_pack()
+        p["questions"][0]["media"] = [{"type": "image", "src": "figures/a.png"}]
+        warns = lint_pack(p)
+        self.assertTrue(any("alt text" in w for w in warns), warns)

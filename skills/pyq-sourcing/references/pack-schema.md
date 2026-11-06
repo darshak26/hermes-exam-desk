@@ -32,6 +32,35 @@ A plain-English mirror of what `cbt_exam/pack.py` + `scripts/validate_pack.py` e
 | `explanation` | optional, shown after submit |
 | `source_url` | **required on every question** (provenance rule) |
 | `difficulty` | optional: `easy` / `medium` / `hard` (anything else is rejected) |
+| `media` | optional list of blocks shown under the stem: figure, data table, or a note |
+| `option_media` | optional list parallel to `options`; each entry is a list of blocks or `null` |
+
+### Media blocks (diagrams, tables)
+
+A question is not always text. Papers carry gels, graphs, circuit diagrams and
+data tables, and a stem like "the gel below shows…" is useless without them.
+
+```json
+"media": [
+  {"type": "image", "src": "figures/A-23-gel.png", "alt": "four-lane agarose gel", "caption": "Fig. 1 — 1 kb ladder in lane 1"},
+  {"type": "table", "caption": "Fragment sizes", "head": ["Lane", "bp"], "rows": [[2, 1200], [3, 800]]},
+  {"type": "text", "text": "Assume the gel ran 40 min at 100 V."}
+]
+```
+
+- **Where images live:** `packs/<exam_id>.assets/` next to the JSON — e.g.
+  `packs/gat-b-2023.assets/figures/A-23-gel.png`, referenced as
+  `figures/A-23-gel.png`. A path may not climb out of that directory (`..`,
+  leading `/` and absolute paths are rejected), and `http(s)` URLs are allowed
+  for figures that already live online.
+- **Never base64 a figure into the JSON.** It bloats every model turn that reads
+  the pack and the panel renders it through the plugin's own asset route.
+- **`alt` matters:** it is what a screen reader says and what the panel shows if
+  the file is missing. `lint_pack` warns when an image has no alt text or the
+  file is absent.
+- **Option figures:** set `option_media` on *every* option when the question
+  compares figures (four gels, four circuits). A figure on one option only draws
+  the eye to it — lint warns when coverage is partial.
 
 ## Rules the grader lives by (so the pack can express them)
 
@@ -50,6 +79,9 @@ They are the OCR guard: a freshly sourced paper is usually full of them.
 - duplicate option text inside one question
 - a `topic` that just repeats the exam title (placeholder — the AI evaluation is only as good as the topics)
 - question text shorter than 15 characters
+- an image with no `alt` text
+- an image whose file is missing from `packs/<exam_id>.assets/`
+- only some options carrying a figure
 
 Fix them before sitting the exam; they do not block grading.
 

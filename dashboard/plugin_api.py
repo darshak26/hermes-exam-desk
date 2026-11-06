@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
+ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 
 _pkg = Path(__file__).resolve().parents[1] / "cbt_exam"
 _name = "_cbt_exam_http"
@@ -68,8 +70,40 @@ def health():
 def get_packs():
     out = []
     for p in store_mod.list_packs():
-        out.append(p if "invalid" in p else pack_mod.summarize(p))
+        if "invalid" in p:
+            out.append(p)
+            continue
+        try:
+            assets = store_mod.pack_assets_dir(p["exam_id"])
+        except KeyError:
+            assets = None
+        out.append(pack_mod.summarize(p, assets))
     return {"packs": out}
+
+
+@router.get("/packs/{exam_id}/assets/{name:path}")
+def get_pack_asset(exam_id: str, name: str):
+    """Static bytes for a question figure (`packs/<exam_id>.assets/<name>`).
+
+    The browser loads these with a plain <img src>, so the path is checked twice:
+    the exam_id must be a plain slug and the resolved file must still sit inside
+    the asset directory after symlinks and `..` are collapsed.
+    """
+    try:
+        base = store_mod.pack_assets_dir(exam_id).resolve()
+    except KeyError:
+        raise HTTPException(404, "no such pack")
+    try:
+        target = (base / name).resolve()
+    except (OSError, ValueError):
+        raise HTTPException(400, "bad asset path")
+    if base != target and base not in target.parents:
+        raise HTTPException(400, "asset path leaves the pack directory")
+    if not target.is_file():
+        raise HTTPException(404, "no such asset")
+    if target.stat().st_size > ASSET_MAX_BYTES:
+        raise HTTPException(413, "asset is too large to serve")
+    return FileResponse(target)
 
 
 @router.get("/packs/{exam_id}")
