@@ -1089,8 +1089,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       jsx('strong', { className: 'cbt-head-title', title: pack.title || pack.exam_id, children: pack.title || pack.exam_id }),
       isNarrow ? null : jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
       jsx('span', { style: { flex: 1 } }),
-      // One control, always in the same place: the panel toggle sits with the other
-      // header tools instead of living on a rail at the screen edge.
+      isNarrow
+        ? jsx('button', { type: 'button', className: 'icon-btn', title: 'Question paper', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: jsx('i', { className: 'codicon codicon-book', 'aria-hidden': 'true' }) })
+        : jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
+      jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
+      // the panel toggle is the last thing in the header — it governs the panel on
+      // the right, so it sits on the right of everything else
       jsx('button', {
         type: 'button', className: 'icon-btn',
         'aria-expanded': !palCollapsed,
@@ -1098,10 +1102,6 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         onClick: () => setPalCollapsed(v => !v),
         children: jsx('i', { className: 'codicon codicon-layout-sidebar-right', 'aria-hidden': 'true' }),
       }),
-      isNarrow
-        ? jsx('button', { type: 'button', className: 'icon-btn', title: 'Question paper', 'aria-label': 'Question paper', onClick: () => setShowPaper(v => !v), children: jsx('i', { className: 'codicon codicon-book', 'aria-hidden': 'true' }) })
-        : jsx('button', { type: 'button', onClick: () => setShowPaper(v => !v), children: 'Question Paper' }),
-      jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
     ] }),
     jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: sections.map(s => {
       const qs = secQs(s.id)
