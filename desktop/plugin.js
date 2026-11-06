@@ -7,11 +7,24 @@ const CSS = `
 .cbt{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary,#222);font:13px/1.5 var(--font-sans,system-ui)}
 .cbt *{box-sizing:border-box}
 .cbt .muted{color:var(--ui-text-secondary,#666)}
-.cbt .pad{padding:20px 24px;overflow:auto}
+/* Spacing scale: 4 8 12 16 24 32. Every padding/gap/margin below is a step or a
+   half-step of it; horizontal text starts on one left edge: 20px page gutter,
+   table cells carry only a right gutter so column text stays on that edge. */
+/* page container: block flow, so a stray button is never stretched to full width */
+.cbt.pad{display:block;padding:24px;overflow:auto}
+.cbt h2{font-size:17px;line-height:1.35;font-weight:600;margin:0 0 16px}
+.cbt.pad > .row.head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.cbt.pad > .row.head h2{margin:0}
+.cbt.pad > .row.head *{overflow-wrap:anywhere}
+.cbt .muted + .muted{margin-top:4px}
 .cbt table{border-collapse:collapse;width:100%}
-.cbt th,.cbt td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--ui-stroke-secondary,#ccc);font-size:12.5px}
-.cbt th{color:var(--ui-text-secondary,#666);font-weight:600}
-.cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer}
+.cbt th,.cbt td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--ui-stroke-secondary,#ccc);font-size:12.5px;vertical-align:middle}
+.cbt th:last-child,.cbt td:last-child{padding-right:0;text-align:right}
+.cbt td:last-child .row,.cbt td:last-child{justify-content:flex-end}
+.cbt td:last-child .row{flex-wrap:nowrap}
+.cbt th{color:var(--ui-text-secondary,#666);font-weight:600;padding-top:0}
+.cbt td .row{gap:8px}
+.cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
 .cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
 .cbt button.primary{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt button:disabled{opacity:.5;cursor:default}
@@ -32,10 +45,17 @@ const CSS = `
 .cbt .sw.err{border-color:var(--ui-error-foreground);background:color-mix(in srgb,var(--ui-error-foreground) 16%,transparent)}
 .cbt .sw.ok{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
 .cbt .sw.acc{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
-.cbt h3{font-size:13px;margin:14px 0 6px}
+.cbt h3{font-size:13px;line-height:1.4;margin:24px 0 8px}
+.cbt p{margin:0 0 16px;max-width:70ch}
+.cbt p.note{margin:0 0 8px}
+.cbt h4{font-size:12.5px;margin:16px 0 8px;font-weight:600}
+.cbt h4:first-child{margin-top:0}
+.cbt .list{margin:0 0 16px;padding-left:18px}
+.cbt .list li{margin:0 0 6px}
+.cbt p:last-child{margin-bottom:0}
 .cbt input[type=text]{font:inherit;color:inherit;background:var(--ui-surface-background,#fff);border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:6px 10px;min-width:280px}
-.cbt .opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;margin:8px 0;cursor:pointer;background:var(--ui-surface-background,#fff)}
-.cbt .opt input{margin-top:2px}
+.cbt .opt{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:8px;margin:0 0 10px;cursor:pointer;background:var(--ui-surface-background,#fff);line-height:1.5}
+.cbt .opt input{margin:2px 0 0}
 .cbt .opt.sel{border-color:var(--ui-accent)}
 .cbt .opt{text-align:left;max-width:640px}
 .cbt-shell{display:grid;height:100%;min-height:0;
@@ -45,28 +65,28 @@ const CSS = `
   grid-template-rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
   grid-template-areas:"head head" "tabs pal" "body pal" "act pal";}
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
-.cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
-.cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
-.cbt-chip.s-not-answered{border-color:var(--ui-error-foreground);background:color-mix(in srgb,var(--ui-error-foreground) 16%,transparent)}
-.cbt-chip.s-answered{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
-.cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
-.cbt-chip.s-answered-marked{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-accent) 18%,transparent)}
-.cbt-qbody{max-width:860px;margin:0 auto;padding:24px 28px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt-actions{display:flex;gap:8px;align-items:center;padding:0 16px;flex-wrap:wrap}
-.cbt-actions button{text-align:left}
+.cbt .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
+.cbt .cbt-chip.s-not-answered{border-color:var(--ui-error-foreground);background:color-mix(in srgb,var(--ui-error-foreground) 16%,transparent)}
+.cbt .cbt-chip.s-answered{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-success-foreground) 16%,transparent)}
+.cbt .cbt-chip.s-marked{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 16%,transparent)}
+.cbt .cbt-chip.s-answered-marked{border-color:var(--ui-success-foreground);background:color-mix(in srgb,var(--ui-accent) 18%,transparent)}
+.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 24px;font-size:15px;line-height:1.6;overflow:auto}
+.cbt-actions{display:flex;gap:8px;align-items:center;padding:12px 20px;flex-wrap:wrap;border-top:1px solid var(--ui-stroke-secondary)}
+.cbt-actions button{text-align:left;justify-content:flex-start}
 .cbt-shell.pal-collapsed{grid-template-columns:minmax(0,1fr) 24px}
 .cbt-shell.pal-collapsed .cbt-pal-inner{display:none}
-.cbt-head{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--ui-stroke-secondary)}
-.cbt-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:hidden}
-.cbt-tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 14px}
+.cbt-head{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt-tabs{display:flex;gap:4px;padding:0 8px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:hidden}
+.cbt-tabs button{height:34px;border:none;border-bottom:2px solid transparent;border-radius:0;padding:0 12px}
 .cbt-tabs button.on{border-bottom-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt-pal{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--ui-stroke-secondary)}
-.cbt-pal-head{padding:10px 12px 4px}
+.cbt-pal-head{padding:12px 12px 8px}
 .cbt-pal-scroll{flex:1;overflow:auto}
-.cbt-pal-group{margin:6px 0}
-.cbt-pal-group h4{font-size:11px;margin:8px 12px 4px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.cbt-pal-submit{padding:8px 12px;border-top:1px solid var(--ui-stroke-secondary)}
-.cbt-pal-toggle{position:absolute;right:0;top:0;height:100%;width:24px}
+.cbt-pal-group{margin:8px 0}
+.cbt-pal-group h4{font-size:11px;margin:12px 12px 6px;color:var(--ui-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.cbt-pal-submit{padding:12px;border-top:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-pal-toggle{position:absolute;right:0;top:0;height:100%;width:24px}
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%}
 /* Narrow (side-pane) layout: one column, palette becomes an overlay drawer so the
    question keeps its full width instead of being squeezed by a fixed 358px column. */
@@ -78,8 +98,9 @@ const CSS = `
 .cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-grid{grid-template-columns:repeat(8,28px)}
 .cbt-pal-close{display:none}
 .cbt-shell.narrow .cbt-pal.as-drawer .cbt-pal-close{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border-radius:4px;flex:0 0 auto}
-.cbt-shell.narrow .cbt-qbody{padding:18px 16px}
-.cbt-shell.narrow .cbt-head{padding:0 10px;gap:8px}
+.cbt-shell.narrow .cbt-qbody{padding:16px 16px 20px}
+.cbt-shell.narrow .cbt-head{padding:0 16px;gap:8px}
+.cbt-shell.narrow .cbt-actions{padding:12px 16px}
 `;
 
 async function rest(path, opts) {
@@ -343,7 +364,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
   }
   return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row', children: [
+    jsx('div', { className: 'row head', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
       jsx('span', { className: `badge ${mode === 'assisted' ? 'assisted' : ''}`, children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
@@ -361,7 +382,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     jsx('h3', { children: 'Question palette' }),
     legendNode(),
     jsx('div', { className: 'muted', children: 'Answered and marked-for-review questions are evaluated. Marked-for-review without an answer is not.' }),
-    jsx('div', { className: 'row', style: { marginTop: 18 }, children: [
+    jsx('div', { className: 'row', style: { marginTop: 24 }, children: [
       jsx('button', { type: 'button', className: 'primary', disabled: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
       jsx('button', { type: 'button', disabled: starting, onClick: onBack, children: 'Back' }),
       jsx('span', { className: 'muted', children: mode === 'assisted'
@@ -386,7 +407,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
     host.composer.focus(null)
   }
   return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row', children: [
+    jsx('div', { className: 'row head', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: 'CBT Exams' }),
       jsx('span', { className: 'muted', children: 'exam-agnostic practice — any CBT, pattern is data' }),
@@ -644,7 +665,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         `Question ${cur.id} · ${QTYPE_LABEL[cur.type] || cur.type}`,
         cur.type !== 'nat' ? ` · +${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` : '',
       ] }),
-      jsx('p', { style: { fontSize: 16, marginTop: 8 }, children: cur.text }),
+      jsx('p', { style: { fontSize: 16, marginTop: 12, marginBottom: 16 }, children: cur.text }),
       cur.type === 'nat'
         ? jsx('input', {
             type: 'text', inputMode: 'decimal', placeholder: 'Your answer',
@@ -658,7 +679,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         jsx('div', { className: 'cbt-pal-inner', style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }, children: [
           jsx('div', { className: 'cbt-pal-head', children: [
             narrow
-              ? jsxs('div', { className: 'row', style: { marginBottom: 4 }, children: [
+              ? jsxs('div', { className: 'row', style: { marginBottom: 8 }, children: [
                   jsx('strong', { style: { fontSize: 12 }, children: 'Palette' }),
                   jsx('span', { style: { flex: 1 } }),
                   jsx('button', { type: 'button', className: 'cbt-pal-close', title: 'Close palette', onClick: () => setPalCollapsed(true), children: '✕' }),
@@ -744,26 +765,26 @@ const VERDICT_LABEL = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped', 
 
 function evaluationCard(d) {
   if (!d) return null
-  return jsxs('div', { style: { marginTop: 8 }, children: [
-    jsx('p', { style: { margin: '4px 0 8px' }, children: d.overall_comment }),
+  return jsxs('div', { children: [
+    jsx('p', { children: d.overall_comment }),
     (d.sections || []).map((s, i) => jsx('p', { key: i, className: 'muted', children: `${s.section_id}: ${s.comment}` })),
     (d.weak_topics || []).length
       ? jsxs('div', { children: [
-          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Weak topics' }),
-          jsx('div', { className: 'row', children: d.weak_topics.map((w, i) =>
-            jsxs('span', { key: i, className: `badge ${w.priority === 'high' ? 'err' : w.priority === 'medium' ? 'acc' : ''}`, children: [`${w.topic} `, jsx('span', { className: 'muted', children: `(${w.priority})` })] })) }),
+          jsx('h4', { children: 'Weak topics' }),
+          jsx('ul', { className: 'list', children: d.weak_topics.map((w, i) =>
+            jsxs('li', { key: i, children: [`${w.topic} `, jsx('span', { className: 'muted', children: `· ${w.priority} priority` })] })) }),
         ] })
       : null,
     (d.wrong_answer_notes || []).length
       ? jsxs('div', { children: [
-          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Where it slipped' }),
-          ...d.wrong_answer_notes.map((n, i) => jsx('p', { key: i, style: { margin: '2px 0' }, children: [jsx('strong', { children: `${n.question_id}: ` }), n.note] })),
+          jsx('h4', { children: 'Where it slipped' }),
+          ...d.wrong_answer_notes.map((n, i) => jsx('p', { key: i, className: 'note', children: [jsx('strong', { children: `${n.question_id}: ` }), n.note] })),
         ] })
       : null,
     (d.study_plan || []).length
       ? jsxs('div', { children: [
-          jsx('h4', { style: { margin: '10px 0 4px' }, children: 'Study plan' }),
-          jsx('ol', { style: { margin: '4px 0', paddingLeft: 20 }, children: d.study_plan.map((s, i) => jsx('li', { key: i, children: s })) }),
+          jsx('h4', { children: 'Study plan' }),
+          jsx('ol', { className: 'list', children: d.study_plan.map((s, i) => jsx('li', { key: i, children: s })) }),
         ] })
       : null,
   ] })
@@ -821,7 +842,7 @@ function CbtResult({ attemptId, onHome }) {
   const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
   const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
   return jsxs('div', { className: 'cbt pad', children: [
-    jsx('div', { className: 'row', children: [
+    jsx('div', { className: 'row head', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: pack.title || pack.exam_id }),
       jsx('span', { className: `badge ${attempt.mode === 'assisted' ? 'assisted' : ''}`, children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
@@ -829,7 +850,7 @@ function CbtResult({ attemptId, onHome }) {
       jsx('span', { style: { flex: 1 } }),
       jsx('button', { type: 'button', onClick: () => onHome(), children: 'New attempt' }),
     ] }),
-    jsx('div', { style: { fontSize: 34, fontWeight: 700, marginTop: 8 }, children: String(r.score) }),
+    jsx('div', { style: { fontSize: 34, fontWeight: 700, marginTop: 8, marginBottom: 12, lineHeight: 1.2 }, children: String(r.score) }),
     jsx('div', { className: 'row', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
       jsxs('span', { key: k, className: 'badge', children: [`${VERDICT_LABEL[k]} `, jsx('strong', { children: String(r.totals[k]) })] })) }),
     jsx('h3', { children: 'Sections' }),
@@ -856,7 +877,7 @@ function CbtResult({ attemptId, onHome }) {
               jsx('button', { type: 'button', onClick: () => void runEval(false), children: 'Retry' }),
               jsx('button', { type: 'button', onClick: discuss, children: 'Discuss with the agent instead' }),
             ] }),
-            jsxs('details', { style: { marginTop: 6 }, children: [
+            jsxs('details', { style: { marginTop: 8 }, children: [
               jsx('summary', { className: 'muted', style: { cursor: 'pointer', fontSize: 12 }, children: 'What the model said' }),
               jsx('pre', { className: 'muted', style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, margin: '6px 0 0' }, children: evalError }),
             ] }),
@@ -864,7 +885,7 @@ function CbtResult({ attemptId, onHome }) {
         : attempt.evaluation
           ? jsxs('div', { children: [
               evaluationCard(attempt.evaluation.data),
-              jsxs('div', { className: 'row', style: { marginTop: 10 }, children: [
+              jsxs('div', { className: 'row', style: { marginTop: 12 }, children: [
                 jsx('span', { className: 'muted', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                 jsx('span', { style: { flex: 1 } }),
                 jsx('button', { type: 'button', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
@@ -877,12 +898,12 @@ function CbtResult({ attemptId, onHome }) {
               jsx('button', { type: 'button', onClick: discuss, children: 'Discuss in chat' }),
             ] }),
     jsx('h3', { children: 'Review' }),
-    jsx('div', { className: 'row', children: ['all', 'wrong', 'skipped', 'not_counted'].map(f =>
-      jsx('button', { key: f, type: 'button', className: filter === f ? 'primary' : '', onClick: () => setFilter(f), children: f })) }),
+    jsx('div', { className: 'row', children: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) =>
+      jsx('button', { key: f, type: 'button', className: filter === f ? 'primary' : '', onClick: () => setFilter(f), children: label })) }),
     jsx('div', { style: { marginTop: 8 }, children: rows.map(row => {
       const qq = qmap[row.id]
       const expanded = open === row.id
-      return jsxs('div', { key: row.id, style: { borderTop: '1px solid var(--ui-stroke-secondary)', padding: '6px 0' }, children: [
+      return jsxs('div', { key: row.id, style: { borderTop: '1px solid var(--ui-stroke-secondary)', padding: '10px 0' }, children: [
         jsx('div', { className: 'row', onClick: () => setOpen(expanded ? null : row.id), style: { cursor: 'pointer' }, children: [
           jsx('strong', { children: row.id }),
           jsx('span', { className: `badge ${VERDICT_CLS[row.verdict]}`, children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}` }),
@@ -890,7 +911,7 @@ function CbtResult({ attemptId, onHome }) {
           jsx('span', { style: { flex: 1 } }),
           jsx('span', { className: 'muted', children: expanded ? '▾' : '▸' }),
         ] }),
-        expanded && jsxs('div', { style: { marginTop: 8, maxWidth: 860 }, children: [
+        expanded && jsxs('div', { style: { marginTop: 12, maxWidth: 820 }, children: [
           jsx('p', { children: qq.text }),
           (qq.options || []).map((o, i) => jsx('div', { key: i, className: 'muted', children: `${String.fromCharCode(65 + i)}) ${o}` })),
           jsx('p', { children: [jsx('strong', { children: 'Your answer: ' }), fmtAns(qq, attempt.answers[row.id])] }),
