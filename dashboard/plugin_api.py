@@ -12,6 +12,7 @@ import importlib.util
 import sys
 import time
 from pathlib import Path
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -187,6 +188,31 @@ def abandon(aid: str):
         if a["status"] == "in_progress":
             a = store_mod.abandon_attempt(a)
         return _view(a, pack)
+
+
+@router.delete("/attempts/{aid}")
+def delete_attempt(aid: str):
+    """Remove one finished attempt. A live attempt must be abandoned first."""
+    with store_mod.attempt_lock(aid):
+        try:
+            removed = store_mod.delete_attempt(aid)
+        except KeyError:
+            raise HTTPException(404, "no such attempt")
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+    return {"deleted": removed, "id": aid}
+
+
+class PruneBody(BaseModel):
+    exam_id: Optional[str] = None
+    statuses: List[str] = Field(default_factory=lambda: ["abandoned"])
+
+
+@router.post("/attempts/prune")
+def prune_attempts(body: PruneBody = PruneBody()):
+    """Bulk-delete finished attempts (abandoned by default). Live ones are safe."""
+    gone = store_mod.prune_attempts(statuses=body.statuses, exam_id=body.exam_id)
+    return {"deleted": len(gone), "ids": gone}
 
 
 @router.post("/attempts/{aid}/evaluate")

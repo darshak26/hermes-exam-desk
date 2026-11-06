@@ -231,6 +231,47 @@ def abandon_attempt(a, now=None):
 # --------------------------------------------------------------------------- #
 # live exam context (what the exam-assist skill reads)
 # --------------------------------------------------------------------------- #
+def delete_attempt(aid):
+    """Remove a finished attempt and its live context. Refuses a live one.
+
+    Returns True when a file was removed. History is the user's to prune: an
+    attempt list that only ever grows is unusable after a week of practice.
+    """
+    a = get_attempt(aid)                      # KeyError when it does not exist
+    if a.get("status") == "in_progress":
+        raise ValueError("cannot delete an attempt that is still running")
+    path = _file_in(attempts_dir(), aid, "attempt")
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    clear_live_context(a)
+    return True
+
+
+def prune_attempts(statuses=("abandoned",), exam_id=None):
+    """Delete finished attempts in bulk. Returns the ids removed.
+
+    `statuses` is intersected with the deletable set — a live attempt is never
+    touched, whatever the caller asks for.
+    """
+    wanted = {s for s in statuses if s != "in_progress"}
+    removed = []
+    for a, err in iter_attempts():
+        if err is not None or a is None:
+            continue
+        if a.get("status") not in wanted:
+            continue
+        if exam_id and a.get("exam_id") != exam_id:
+            continue
+        try:
+            if delete_attempt(a["id"]):
+                removed.append(a["id"])
+        except (KeyError, ValueError):
+            continue
+    return removed
+
+
 def current_question_id(a, pack):
     """The question on screen: explicit `current`, else the last visited, else the first."""
     qs = pack.get("questions") or []

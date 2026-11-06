@@ -72,6 +72,19 @@ const CSS = `
   margin:-20px -20px 12px;padding:12px 20px;background:var(--ui-surface-background,#fff);
   border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .kbd{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
+/* one paper = one card: title, numbers, then its own history */
+.cbt .card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:16px;margin:0 0 16px}
+.cbt .card-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
+.cbt .card-actions{flex:0 0 auto}
+.cbt .card-body{margin-top:12px;border-top:1px solid var(--ui-stroke-secondary);padding-top:12px}
+.cbt .stat{display:flex;gap:12px;font-size:12px;color:var(--ui-text-secondary);margin-top:6px;align-items:baseline}
+.cbt .stat > span + span::before{content:'·';margin-right:12px;color:var(--ui-text-quaternary)}
+.cbt button.ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt button.ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
+.cbt button.ghost.danger{margin-left:8px}
+.cbt button.ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
+.cbt .card table th{padding-top:0}
+.cbt .card caption{padding-top:8px}
 .cbt .lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin:10px 0}
 .cbt .lg .item{display:flex;align-items:center}
 .cbt .sw{width:12px;height:12px;border-radius:3px;margin-right:6px;border:1px solid var(--ui-stroke-secondary);display:inline-block}
@@ -512,10 +525,157 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
   ] })
 }
 
+// One paper, its numbers, and its own attempt history. History is scoped to the
+// paper because a flat list of every attempt ever made stops being readable the
+// moment a second paper arrives.
+function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
+  const qc = useQueryClient()
+  const live = attempts.filter(a => a.status === 'in_progress')
+  const [open, setOpen] = useState(live.length > 0)
+  const [showAll, setShowAll] = useState(false)
+  const [showDiscarded, setShowDiscarded] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
+  const rank = a => (a.status === 'in_progress' ? 0 : 1)
+  const ordered = [...kept].sort((x, y) =>
+    rank(x) - rank(y) || (y.submitted_at || y.started_at || 0) - (x.submitted_at || x.started_at || 0))
+  const shown = showAll ? ordered : ordered.slice(0, 6)
+  const hidden = ordered.length - shown.length
+  const discarded = attempts.length - attempts.filter(a => a.status !== 'abandoned').length
+  const scores = attempts.map(a => a.score).filter(v => typeof v === 'number')
+  const best = scores.length ? Math.max(...scores) : null
+  const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
+
+  const del = async id => {
+    setBusy(true)
+    try {
+      await rest(`/attempts/${id}`, { method: 'DELETE' })
+      setConfirmDel(null)
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+    } catch (e) { host.notifyError?.(`Delete failed: ${e?.message || e}`) }
+    setBusy(false)
+  }
+  const clearDiscarded = async () => {
+    setBusy(true)
+    try {
+      await rest('/attempts/prune', { method: 'POST', body: { exam_id: pack.exam_id } })
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+    } catch (e) { host.notifyError?.(`Clear failed: ${e?.message || e}`) }
+    setBusy(false)
+  }
+
+  const marks = [...new Set((pack.sections || [])
+    .map(s => sectionMarks(s, pack.pattern || {}))
+    .filter(m => m.correct != null)
+    .map(m => marksLabel({ marks_correct: m.correct, marks_wrong: m.wrong }, {})))]
+  const meta = [
+    pack.year ? String(pack.year) : null,
+    pack.invalid ? null : `${pack.question_count} questions`,
+    pack.invalid ? null : `${pack.duration_minutes ?? '?'} min`,
+    marks.length ? marks.join(' · ') : null,
+  ].filter(Boolean).join(' · ')
+
+  return jsxs('section', { className: 'card', children: [
+    jsxs('div', { className: 'card-head', children: [
+      jsxs('div', { style: { minWidth: 0 }, children: [
+        jsxs('div', { className: 'row', children: [
+          jsx('h3', { style: { margin: 0 }, children: pack.title || pack.exam_id }),
+          pack.invalid ? jsx('span', { className: 'badge err', children: 'invalid' }) : null,
+          pack.warnings?.length
+            ? jsxs('details', { className: 'warn', style: { display: 'inline-block' }, children: [
+                jsx('summary', { className: 'badge err', style: { cursor: 'pointer' }, children: `${pack.warnings.length} warnings` }),
+                jsx('ul', { className: 'list', style: { margin: '8px 0 0' }, children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) }),
+              ] })
+            : null,
+        ] }),
+        jsx('div', { className: 'muted', children: pack.invalid
+          ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
+          : meta }),
+        pack.provenance && !pack.invalid ? jsx('div', { className: 'muted', style: { fontSize: 12 }, children: pack.provenance }) : null,
+        attempts.length
+          ? jsxs('div', { className: 'row stat', children: [
+              jsx('span', { children: `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}` }),
+              discarded ? jsx('span', { children: `${discarded} discarded` }) : null,
+              best != null ? jsx('span', { children: `best score ${fmtScore(best)}` }) : null,
+              last ? jsx('span', { children: `last ${relTime(last)}` }) : null,
+              live.length ? jsx('span', { className: 'badge fill', children: 'live now' }) : null,
+            ] })
+          : null,
+      ] }),
+      jsx('div', { className: 'card-actions', children: pack.invalid ? null : jsxs('span', { className: 'row', children: [
+        live.length
+          ? jsx('button', { type: 'button', className: 'primary', onClick: () => onResume(live[0].id, live[0].mode), children: 'Resume' })
+          : null,
+        jsx('button', {
+          type: 'button', className: live.length ? '' : 'primary',
+          title: 'Side pane beside the chat — ask doubts while you answer',
+          onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
+        }),
+        jsx('button', {
+          type: 'button', title: 'Full page, no chat, no hints',
+          onClick: () => onStart(pack, 'exam'), children: 'Start exam',
+        }),
+      ] }) }),
+    ] }),
+    attempts.length
+      ? jsxs('div', { className: 'card-body', children: [
+          jsxs('div', { className: 'row', style: { marginBottom: 8 }, children: [
+            jsx('button', {
+              type: 'button', className: 'ghost', 'aria-expanded': open,
+              onClick: () => setOpen(v => !v),
+              children: open ? '▾ Hide history' : `▸ History · ${ordered.length}`,
+            }),
+            jsx('span', { style: { flex: 1 } }),
+            discarded
+              ? jsx('button', {
+                  type: 'button', className: 'ghost',
+                  onClick: () => setShowDiscarded(v => !v),
+                  children: showDiscarded ? 'Hide discarded' : `Show ${discarded} discarded`,
+                })
+              : null,
+            discarded && showDiscarded
+              ? jsx('button', { type: 'button', className: 'ghost', disabled: busy, title: 'Delete every discarded attempt of this paper', onClick: () => void clearDiscarded(), children: 'Clear discarded' })
+              : null,
+          ] }),
+          open ? jsxs('table', { children: [
+            jsx('thead', { children: jsx('tr', { children: ['Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
+            jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
+              jsx('td', { children: jsx('span', { className: `badge ${a.mode === 'assisted' ? 'assisted' : ''}`, children: MODE_LABEL[a.mode] || a.mode }) }),
+              jsx('td', { children: jsx('span', { className: `badge ${a.status === 'in_progress' ? 'fill' : STATUS_CLS[a.status] || 'mut'}`, children: STATUS_LABEL[a.status] || a.status }) }),
+              jsx('td', { className: a.score == null ? 'muted num' : 'num', title: a.score == null ? 'not scored' : `score ${fmtScore(a.score)}`, children: fmtScore(a.score) }),
+              jsx('td', { className: 'muted', title: fmtWhen(a.submitted_at || a.started_at), children: relTime(a.submitted_at || a.started_at) }),
+              jsx('td', { children: confirmDel === a.id
+                ? jsxs('span', { className: 'row', children: [
+                    jsx('span', { className: 'muted', children: 'Delete this attempt?' }),
+                    jsx('button', { type: 'button', disabled: busy, onClick: () => void del(a.id), children: busy ? 'Deleting…' : 'Delete' }),
+                    jsx('button', { type: 'button', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
+                  ] })
+                : jsxs('span', { className: 'row', children: [
+                    a.status === 'in_progress'
+                      ? jsx('button', { type: 'button', className: 'primary', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
+                      : a.status === 'abandoned'
+                        ? jsx('button', { type: 'button', title: 'This attempt was thrown away — nothing was graded', onClick: () => onViewResult(a.id), children: 'Details' })
+                        : jsx('button', { type: 'button', onClick: () => onViewResult(a.id), children: 'Result' }),
+                    jsx('button', { type: 'button', className: 'ghost danger', title: 'Delete this attempt permanently', onClick: () => setConfirmDel(a.id), children: 'Delete' }),
+                  ] }) }),
+            ] })) }),
+            hidden > 0
+              ? jsx('caption', { style: { captionSide: 'bottom', textAlign: 'left' }, children: jsx('button', {
+                  type: 'button', className: 'ghost', onClick: () => setShowAll(true),
+                  children: `Show ${hidden} more`,
+                }) })
+              : null,
+          ] }) : null,
+        ] })
+      : jsx('div', { className: 'muted', style: { marginTop: 8 }, children: 'No attempts yet.' }),
+  ] })
+}
+
 function CbtHome({ onStart, onResume, onViewResult }) {
   const packs = useQuery({ queryKey: ['cbt', 'packs'], queryFn: () => rest('/packs') })
   const hist = useQuery({ queryKey: ['cbt', 'attempts'], queryFn: () => rest('/attempts'), refetchInterval: 15000 })
-  const [histFilter, setHistFilter] = useState('all')
   const start = async (p, mode) => {
     try {
       const full = await rest(`/packs/${p.exam_id}`)
@@ -523,25 +683,18 @@ function CbtHome({ onStart, onResume, onViewResult }) {
     } catch (e) { host.notifyError?.(`Could not load pack: ${e?.message || e}`) }
   }
   const source = async () => {
-    // submit() silently no-ops on a fresh chat; a staged draft always lands
     await stageInChat('Load the skill cbt-exam:pyq-sourcing and source <EXAM NAME> <YEAR> previous-year questions into the CBT plugin.')
   }
   const packList = packs.data?.packs || []
-  const byExam = Object.fromEntries(packList.map(p => [p.exam_id, p]))
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
-  // live attempts first (they are the ones with an action), then newest first
-  const rank = a => (a.status === 'in_progress' ? 0 : 1)
-  const rows = all
-    .filter(a => histFilter === 'all' || (histFilter === 'active' ? a.status === 'in_progress' : a.status !== 'in_progress'))
-    .sort((x, y) => rank(x) - rank(y) || (y.submitted_at || y.started_at || 0) - (x.submitted_at || x.started_at || 0))
   return jsxs('div', { className: 'cbt pad', children: [
     jsx('div', { className: 'row head', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: 'CBT Exams' }),
-      jsx('span', { className: 'muted', children: 'exam-agnostic practice — any CBT, pattern is data' }),
+      jsx('span', { className: 'muted', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
-      jsx('button', { type: 'button', onClick: () => packs.refetch(), children: 'Refresh' }),
+      jsx('button', { type: 'button', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
       jsx('button', { type: 'button', onClick: source, children: 'Source more papers' }),
     ] }),
     packs.isLoading
@@ -553,88 +706,15 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               jsx('p', { className: 'muted', children: 'No papers yet. Ask the agent to source a previous-year paper — it files itself here once validated.' }),
               jsx('button', { type: 'button', onClick: source, children: 'Source a paper' }),
             ] })
-          : jsxs('table', { children: [
-              jsx('thead', { children: jsx('tr', { children: ['Exam', 'Year', 'Questions', 'Duration', 'Marks', 'Provenance', ''].map(h => jsx('th', { key: h, children: h })) }) }),
-              jsx('tbody', { children: packList.map(p => {
-                const marks = [...new Set((p.sections || [])
-                  .map(s => sectionMarks(s, p.pattern || {}))
-                  .filter(m => m.correct != null)
-                  .map(m => marksLabel({ marks_correct: m.correct, marks_wrong: m.wrong }, {})))]
-                  .join(' · ')                     // one label per distinct marking pair
-                const act = p.invalid
-                  ? jsxs('span', { className: 'row', style: { gap: 8, alignItems: 'baseline' }, children: [
-                      jsx('span', { className: 'badge err', children: 'invalid' }),
-                      // the validator's message is the only thing that tells you what to
-                      // fix; a generic "fix the source file" makes you go read it yourself
-                      jsx('span', { className: 'muted', style: { fontSize: 12 }, children: String(p.invalid).replace(/^invalid pack:\s*/, '') }),
-                    ] })
-                  : jsxs('span', { className: 'row', children: [
-                      jsx('button', {
-                        type: 'button',
-                        title: 'Side pane beside the chat — ask doubts while you answer',
-                        onClick: () => start(p, 'assisted'), children: 'Start (assisted)',
-                      }),
-                      jsx('button', {
-                        type: 'button',
-                        title: 'Full page, no chat, no hints',
-                        onClick: () => start(p, 'exam'), children: 'Start (exam)',
-                      }),
-                    ] })
-                return jsxs('tr', { key: p.exam_id, children: [
-                  jsx('td', { children: p.title || p.exam_id }),
-                  jsx('td', { children: String(p.year || '—') }),
-                  jsx('td', { children: p.invalid ? '—' : String(p.question_count) }),
-                  jsx('td', { children: p.invalid ? '—' : `${p.duration_minutes ?? '?'} min` }),
-                  jsx('td', { children: p.invalid ? '—' : (marks || '—') }),
-                  jsx('td', { className: 'muted', children: [
-                    p.invalid ? '' : (p.provenance || ''),
-                    p.warnings?.length
-                      ? jsx('span', { key: 'w', className: 'badge err', style: { marginLeft: 6 }, title: p.warnings.slice(0, 8).join('\n'), children: `${p.warnings.length} warnings` })
-                      : null,
-                  ] }),
-                  jsx('td', { children: act }),
-                ] })
-              }) }) ] })),
-    jsxs('div', { className: 'row', style: { marginTop: 24 }, children: [
-      jsx('h3', { style: { margin: 0 }, children: 'Attempts' }),
-      jsx('span', { className: 'muted', children: all.length ? `${all.length} total${liveCount ? ` · ${liveCount} live` : ''}` : '' }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx('span', { className: 'seg', children: [
-        ['all', 'All'], ['active', 'Live'], ['done', 'Finished'],
-      ].map(([f, label]) => jsx('button', {
-        key: f, type: 'button', className: histFilter === f ? 'on' : '',
-        'aria-pressed': histFilter === f,
-        onClick: () => setHistFilter(f), children: label,
-      })) }),
-    ] }),
-    hist.isLoading
-      ? jsx('div', { className: 'muted', children: 'loading…' })
-      : hist.isError
-        ? jsx(ErrorBox, { what: 'Loading attempts', onRetry: () => hist.refetch() })
-        : (rows.length === 0
-          ? jsx('div', { className: 'muted', children: histFilter === 'all'
-              ? 'No attempts yet — start one above.'
-              : `No ${histFilter === 'active' ? 'live' : 'finished'} attempts.` })
-          : jsxs('table', { children: [
-              jsx('thead', { children: jsx('tr', { children: ['Exam', 'Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
-              jsx('tbody', { children: rows.map((a, i) => {
-                // the paper name only on the first row of a run — a list of one paper
-                // otherwise repeats the same long title eighteen times
-                const prev = i > 0 ? rows[i - 1] : null
-                const sameExam = prev && prev.exam_id === a.exam_id
-                return jsxs('tr', { key: a.id, children: [
-                jsx('td', { title: byExam[a.exam_id]?.title || a.exam_id, children: sameExam ? '' : (byExam[a.exam_id]?.title || a.exam_id) }),
-                jsx('td', { children: jsx('span', { className: `badge ${a.mode === 'assisted' ? 'assisted' : ''}`, children: MODE_LABEL[a.mode] || a.mode }) }),
-                jsx('td', { children: jsx('span', { className: `badge ${a.status === 'in_progress' ? 'fill' : STATUS_CLS[a.status] || 'mut'}`, children: STATUS_LABEL[a.status] || a.status }) }),
-                jsx('td', { className: a.score == null ? 'muted num' : 'num', title: a.score == null ? 'not scored' : `score ${fmtScore(a.score)}`, children: fmtScore(a.score) }),
-                jsx('td', { className: 'muted', title: fmtWhen(a.submitted_at || a.started_at), children: relTime(a.submitted_at || a.started_at) }),
-                jsx('td', { children: a.status === 'in_progress'
-                  ? jsx('button', { type: 'button', className: 'primary', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
-                  : a.status === 'abandoned'
-                    ? jsx('button', { type: 'button', title: 'This attempt was thrown away — nothing was graded', onClick: () => onViewResult(a.id), children: 'Details' })
-                    : jsx('button', { type: 'button', onClick: () => onViewResult(a.id), children: 'View result' }) }),
-                ] })
-              }) }) ] })),
+          : packList.map(p => jsx(ExamCard, {
+              key: p.exam_id,
+              pack: p,
+              attempts: all.filter(a => a.exam_id === p.exam_id),
+              onStart: start,
+              onResume,
+              onViewResult,
+            }))),
+    hist.isError ? jsx(ErrorBox, { what: 'Loading attempts', onRetry: () => hist.refetch() }) : null,
   ] })
 }
 

@@ -228,3 +228,61 @@ class LlmApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeleteTests(unittest.TestCase):
+    """History has to be prunable, or a week of practice buries the start screen."""
+
+    def setUp(self):
+        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
+        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        seed_pack()
+
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+
+    def finished(self):
+        aid = make_attempt()
+        client.post(f"/attempts/{aid}/submit")
+        return aid
+
+    def test_delete_removes_a_finished_attempt(self):
+        aid = self.finished()
+        self.assertTrue((DATA / "attempts" / f"{aid}.json").exists())
+        r = client.delete(f"/attempts/{aid}")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse((DATA / "attempts" / f"{aid}.json").exists())
+        listed = [a["id"] for a in client.get("/attempts").json()["attempts"]]
+        self.assertNotIn(aid, listed)
+
+    def test_delete_refuses_a_live_attempt(self):
+        aid = make_attempt()
+        r = client.delete(f"/attempts/{aid}")
+        self.assertEqual(r.status_code, 409)
+        self.assertTrue((DATA / "attempts" / f"{aid}.json").exists())
+
+    def test_delete_unknown_attempt_is_404(self):
+        self.assertEqual(client.delete("/attempts/a-doesnotexist").status_code, 404)
+
+    def test_prune_keeps_submitted_and_live(self):
+        done = self.finished()
+        live = make_attempt()
+        dropped = make_attempt()
+        client.post(f"/attempts/{dropped}/abandon")
+
+        r = client.post("/attempts/prune", json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["deleted"], 1)
+        listed = {a["id"] for a in client.get("/attempts").json()["attempts"]}
+        self.assertIn(done, listed)
+        self.assertIn(live, listed)
+        self.assertNotIn(dropped, listed)
+
+    def test_prune_only_touches_the_named_exam(self):
+        dropped = make_attempt()
+        client.post(f"/attempts/{dropped}/abandon")
+        r = client.post("/attempts/prune", json={"exam_id": "some-other-exam"})
+        self.assertEqual(r.json()["deleted"], 0)
+        self.assertIn(dropped, {a["id"] for a in client.get("/attempts").json()["attempts"]})
