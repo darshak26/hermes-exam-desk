@@ -1,5 +1,5 @@
 // cbt-exam — exam-agnostic CBT practice panel (route /cbt)
-import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient, Button, Tip } from '@hermes/plugin-sdk'
+import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 
@@ -29,13 +29,13 @@ const CSS = `
 .cbt td:last-child .row{flex-wrap:nowrap}
 .cbt th{color:var(--ui-text-secondary,#666);font-weight:600;padding-top:0}
 .cbt td .row{gap:8px}
-.cbt button:not([data-slot]){font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
-.cbt button:not([data-slot]):hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
+.cbt button{font:inherit;color:inherit;background:transparent;border:1px solid var(--ui-stroke-secondary,#ccc);border-radius:6px;padding:0 12px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap}
+.cbt button:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent)}
 /* a tinted outline still reads as "hovered" — the app's solid pairing is what makes
    a button look like THE action: --dt-primary-solid with its own foreground */
-.cbt button:not([data-slot]).primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
-.cbt button:not([data-slot]).primary:hover:not(:disabled){filter:brightness(1.12)}
-.cbt button:not([data-slot]):disabled{opacity:.5;cursor:default}
+.cbt button.primary{border-color:var(--dt-primary-solid, var(--ui-accent));background:var(--dt-primary-solid, var(--ui-accent));color:var(--dt-primary-solid-foreground, #fff);font-weight:600}
+.cbt button.primary:hover:not(:disabled){filter:brightness(1.12)}
+.cbt button:disabled{opacity:.5;cursor:default}
 .cbt .cbt-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:0;background:transparent;border-radius:5px;color:var(--ui-muted-foreground,#6b7280);cursor:pointer;transition:background-color .12s ease,color .12s ease}
 .cbt .cbt-icon-btn:hover{background:var(--ui-control-hover-background,rgba(127,127,127,.16));color:var(--ui-foreground,inherit)}
 .cbt .cbt-icon-btn:active{background:var(--ui-control-active-background,rgba(127,127,127,.24))}
@@ -54,7 +54,7 @@ const CSS = `
 .cbt .badge.ok{border-color:var(--ui-success, #10b981);color:var(--ui-success, #10b981)}
 .cbt .badge.acc{border-color:var(--ui-accent);color:var(--ui-accent)}
 .cbt .badge.mut{border-color:var(--ui-stroke-secondary);color:var(--ui-text-secondary)}
-.cbt button:not([data-slot]).badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
+.cbt button.badge{height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:400;gap:0;line-height:1}
 .cbt .warn-list{margin:8px 0 0;font-size:12px;color:var(--ui-text-secondary)}
 /* result headline + review diff */
 .cbt .score{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin:8px 0 12px}
@@ -99,10 +99,10 @@ const CSS = `
 .cbt .card-body{margin-top:12px;border-top:1px solid var(--ui-stroke-secondary);padding-top:12px}
 .cbt .stat{display:flex;gap:12px;font-size:12px;color:var(--ui-text-secondary);margin-top:6px;align-items:baseline}
 .cbt .stat > span + span::before{content:'·';margin-right:12px;color:var(--ui-text-quaternary)}
-.cbt button:not([data-slot]).ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
-.cbt button:not([data-slot]).ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
-.cbt button:not([data-slot]).ghost.danger{margin-left:8px}
-.cbt button:not([data-slot]).ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
+.cbt button.ghost{border-color:transparent;background:transparent;padding:0 6px;height:22px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt button.ghost:hover:not(:disabled){background:color-mix(in srgb,currentColor 7%,transparent);color:var(--ui-text-primary)}
+.cbt button.ghost.danger{margin-left:8px}
+.cbt button.ghost.danger:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));background:color-mix(in srgb,var(--ui-red, #f87171) 10%,transparent)}
 .cbt .card table th{padding-top:0}
 .cbt .card caption{padding-top:8px}
 .cbt .legend{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;row-gap:3px;font-size:11.5px;color:var(--ui-text-secondary);margin:0 0 12px}
@@ -168,6 +168,10 @@ const CSS = `
      action row wraps to two, and a fixed row clips the overflow off the pane. */
   grid-template-rows:minmax(44px,auto) minmax(40px,auto) minmax(0,1fr) minmax(48px,auto);
   grid-template-areas:"head head" "tabs pal" "body pal" "act pal";}
+/* A single-section paper has nothing to switch between, so the tab row is not
+   rendered and its band must not be reserved either. */
+.cbt-shell.single-sec{grid-template-rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);
+  grid-template-areas:"head head" "body pal" "act pal";}
 .cbt-pal-grid{display:grid;grid-template-columns:repeat(10,28px);gap:6px;justify-content:center;padding:12px}
 .cbt .cbt-chip{height:24px;font-size:11.5px;font-variant-numeric:tabular-nums;border-radius:4px;border:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-chip.s-not-visited{background:transparent;color:var(--ui-text-secondary)}
@@ -182,10 +186,13 @@ const CSS = `
 .cbt .act-group{display:flex;gap:8px;align-items:center;min-width:0}
 .cbt .act-group.nav{margin-left:auto}
 .cbt-actions .ask{display:flex;flex-direction:column;gap:2px;min-width:0}
-.cbt .cbt-actions .codicon{font-size:14px;opacity:.9}
-.cbt .cbt-actions button{white-space:nowrap}
-.cbt button:not([data-slot]).danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
-.cbt button:not([data-slot]).danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
+.cbt .cbt-actions button{height:30px;gap:6px;padding:0 9px}
+.cbt .cbt-actions button .codicon{font-size:14px;opacity:.9}
+.cbt .cbt-actions button.on{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-text-primary);font-weight:600}
+.cbt .cbt-actions button.clear{color:var(--ui-text-secondary)}
+.cbt .cbt-actions button.clear:hover:not(:disabled){color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt button.danger{color:var(--ui-red, var(--ui-danger, #f87171));border-color:color-mix(in srgb,var(--ui-red, #f87171) 45%,var(--ui-stroke-secondary))}
+.cbt button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--ui-red, #f87171) 12%,transparent)}
 .cbt-actions button{text-align:left;justify-content:flex-start}
 /* Folded: the panel is simply not there — no 24px rail, no chevron hovering at
    the screen edge. The header toggle (always in the same place) brings it back. */
@@ -194,9 +201,17 @@ const CSS = `
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cbt .submit-head{border-color:color-mix(in srgb,var(--ui-accent) 55%,var(--ui-stroke-secondary));font-weight:600}
 .cbt .submit-head:hover:not(:disabled){background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
-.cbt-tabs{display:flex;gap:4px;padding:0 8px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:hidden}
-.cbt-tabs button{height:34px;border:none;border-bottom:2px solid transparent;border-radius:0;padding:0 12px}
-.cbt-tabs button.on{border-bottom-color:var(--ui-accent);color:var(--ui-accent)}
+.cbt .cbt-tabs{display:flex;align-items:center;gap:8px;padding:6px 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+/* Sections are a small mutually-exclusive set, so they are a segmented control:
+   one soft track, the current section raised inside it. Two classes deep so no
+   base-button rule can re-box a segment into a pill. */
+.cbt .cbt-sectrack{display:inline-flex;gap:2px;padding:2px;border-radius:7px;background:var(--ui-bg-quaternary, rgba(127,127,127,.12));flex:0 0 auto}
+.cbt .cbt-sectrack button{height:26px;border:0;border-radius:5px;padding:0 10px;font-size:12px;line-height:1;background:transparent;color:var(--ui-text-secondary);gap:6px;flex:0 0 auto}
+.cbt .cbt-sectrack button:hover:not(:disabled){background:color-mix(in srgb, currentColor 8%, transparent);color:var(--ui-text-primary)}
+.cbt .cbt-sectrack button.on{background:var(--ui-surface-background,#fff);color:var(--ui-text-primary);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.16)}
+.cbt .cbt-sectrack button.on:hover:not(:disabled){background:var(--ui-surface-background,#fff)}
+.cbt .cbt-sectrack .count{font-variant-numeric:tabular-nums;opacity:.65;font-weight:400}
+.cbt .cbt-sectrack button.on .count{opacity:.8}
 .cbt-pal{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--ui-stroke-secondary)}
 .cbt-pal-head{padding:12px 12px 8px}
 .cbt-pal-scroll{flex:1;overflow:auto}
@@ -210,6 +225,7 @@ const CSS = `
    question keeps its full width instead of being squeezed by a fixed 358px column. */
 .cbt-shell.narrow{position:relative;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "tabs" "body" "act";
   grid-template-rows:auto auto minmax(0,1fr) auto}
+.cbt-shell.narrow.single-sec{grid-template-areas:"head" "body" "act";grid-template-rows:auto minmax(0,1fr) auto}
 .cbt .pal-sec-head{display:flex;align-items:baseline;gap:8px;margin:12px 12px 6px}
 .cbt .pal-sec-head strong{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary)}
 .cbt .pal-sec-head span{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ui-text-quaternary);margin-left:auto}
@@ -228,24 +244,22 @@ const CSS = `
 /* Narrow: the footer becomes a 6-column grid. Each row of buttons fills the width
    exactly (3+3, 2+2+2, 3+3), so there is no ragged trailing edge, and every row is
    flush with both sides of the bar. */
-/* Below ~800px of bar the buttons cannot sit in one row, so the row becomes a
-   6-column grid whose rows each fill the width exactly (3+3 · 2+2+2 · 3+3). */
-/* 690px is the measured one-row budget: 577px of buttons + group gaps + the
-   save indicator. Below it the row would wrap ragged, so it becomes the grid. */
+/* 690px is the measured one-row budget: ~577px of buttons + group gaps + the
+   save indicator. Below it the row would wrap ragged, so it becomes a 6-column
+   grid whose rows each fill the width exactly (3+3 · 2+2+2 · 3+3). */
 @container (max-width: 690px) {
   .act-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
   .act-bar .act-group{display:contents}
   .act-bar .act-group.nav{margin-left:0}
-  .act-bar button{width:100%;min-width:0!important;justify-content:center}
+  .act-bar button{width:100%;height:34px;min-width:0!important;justify-content:center;padding:0 6px}
   .act-bar button[data-span="2"]{grid-column:span 2}
   .act-bar button[data-span="3"]{grid-column:span 3}
-  /* out of flow: taking a grid row would grow the bar by 30px on every save */
+  /* out of flow: taking a grid row would grow the bar on every save */
   .cbt-actions{position:relative}
   .act-bar .save-slot{position:absolute;left:20px;bottom:calc(100% + 4px);margin:0;padding:3px 10px;border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:var(--ui-surface-background,#fff);box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:2}
 }
 /* the save state floats above the bar instead of taking a grid row, otherwise the
    footer grows 42px every time you save */
-
 `;
 
 async function rest(path, opts) {
@@ -1271,7 +1285,8 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     else if (k === 'm') { e.preventDefault(); void act('saveMark') }
     else if (k === 'enter') { e.preventDefault(); void act('saveNext') }
   }
-  return jsxs('div', { ref: rootRef, className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${isNarrow ? ' narrow' : ''}`, children: [
+  const multiSection = sections.length > 1
+  return jsxs('div', { ref: rootRef, className: `cbt cbt-shell${palCollapsed ? ' pal-collapsed' : ''}${isNarrow ? ' narrow' : ''}${multiSection ? '' : ' single-sec'}`, children: [
     jsx(ExamKeys, { enabled: true, onKeyDown: onKey }),
     jsx(ScrollToTop, { dep: curIdResolved, targetRef: bodyRef }),
     jsxs('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
@@ -1303,7 +1318,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         children: jsx('i', { className: 'codicon codicon-layout-sidebar-right', 'aria-hidden': 'true' }),
       }),
     ] }),
-    jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: sections.map(s => {
+    multiSection ? jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children: jsx('div', { className: 'cbt-sectrack', children: sections.map(s => {
       const qs = secQs(s.id)
       const done = qs.filter(x => {
         const v = answered[x.id]
@@ -1313,9 +1328,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         key: s.id, type: 'button', className: s.id === activeSecId ? 'on' : '',
         title: `${s.title}: ${done} of ${qs.length} answered`,
         onClick: () => jumpSection(s.id),
-        children: `${s.title} · ${done}/${qs.length}`,
+        children: [
+          jsx('span', { key: 't', children: s.title }),
+          jsx('span', { key: 'c', className: 'count', children: `${done}/${qs.length}` }),
+        ],
       })
-    }) }),
+    }) }) }) : null,
     jsx('div', { ref: bodyRef, className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
       jsxs('div', { className: 'row', style: { gap: 10, marginBottom: 12 }, children: [
         jsx('span', { className: 'muted', children: `Question ${qIndex} of ${pack.questions.length} · ${QTYPE_LABEL[cur.type] || cur.type}` }),
@@ -1388,31 +1406,24 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     ] }),
     jsx('div', { className: 'cbt-actions', style: { gridArea: 'act' }, children: jsx('div', { className: 'act-bar', children: [
       // Three groups, in the order you use them: answer · review · navigate.
-      // The app's own Button carries variants/sizes so the bar matches the
-      // surrounding chrome instead of a hand-tuned height of its own.
       jsxs('span', { key: 'g-answer', className: 'act-group', children: [
-        jsx(Tip, { key: 'sv-t', label: 'Save the answer and stay (S)', children:
-          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', loading: saveState === 'saving', onClick: () => void act('saveStay'), children: [icon('save'), 'Save'] }) }),
-        jsx(Tip, { key: 'sn-t', label: 'Save and move to the next question (Enter)', children:
-          jsx(Button, { variant: 'default', size: 'sm', 'data-span': '3', loading: saveState === 'saving', onClick: () => void act('saveNext'), children: [icon('save'), 'Save & Next'] }) }),
+        jsx('button', { key: 'sv', type: 'button', 'data-span': '3', onClick: () => void act('saveStay'), title: 'Save the answer and stay (S)', children: [icon('save'), 'Save'] }),
+        jsx('button', { key: 'sn', type: 'button', className: 'primary', 'data-span': '3', onClick: () => void act('saveNext'), title: 'Save and move to the next question (Enter)', children: [icon('save'), 'Save & Next'] }),
       ] }),
       jsxs('span', { key: 'g-review', className: 'act-group', children: [
-        jsx(Tip, { key: 'sm-t', label: marked.includes(curIdResolved) ? 'Remove the review flag — stays here (M)' : 'Flag this question for review — stays here (M)', children:
-          jsx(Button, {
-            variant: 'secondary', size: 'sm', 'data-span': '2',
-            style: marked.includes(curIdResolved) ? { boxShadow: 'inset 0 0 0 1px var(--cbt-mark)', color: 'var(--cbt-mark)' } : undefined,
-            'aria-pressed': marked.includes(curIdResolved),
-            onClick: () => void act('saveMark'),
-            children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
-          }) }),
-        jsx(Tip, { key: 'mn-t', label: 'Flag for review and move on', children:
-          jsx(Button, {
-            variant: 'secondary', size: 'sm', 'data-span': '2',
-            onClick: () => void act('markNext'),
-            children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
-          }) }),
-        jsx(Tip, { key: 'cr-t', label: 'Remove the saved answer for this question', children:
-          jsx(Button, { variant: 'ghost', size: 'sm', 'data-span': '2', onClick: () => void act('clear'), children: [icon('clear-all'), 'Clear'] }) }),
+        jsx('button', {
+          key: 'sm', type: 'button', className: marked.includes(curIdResolved) ? 'on' : '', 'data-span': '2', style: { minWidth: 96 },
+          title: 'Flag this question for review — stays here (M)',
+          onClick: () => void act('saveMark'),
+          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark' : 'Mark'],
+        }),
+        jsx('button', {
+          key: 'mn', type: 'button', 'data-span': '2', style: { minWidth: 150 },
+          title: 'Flag for review and move on',
+          onClick: () => void act('markNext'),
+          children: [icon('bookmark'), marked.includes(curIdResolved) ? 'Unmark & Next' : 'Mark & Next'],
+        }),
+        jsx('button', { key: 'cr', type: 'button', className: 'clear', 'data-span': '2', onClick: () => void act('clear'), title: 'Remove the saved answer for this question', children: [icon('clear-all'), 'Clear'] }),
       ] }),
       // fixed-width slot: the indicator appearing must not shift the nav group
       saveState
@@ -1426,10 +1437,8 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         : null,
       // nav pair travels as one unit and sits at the far right
       jsxs('span', { key: 'nav', className: 'act-group nav', children: [
-        jsx(Tip, { key: 'bk-t', label: 'Previous question (←)', children:
-          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', onClick: () => void act('back'), children: [icon('chevron-left'), 'Back'] }) }),
-        jsx(Tip, { key: 'nx-t', label: 'Next question (→)', children:
-          jsx(Button, { variant: 'secondary', size: 'sm', 'data-span': '3', onClick: () => void act('next'), children: ['Next', icon('chevron-right')] }) }),
+        jsx('button', { key: 'bk', type: 'button', 'data-span': '3', onClick: () => void act('back'), title: 'Previous question (←)', children: [icon('chevron-left'), 'Back'] }),
+        jsx('button', { key: 'nx', type: 'button', 'data-span': '3', onClick: () => void act('next'), title: 'Next question (→)', children: ['Next', icon('chevron-right')] }),
       ] }),
     ] }) }),
     confirming && jsx(SubmitDialog, {
