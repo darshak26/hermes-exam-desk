@@ -674,8 +674,37 @@ const SOURCE_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a p
   + 'Ask me which exam and which year first — one question at a time — then find the '
   + 'official paper, validate it and file it.'
 
-// Send the turn straight into a chat — never through the composer draft, so the
-// prompt cannot end up sitting in the input box as well as being sent. The retry
+// One click for the deep review. The result page keeps the AI's basic analysis; the
+// per-question walkthrough and the study plan live in a chat, so this opens a FRESH
+// session (a review is its own conversation, never a stray reply in yesterday's chat)
+// and sends the turn rather than staging a draft — a draft left in the composer was
+// the old defect. Same retry window as the sourcing button: the composer mounts late.
+const REVIEW_PROMPT_BASE = 'Load the skill exam-desk:attempt-review and review my finished '
+  + 'CBT attempt in detail: analyse every wrong, skipped and not-counted question, '
+  + 'then build the study plan. Attempt id: '
+function discussPrompt(att) { return REVIEW_PROMPT_BASE + att.id + '.' }
+
+async function launchDiscussion(att) {
+  goToChat()
+  await new Promise(done => setTimeout(done, 250))
+  try { host.newChat?.() } catch { /* older desktop without newChat */ }
+  await new Promise(done => setTimeout(done, 500))
+  for (let i = 0; i < 30; i++) {
+    const addr = host.state.activeSessionId.get() || 'new'
+    try {
+      if (host.composer.submit?.(addr, discussPrompt(att))) {
+        try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
+        return true
+      }
+    } catch { /* composer not mounted yet */ }
+    await new Promise(done => setTimeout(done, 250))
+  }
+  host.notify?.({ kind: 'error', message: 'Could not start the review chat — the composer never mounted.' })
+  return false
+}
+
+// Send the sourcing turn straight into a chat — never through the composer draft, so
+// the prompt cannot end up sitting in the input box as well as being sent. The retry
 // window is long on purpose: a fresh chat mounts its composer asynchronously, and
 // giving up early is what used to fall back to pasting the text.
 async function launchSourcing() {
@@ -1591,18 +1620,15 @@ function evalSectionTitle(pack, id) {
 }
 
 const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
-// A 160-question attempt can carry ~94 notes; six of them is already a screenful, so
-// the rest sit behind a count the reader can open.
-const NOTES_OPEN = 6
 
+// The result page carries the BASIC analysis only: overall comment, sections, weak
+// topics. Per-question notes and the 2-week plan are the chat's job ("Discuss in
+// chat" opens a session loaded with the attempt-review skill), and the per-question
+// review rows below already carry your answer vs the key.
 function EvaluationCard({ d, pack }) {
-  const [showAllNotes, setShowAllNotes] = useState(false)
   if (!d) return null
   const sections = d.sections || []
   const topics = d.weak_topics || []
-  const notes = d.wrong_answer_notes || []
-  const plan = d.study_plan || []
-  const shownNotes = showAllNotes ? notes : notes.slice(0, NOTES_OPEN)
   return jsxs('div', { className: 'cbt-eval', children: [
     d.overall_comment
       ? jsxs('div', { className: 'cbt-how', children: [
@@ -1627,35 +1653,6 @@ function EvaluationCard({ d, pack }) {
               jsx('span', { children: w.topic }),
               jsx(Badge, { size: 'xs', variant: PRIORITY_VARIANT[String(w.priority || '').toLowerCase()] || 'muted', children: w.priority }),
             ] })) }),
-        ] })
-      : null,
-    notes.length
-      ? jsxs('div', { children: [
-          jsx('div', { className: 'cbt-section', children: 'Where it slipped' }),
-          jsxs('div', { className: 'cbt-how', children: [
-            shownNotes.map((n, i) =>
-              jsxs('div', { className: 'cbt-how-row', key: n.question_id || i, children: [
-                jsx('div', { className: 'cbt-eval-title', children: n.question_id }),
-                jsx('div', { className: 'cbt-eval-body', children: n.note }),
-              ] })),
-            notes.length > NOTES_OPEN
-              ? jsx('div', { className: 'cbt-more', children:
-                  jsx('button', {
-                    type: 'button',
-                    'aria-expanded': showAllNotes,
-                    onClick: () => setShowAllNotes(v => !v),
-                    children: showAllNotes
-                      ? 'Show fewer'
-                      : `Show all ${notes.length} notes`,
-                  }) })
-              : null,
-          ] }),
-        ] })
-      : null,
-    plan.length
-      ? jsxs('div', { children: [
-          jsx('div', { className: 'cbt-section', children: 'Study plan' }),
-          jsx('ol', { className: 'cbt-list cbt-plan', children: plan.map((s, i) => jsx('li', { key: i, children: s })) }),
         ] })
       : null,
   ] })
@@ -1697,7 +1694,10 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, q.data?.attempt?.evaluation_error, evalTried, evalBusy])
   const discuss = () => {
     const a = q.data?.attempt
-    void stageInChat(`Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the exam-desk plugin result page.`)
+    if (!a) return
+    // Detail is a chat's job: this opens a fresh review session with a turn that
+    // loads the attempt-review skill — it never stages a draft.
+    void launchDiscussion(a)
   }
   if (q.isLoading) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
   if (q.isError || !q.data) return jsx('div', { className: 'cbt cbt-page', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })

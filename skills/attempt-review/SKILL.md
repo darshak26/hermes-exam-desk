@@ -1,0 +1,43 @@
+---
+name: attempt-review
+description: Post-exam review for the exam-desk plugin — walk a finished attempt, explain every miss, build the study plan.
+version: 0.1.0
+author: Swapnil Padmane (darshak26)
+license: MIT
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [cbt, exams, attempt-review, analysis]
+    related_skills: []
+---
+
+# attempt-review Skill
+
+Detailed post-exam review for the exam-desk plugin. The result page shows the score and the AI's basic analysis; the "Discuss in chat" button on that page opens a session primed with this skill. Your job is the depth the surface leaves out: every wrong and skipped question, why, and what to study.
+
+## When to Use
+
+- The exam-desk result page primes you with a turn that names `exam-desk:attempt-review` and carries the attempt id. Then analyse THAT attempt without asking for another id.
+- The user asks about a specific finished attempt (" analyse my GAT-B attempt a-1a2b3c4d5", "why did I lose marks in section B").
+
+Don't use for: an attempt still running (`exam-desk:exam-assist` and the live file cover that; there must be no help mid-exam) or sourcing a paper (`exam-desk:pyq-sourcing`).
+
+## Procedure
+
+1. **Load the attempt.** The id is in the priming turn. Read the packaged JSON via the skill's script — it also validates that the attempt is finished:
+   `terminal(command="{venv-python} {skill}/scripts/load_attempt.py <ATTEMPT-ID>", timeout=30)`
+   where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`) and `{skill}` is this skill's directory.
+   If the attempt does not exist or its status is not `submitted`, say so plainly and stop — do not reconstruct a result from memory.
+   **Completion criterion:** the printed JSON carries the exam id, score totals and per-question verdicts.
+
+2. **Load the pack for the key.** The report includes the pack path. Questions carry the full text, options, the answer and the explanation; per-question verdicts, awarded marks and the topic live on the attempt's `result.questions`.
+   `provenance` and `key_status` matter: a pack declared `random` or `unverified` has no trustworthy key — say which items you could not audit instead of grading the student against placeholders.
+
+3. **Walk the misses in the student's order, one by one.** For every wrong or skipped line, give: the question id, what the item tests, what the student chose (or "skipped"), why the recorded answer is right — a mechanism, not a letter — and the step to fix it. Keep the same rules the panel's AI analysis already followed: only a chosen option is evidence; a skip gets what the item tests, never an invented misconception; solve each item yourself and say so when the pack's key is wrong. Skip the ones the same misconception already covered — name it once and list the ids under it.
+   **Completion criterion:** every `wrong`/`skipped`/`not_counted` non-correct row is either explained or folded under a named misconception.
+
+4. **End with a study plan.** Prioritise the misconceptions by marks lost (awarded × occurrences), give each a concrete drill and rough dates in days from today, and keep it short — a plan someone would actually run, so two or three bullets per block and the block order justified in one line.
+
+## Report shape
+
+Plain talk: one line per question under a heading per section, then the plan. The result page already shows the numbers — do not re-derive the scorecard; only total marks at the top and the plan. Cite ids as `A-07`, so the student can jump between the chat and the result page's review rows.
