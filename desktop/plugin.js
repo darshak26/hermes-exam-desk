@@ -82,10 +82,10 @@ const CSS = `
 .cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:108px}
 .cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
 /* instructions pattern — Section | Questions | To attempt | Marks */
-.cbt .cbt-pattern{table-layout:fixed}
+.cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:520px}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
 /* result sections — Section | Score | Correct | Wrong | Skipped | Not counted */
-.cbt .cbt-sec{table-layout:fixed}
+.cbt .cbt-sec{table-layout:fixed;width:auto;min-width:560px}
 .cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:76px}
 .cbt .cbt-sec th:nth-child(3),.cbt .cbt-sec td:nth-child(3){width:72px}
 .cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
