@@ -21,6 +21,9 @@ SCHEMA = "cbt-pack/1"
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 QTYPES = ("mcq", "msq", "nat")
 DIFFICULTIES = ("easy", "medium", "hard")
+# How much the pack's `answer` fields can be trusted. Absent means "official"
+# (every hand-written pack, and the bundled demo), so this is opt-out only.
+KEY_STATUSES = ("official", "unverified", "random")
 # Never serialised to the client while an attempt is in progress.
 HIDDEN_KEYS = ("answer", "explanation", "tolerance")
 
@@ -291,6 +294,8 @@ def validate_pack(pack):
         actual = per_sec.get(s.get("id"), 0)
         if actual != s.get("question_count"):
             errs.append(f"section {s.get('id')!r}: question_count {s.get('question_count')} != actual {actual}")
+    if pack.get("key_status") is not None and pack["key_status"] not in KEY_STATUSES:
+        errs.append(f"key_status must be one of {KEY_STATUSES} (leave it out when the key is official)")
     if not str(pack.get("provenance", "")).strip():
         errs.append("pack-level provenance string is required")
     if not (pack.get("source_url") or pack.get("provenance")):
@@ -404,6 +409,16 @@ def sanitize_pack(pack):
                                   for q in pack["questions"]]}
 
 
+def key_status(pack):
+    """'official' | 'unverified' | 'random' — what the pack claims about its key.
+
+    A random key still grades (it is data, not an error), but the scoreline is
+    noise: the HTTP layer refuses to analyse an attempt graded against one.
+    """
+    ks = pack.get("key_status")
+    return ks if ks in KEY_STATUSES else "official"
+
+
 def summarize(pack, assets_dir=None):
     return {"exam_id": pack["exam_id"], "title": pack.get("title", pack["exam_id"]),
             "year": pack.get("year"), "body": pack.get("body"),
@@ -415,4 +430,5 @@ def summarize(pack, assets_dir=None):
                           "marks_correct": s.get("marks_correct"),
                           "marks_wrong": s.get("marks_wrong")} for s in pack["pattern"]["sections"]],
             "provenance": pack.get("provenance"), "source_url": pack.get("source_url"),
+            "key_status": key_status(pack),
             "warnings": lint_pack(pack, assets_dir)}

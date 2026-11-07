@@ -176,38 +176,68 @@ class LlmApiTests(unittest.TestCase):
         if self._old is not None:
             os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
-    def _attempt(self, mode="assisted"):
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": mode})
+    def _attempt(self, mode="assisted", exam_id="gat-b-demo"):
+        r = client.post("/attempts", json={"exam_id": exam_id, "mode": mode})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["attempt"]["id"]
+
+    def _answer(self, aid):
+        """One saved answer — evaluate refuses a sheet nobody wrote on."""
+        r = client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
+        self.assertEqual(r.status_code, 200, r.text)
+        return aid
 
     def test_evaluate_requires_submit(self):
         aid = self._attempt()
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 409)
 
-    def test_evaluate_after_submit(self):
+    def test_evaluate_refuses_blank_attempt(self):
+        """A blank sheet has no evidence: 37 'likely…' notes were invented from one."""
+        before = len(FAKE_LLM.calls)
         aid = self._attempt()
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("no recorded answers", r.json()["detail"])
+        self.assertEqual(len(FAKE_LLM.calls), before, "a blank attempt must not cost a model call")
+
+    def test_evaluate_refuses_random_key(self):
+        pack = base_pack()
+        pack["exam_id"], pack["key_status"] = "gat-b-nokey", "random"
+        (DATA / "packs" / "gat-b-nokey.json").write_text(json.dumps(pack))
+        aid = self._answer(self._attempt(exam_id="gat-b-nokey"))
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("key_status 'random'", r.json()["detail"])
+
+    def test_evaluate_after_submit(self):
+        aid = self._answer(self._attempt())
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["data"]["overall_comment"], "ok")
         got = client.get(f"/attempts/{aid}").json()
         self.assertEqual(got["attempt"]["evaluation"]["data"]["overall_comment"], "ok")
+        self.assertNotIn("evaluation_error", got["attempt"], "a success clears the stored failure")
 
     def test_evaluate_unparseable_502(self):
         FAKE_LLM.return_parsed_none = True
         try:
-            aid = self._attempt()
+            aid = self._answer(self._attempt())
             client.post(f"/attempts/{aid}/submit")
             r = client.post(f"/attempts/{aid}/evaluate")
             self.assertEqual(r.status_code, 502)
+            got = client.get(f"/attempts/{aid}").json()["attempt"]
+            self.assertIn("evaluation_error", got, "a failed analysis must be auditable after reload")
+            self.assertIn("evaluation failed", got["evaluation_error"]["message"])
         finally:
             FAKE_LLM.return_parsed_none = False
 
     def test_evaluate_without_bridge_503(self):
         sys.modules.pop("exam_desk_ctx_bridge", None)
-        aid = self._attempt()
+        aid = self._answer(self._attempt())
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 503)
@@ -230,13 +260,13 @@ class LlmApiTests(unittest.TestCase):
         llm = RefusingLlm()
         sys.modules["exam_desk_ctx_bridge"].ctx.llm = llm
         try:
-            first = self._attempt()
+            first = self._answer(self._attempt())
             client.post(f"/attempts/{first}/submit")
             self.assertEqual(client.post(f"/attempts/{first}/evaluate").status_code, 200)
             self.assertIn("json_schema", llm.calls[0], "the richest shape must be tried first")
             self.assertIn("json_mode", llm.calls[1], "then json_object")
 
-            second = self._attempt()
+            second = self._answer(self._attempt())
             client.post(f"/attempts/{second}/submit")
             self.assertEqual(client.post(f"/attempts/{second}/evaluate").status_code, 200)
             self.assertNotIn("json_schema", llm.calls[2],

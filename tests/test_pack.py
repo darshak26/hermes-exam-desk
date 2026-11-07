@@ -46,6 +46,17 @@ class PackTests(unittest.TestCase):
         self.assertEqual(sm["sections"][0]["marks_correct"], 1)
         self.assertEqual(sm["sections"][1]["marks_correct"], 3)
         self.assertEqual(sm["sections"][1]["marks_wrong"], -1)
+        self.assertEqual(sm["key_status"], "official", "an absent key_status means the key is official")
+
+    def test_key_status_is_opt_out_and_validated(self):
+        p = base_pack(); p["key_status"] = "random"
+        self.assertEqual(validate_pack(p), [])
+
+        p = base_pack(); p["key_status"] = "probably-fine"
+        self.assertIn("key_status must be one of", " ".join(validate_pack(p)))
+
+        p = base_pack(); p["key_status"] = "random"
+        self.assertEqual(summarize(p)["key_status"], "random")
 
 if __name__ == "__main__":
     unittest.main()

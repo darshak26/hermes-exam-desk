@@ -377,6 +377,7 @@ class Evaluation(Base):
         sys.modules["exam_desk_ctx_bridge"] = m
         try:
             aid = self.start()
+            client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
             client.post(f"/attempts/{aid}/submit")
             self.assertEqual(client.post(f"/attempts/{aid}/evaluate").status_code, 200)
             self.assertEqual(client.post(f"/attempts/{aid}/evaluate").status_code, 200)
@@ -417,6 +418,7 @@ class Evaluation(Base):
 
         calls = self._fake_llm(behaviour)
         aid = self.start()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 200, r.text)
@@ -437,6 +439,7 @@ class Evaluation(Base):
 
         calls = self._fake_llm(behaviour)
         aid = self.start()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 200, r.text)

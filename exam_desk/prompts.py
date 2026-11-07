@@ -9,7 +9,15 @@ EVAL_INSTRUCTIONS = (
     "question, name the likely misconception or gap. If a question was answered but not "
     "counted, that is a pacing/attempt-limit mistake — say what it cost and how to avoid "
     "it. Group weaknesses into topics with a priority, and end with a concrete 2-week "
-    "study plan. All strings in English."
+    "study plan. "
+    "Three rules. (1) Only a chosen option is evidence: for a skipped question say it was "
+    "not attempted and what the item tests — never invent a misconception for a blank. "
+    "If the attempt has no answers at all, say plainly that there is no diagnostic data "
+    "and make no topic claims. (2) Solve each item yourself before judging it: when your "
+    "answer differs from the pack's key, say so and label the item MIS-KEYED rather than "
+    "coaching the student toward a wrong key. (3) The KEY line states how far the key can "
+    "be trusted; when it is not official, name the items you could not verify. "
+    "All strings in English."
 )
 
 EVAL_SCHEMA = {
@@ -34,8 +42,11 @@ EVAL_SCHEMA = {
 def evaluation_input(pack, attempt):
     r = attempt["result"]
     lines = [f"EXAM: {pack.get('title', pack['exam_id'])} ({pack.get('provenance', '')})",
-             f"MODE: {attempt['mode']}",
-             "PATTERN:"]
+             f"MODE: {attempt['mode']}"]
+    ks = pack.get("key_status") or "official"
+    lines.append("KEY: official exam key" if ks == "official" else
+                 f"KEY: {ks} — not an official key; a mis-keyed item is a finding, not a student error")
+    lines.append("PATTERN:")
     for s in pack["pattern"]["sections"]:
         limit = s.get("attempt_limit")
         lines.append(f"  {s['id']} {s.get('title', '')}: {s.get('question_count')} questions, "

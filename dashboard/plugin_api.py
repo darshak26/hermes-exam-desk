@@ -292,6 +292,13 @@ def evaluate(aid: str, force: bool = False):
         raise HTTPException(409, "submit the attempt before evaluating")
     if a.get("evaluation") and not force:
         return a["evaluation"]                          # idempotent: no second LLM call
+    # A blank sheet carries no evidence. Analysing it produced 37 invented
+    # "likely unsure…" notes on a run that had answered nothing, so refuse instead.
+    if not any(pack_mod.is_answered(v) for v in (a.get("answers") or {}).values()):
+        raise HTTPException(409, "nothing to analyse: this attempt has no recorded answers")
+    if pack_mod.key_status(pack) == "random":
+        raise HTTPException(409, "this pack has no real answer key (key_status 'random'), so the "
+                                 "scoreline is noise — grade it against an official key first")
     llm = _llm()
     if llm is None:
         raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
@@ -318,9 +325,14 @@ def evaluate(aid: str, force: bool = False):
             break
         last_err = ValueError("model returned unparseable evaluation")
     if data is None:
+        # A failed analysis used to leave no trace on the attempt, so the panel's red
+        # badge was the only record. Keep the reason where a reload can show it.
+        a["evaluation_error"] = {"message": f"evaluation failed: {last_err}", "at": time.time()}
+        store_mod.save_attempt(a, durable=True)
         raise HTTPException(502, f"evaluation failed: {last_err}")
     a["evaluation"] = {"data": data, "model": model, "provider": provider,
                        "generated_at": time.time()}
+    a.pop("evaluation_error", None)
     store_mod.save_attempt(a, durable=True)
     return a["evaluation"]
 

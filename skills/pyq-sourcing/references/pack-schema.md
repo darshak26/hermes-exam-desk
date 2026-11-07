@@ -11,6 +11,7 @@ A plain-English mirror of what `exam_desk/pack.py` + `scripts/validate_pack.py` 
 | `title`, `year`, `body`, `language` | display strings |
 | `source_url` | required — where the paper came from |
 | `provenance` | required — official/memory-based label (see `sources.md`) |
+| `key_status` | optional: `official` (the default when absent) · `unverified` · `random`. `random` means the `answer` fields are placeholders — it still grades, but the AI evaluation refuses to run on a scoreline that means nothing. `unverified` analyses run and must flag mis-keyed items. |
 | `pattern.duration_minutes` | positive int (a full paper's full time) |
 | `pattern.sections[].id/title/question_count` | `question_count` MUST equal the actual question count in that section |
 | `pattern.sections[].attempt_limit` | `null` = every question counts; int N = only the first N saved answers are graded (NTA's "attempt 60 of 100" rule) |

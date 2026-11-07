@@ -1632,11 +1632,13 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   }
   useEffect(() => {
     const a = q.data?.attempt
-    if (a?.status === 'submitted' && a.result && !a.evaluation && !evalTried && !evalBusy) {
+    // A stored failure means the last run already failed: show it instead of paying
+    // for another model call on every open.
+    if (a?.status === 'submitted' && a.result && !a.evaluation && !a.evaluation_error && !evalTried && !evalBusy) {
       setEvalTried(true)
       void runEval(false)
     }
-  }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, evalTried, evalBusy])
+  }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, q.data?.attempt?.evaluation_error, evalTried, evalBusy])
   const discuss = () => {
     const a = q.data?.attempt
     void stageInChat(`Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the exam-desk plugin result page.`)
@@ -1655,6 +1657,9 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     ] })
   }
   const r = attempt.result
+  // A failure survives the reload now (the server stores it on the attempt), so the
+  // panel shows the same reason next time instead of a bare "No evaluation yet."
+  const evalFailure = evalError || (attempt.evaluation_error && attempt.evaluation_error.message) || null
   const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
   // Full marks per section, from the marking each question actually carried. A row the
   // grader left out ('not counted') contributes nothing, so the ceiling matches the score.
@@ -1736,20 +1741,27 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
           'Analysing your attempt — this calls the model once and takes a few seconds.',
         ] })
-      : evalError
+      : evalFailure
         ? jsxs('div', { children: [
             jsxs('div', { className: 'cbt-row', children: [
               jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
+              attempt.evaluation_error && !evalError
+                ? jsx('span', { className: 'cbt-sub', children: `recorded ${relTime(attempt.evaluation_error.at)}` })
+                : null,
               jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
               jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss with the agent instead' }),
             ] }),
             jsxs('details', { style: { marginTop: 8 }, children: [
               jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
-              jsx('pre', { className: 'cbt-pre', children: evalError }),
+              jsx('pre', { className: 'cbt-pre', children: evalFailure }),
             ] }),
           ] })
         : attempt.evaluation
           ? jsxs('div', { children: [
+              pack.key_status && pack.key_status !== 'official'
+                ? jsx('div', { className: 'cbt-row cbt-sub', children:
+                    `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
+                : null,
               evaluationCard(attempt.evaluation.data, pack),
               jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
                 jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),

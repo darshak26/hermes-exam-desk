@@ -131,7 +131,7 @@ question keeps the full width in a narrow split.
 ## Develop
 
 ```bash
-python -m pytest -q            # 75 tests, ~2 s
+python -m pytest -q            # 100 tests, ~3 s
 hermes plugins validate .      # catalog gate
 ```
 
