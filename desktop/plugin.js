@@ -85,7 +85,7 @@ const CSS = `
 .cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:520px}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
 /* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
-.cbt .cbt-sec{table-layout:fixed;width:auto;min-width:620px}
+.cbt .cbt-sec{table-layout:fixed;width:auto;min-width:640px}
 .cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:72px}
 .cbt .cbt-sec th:nth-child(3),.cbt .cbt-sec td:nth-child(3){width:64px}
 .cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:72px}
@@ -116,18 +116,15 @@ const CSS = `
 .cbt .cbt-plan{margin:0;padding-left:20px}
 .cbt .cbt-plan li{margin:0 0 6px}
 .cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
-/* result page: the whole window, not a 1040px ribbon. Score and the sections table
-   share one band (they are 1fr + 640px), so a 160-question paper does not push the
-   review a full screen down. Below 1180px the two cells stack. */
+/* Result layout: two columns of content-sized blocks — score + metrics left,
+   sections + topics right. A three-row table stretched across the full cap reads
+   as a spreadsheet, so the tables keep their content size (min-width, never 100%)
+   and the columns end where their last table ends. Below the grid the analysis
+   (prose, capped 820px) and the review list use the full content width. */
 .cbt.cbt-result > *{max-width:1280px}
-.cbt .cbt-result-top{display:grid;grid-template-columns:minmax(0,1fr) 640px;gap:32px;align-items:start}
-.cbt .cbt-result-top.one-col{grid-template-columns:minmax(0,1fr)}
-@media (max-width:1180px){
-  .cbt .cbt-result-top{grid-template-columns:minmax(0,1fr);gap:0;align-items:start}
-  /* Stacked, the score strip and the sections table become peers — the strip's own
-     8px margin plus this 8px margin-top make the same 16px seam the sections use. */
-  .cbt .cbt-result-top > :not(:first-child){margin-top:8px}
-}
+.cbt .cbt-result-grid{display:grid;grid-template-columns:minmax(0,1fr) 640px;column-gap:32px;align-items:start}
+.cbt .cbt-result-grid > *{min-width:0}
+@media (max-width:1180px){.cbt .cbt-result-grid{display:block}}
 /* review pager: 20 rows a page keeps the page finite whatever the paper size */
 .cbt .cbt-pager{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
@@ -156,14 +153,17 @@ const CSS = `
 @supports not selector(::-webkit-scrollbar){
   .cbt.cbt-page,.cbt .cbt-qbody,.cbt .cbt-pal-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 30%,transparent) transparent}
 }
-/* result statistics: computed from the attempt record — nothing here is model output */
-.cbt .cbt-stats{table-layout:fixed;width:auto;min-width:560px}
+/* result statistics: computed from the attempt record — nothing here is model output.
+   min-width 480: the table sits in the narrow 1fr column beside the 640px tables, and
+   a 160-question paper at the 1280px cap leaves that column ~496px — a 560px table
+   would reach across the gap into the topics table */
+.cbt .cbt-stats{table-layout:fixed;width:auto;min-width:480px}
 /* the measured column carries sentences, not single tokens — left-aligned so a
    three-line value does not hang off the right edge of its cell, and one notch
    more row padding than the numeric tables: the wrapped lines meet the hairline */
-.cbt .cbt-stats td:nth-child(2){width:300px;text-align:left;font-variant-numeric:tabular-nums}
+.cbt .cbt-stats td:nth-child(2){width:260px;text-align:left;font-variant-numeric:tabular-nums}
 .cbt .cbt-stats td{padding-top:10px;padding-bottom:10px}
-.cbt .cbt-topic{table-layout:fixed;width:auto;min-width:620px}
+.cbt .cbt-topic{table-layout:fixed;width:auto;min-width:640px}
 .cbt .cbt-topic th:nth-child(2),.cbt .cbt-topic td:nth-child(2){width:64px}
 .cbt .cbt-topic th:nth-child(3),.cbt .cbt-topic td:nth-child(3){width:104px}
 .cbt .cbt-topic th:nth-child(4),.cbt .cbt-topic td:nth-child(4){width:80px}
@@ -1650,11 +1650,10 @@ function fmtPct(num, den) { return den ? `${Math.round((1000 * num) / den) / 10}
 
 // Statistics — every number comes off the attempt record and the pack; nothing here
 // asks a model. This is the set the standard platforms report: attempts, accuracy,
-// penalty paid, over-limit waste, a topic roll-up. The columns they add that this
-// record cannot support (time per question, topper/cutoff comparison) stay out rather
-// than being faked.
-function ResultStats({ attempt, pack, tl }) {
-  const [allTopics, setAllTopics] = useState(false)
+// penalty paid, over-limit waste. The columns they add that this record cannot
+// support (time per question on the platforms' ideal-time lines, topper/cutoff
+// comparison) stay out rather than being faked.
+function ResultMetrics({ attempt, pack, tl }) {
   const r = attempt.result
   const rows = r.questions || []
   const total = rows.length
@@ -1707,18 +1706,30 @@ function ResultStats({ attempt, pack, tl }) {
       if (sec.dwell) metrics.push([`Time in section ${sid}`, `${fmtFor(sec.dwell)} across ${sec.questions} questions`])
     }
     if (!metrics.some(([label]) => label === 'Time on question' || label.startsWith('Time in section')))
-      metrics.push(['Time on question', 'the stream is too thin for a real median — opened and saved in the same instant'],
-      )
+      metrics.push(['Time on question', 'the stream is too thin for a real median — opened and saved in the same instant'])
   } else {
     metrics.push(['Pace', `${fmtFor(wall)} wall clock for ${answered} recorded answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each, averaged` : ''} (per-question times are not recorded)`])
   }
 
-  // Topic roll-up sorted by marks: the biggest losses to the top. A question may land
-  // under the topic its pack gives it; blanks count as skips there, so a topic with
-  // all its rows blank obviously shows zero accuracy.
+  return jsxs('table', { className: 'cbt-table cbt-stats', children: [
+    jsx('thead', { children: jsx('tr', { children: [
+      jsx('th', { children: 'Statistic' }),
+      jsx('th', { children: 'Measured' }),
+    ] }) }),
+    jsx('tbody', { children: metrics.map(([label, value]) => jsxs('tr', { key: label, children: [
+      jsx('td', { children: label }),
+      jsx('td', { className: 'num', children: value }),
+    ] })) }),
+  ] })
+}
+
+// Topic roll-up sorted by marks: the biggest losses to the top. A question lands
+// under the topic its pack gives it; blanks count as skips there, so a topic whose
+// rows are all blank shows an honest `skip`.
+function topicRoll(rows, questions) {
   const roll = new Map()
   for (const row of rows) {
-    const q = pack.questions.find(x => x.id === row.id) || {}
+    const q = questions.find(x => x.id === row.id) || {}
     const t = String(q.topic || '—')
     const cur = roll.get(t) || { q: 0, attempted: 0, correct: 0, wrong: 0, skipped: 0, awarded: 0 }
     cur.q++; cur.correct += (row.verdict === 'correct' ? 1 : 0); cur.awarded += Number(row.awarded) || 0
@@ -1727,48 +1738,39 @@ function ResultStats({ attempt, pack, tl }) {
     if (row.verdict === 'skipped') cur.skipped++
     roll.set(t, cur)
   }
-  const topics = [...roll.entries()].map(([topic, cur]) => ({ topic, ...cur }))
+  return [...roll.entries()].map(([topic, cur]) => ({ topic, ...cur }))
     .sort((a, b) => a.awarded - b.awarded || b.skipped - a.skipped || a.topic.localeCompare(b.topic))
-  const showTopics = allTopics ? topics : topics.slice(0, 6)
+}
 
-  return jsxs('div', { className: 'cbt-eval', children: [
-    jsxs('table', { className: 'cbt-table cbt-stats', children: [
-      jsx('thead', { children: jsx('tr', { children: [
-        jsx('th', { children: 'Statistic' }),
-        jsx('th', { children: 'Measured' }),
-      ] }) }),
-      jsx('tbody', { children: metrics.map(([label, value]) => jsxs('tr', { key: label, children: [
-        jsx('td', { children: label }),
-        jsx('td', { className: 'num', children: value }),
+function ResultTopics({ attempt, pack }) {
+  const [allTopics, setAllTopics] = useState(false)
+  const topics = topicRoll((attempt.result || {}).questions || [], pack.questions || [])
+  if (topics.length <= 1) return null                       // one topic across the paper is no roll-up
+  const showTopics = allTopics ? topics : topics.slice(0, 6)
+  return jsxs('div', { children: [
+    jsx('div', { className: 'cbt-section', style: { marginTop: 16 }, children: 'Topics' }),
+    jsxs('table', { className: 'cbt-table cbt-topic', children: [
+      jsx('thead', { children: jsx('tr', { children:
+        ['Topic', 'Q', 'Attempted', 'Correct', 'Wrong', 'Marks', 'Accuracy']
+          .map((htitle, i) => jsx('th', { key: htitle, className: i ? 'num' : undefined, children: htitle })) }) }),
+      jsx('tbody', { children: showTopics.map(cur => jsxs('tr', { key: cur.topic, children: [
+        jsx('td', { children: cur.topic }),
+        jsx('td', { className: 'num', children: String(cur.q) }),
+        jsx('td', { className: 'num', children: String(cur.attempted) }),
+        jsx('td', { className: 'num', children: String(cur.correct) }),
+        jsx('td', { className: 'num', children: String(cur.wrong) }),
+        jsx('td', { className: `num${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
+        jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : 'skip' }),
       ] })) }),
     ] }),
-    topics.length > 1
-      ? jsxs('div', { children: [
-          jsx('div', { className: 'cbt-section', children: 'Topics' }),
-          jsxs('table', { className: 'cbt-table cbt-topic', children: [
-            jsx('thead', { children: jsx('tr', { children:
-              ['Topic', 'Q', 'Attempted', 'Correct', 'Wrong', 'Marks', 'Accuracy']
-                .map((htitle, i) => jsx('th', { key: htitle, className: i ? 'num' : undefined, children: htitle })) }) }),
-            jsx('tbody', { children: showTopics.map(cur => jsxs('tr', { key: cur.topic, children: [
-              jsx('td', { children: cur.topic }),
-              jsx('td', { className: 'num', children: String(cur.q) }),
-              jsx('td', { className: 'num', children: String(cur.attempted) }),
-              jsx('td', { className: 'num', children: String(cur.correct) }),
-              jsx('td', { className: 'num', children: String(cur.wrong) }),
-              jsx('td', { className: `num${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
-              jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : 'skip' }),
-            ] })) }),
-          ] }),
-          topics.length > 6
-            ? jsx('div', { className: 'cbt-more', children:
-                jsx('button', {
-                  type: 'button',
-                  'aria-expanded': allTopics,
-                  onClick: () => setAllTopics(v => !v),
-                  children: allTopics ? 'Show fewer topics' : `Show all ${topics.length} topics`,
-                }) })
-            : null,
-        ] })
+    topics.length > 6
+      ? jsx('div', { className: 'cbt-more', children:
+          jsx('button', {
+            type: 'button',
+            'aria-expanded': allTopics,
+            onClick: () => setAllTopics(v => !v),
+            children: allTopics ? 'Show fewer topics' : `Show all ${topics.length} topics`,
+          }) })
       : null,
   ] })
 }
@@ -1897,7 +1899,12 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     // One band: score on the left, sections on the right. A 160-question paper's table
     // is three rows tall, so stacking it under the score cost a screen of height for
     // nothing.
-    jsxs('div', { className: `cbt-result-top${pack.pattern.sections.length > 1 ? '' : ' one-col'}`, children: [
+    // Two columns of content-sized blocks: score and the metric table left, the
+    // per-section and per-topic tables right. A three-row table stretched across the
+    // full cap reads as a spreadsheet (the native rule: small tables size to their
+    // content); below this grid the analysis and the review take the full width.
+    jsxs('div', { className: 'cbt-result-grid', children: [
+    jsxs('div', { className: 'cbt-rg', children: [
       jsxs('div', { className: 'cbt-score-strip', children: [
         jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
         jsxs('div', { className: 'cbt-score-row', children: [
@@ -1917,6 +1924,13 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
         ] }),
       ] }),
+      jsxs('div', { className: 'cbt-row', style: { marginTop: 16 }, children: [
+        jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
+        jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
+      ] }),
+      jsx(ResultMetrics, { attempt, pack, tl: q.data?.stats }),
+    ] }),
+    jsxs('div', { className: 'cbt-rg', children: [
       pack.pattern.sections.length > 1
         ? jsxs('div', { children: [
             jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Sections' }),
@@ -1952,12 +1966,9 @@ function CbtResult({ attemptId, onHome, onRetake }) {
             ] }),
           ] })
         : null,
+        jsx(ResultTopics, { attempt, pack }),
     ] }),
-    jsxs('div', { className: 'cbt-row', style: { marginTop: 16 }, children: [
-      jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
-      jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
     ] }),
-    jsx(ResultStats, { attempt, pack, tl: q.data?.stats }),
     jsx(Separator, { className: 'cbt-sep' }),
     jsxs('div', { className: 'cbt-row', children: [
       jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI analysis' }),
