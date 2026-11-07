@@ -451,5 +451,279 @@ class Evaluation(Base):
         self.assertEqual(client.post(f"/attempts/{aid}/evaluate").status_code, 409)
 
 
+class Audit070Regressions(Base):
+    """Regression tests for defects found in the 0.7.0 verified audit."""
+
+    GOOD = {"overall_comment": "ok", "sections": [{"section_id": "A", "comment": "c"}],
+            "weak_topics": [], "wrong_answer_notes": [], "study_plan": ["revise"]}
+
+    def _fake_llm(self, behaviour):
+        import types
+        calls = []
+
+        class Fake:
+            def complete_structured(self, **kw):
+                calls.append(kw)
+                return behaviour(kw)
+
+        m = types.ModuleType("exam_desk_ctx_bridge")
+        setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
+        sys.modules["exam_desk_ctx_bridge"] = m
+        self.addCleanup(lambda: sys.modules.pop("exam_desk_ctx_bridge", None))
+        return calls
+
+    def test_doubt_log_cli_rejects_injection_and_appends_stream(self):
+        """0.7.0 finding 1: doubt-log shell injection in exam-assist skill."""
+        import importlib.util
+        script = ROOT / "skills" / "exam-assist" / "scripts" / "log_doubt.py"
+        self.assertTrue(script.is_file())
+        spec = importlib.util.spec_from_file_location("log_doubt_cli", script)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        # Invalid attempt id and qid must be rejected
+        self.assertEqual(mod.main(["--attempt-id", "bad;id", "--qid", "A-01", "--note", "n", "--data-dir", str(DATA)]), 1)
+        self.assertEqual(mod.main(["--attempt-id", "../traversal", "--qid", "A-01", "--note", "n", "--data-dir", str(DATA)]), 1)
+        self.assertEqual(mod.main(["--attempt-id", "a-12345", "--qid", "bad;qid", "--note", "n", "--data-dir", str(DATA)]), 1)
+
+        # Valid invocation appends correctly
+        aid = "a-12345"
+        note = 'hello "$(calc)" \' quote; rm'
+        rc = mod.main(["--attempt-id", aid, "--qid", "A-01", "--note", note, "--data-dir", str(DATA)])
+        self.assertEqual(rc, 0)
+
+        log_path = DATA / "attempts" / f"{aid}.log.jsonl"
+        self.assertTrue(log_path.is_file())
+        lines = [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["type"], "doubt")
+        self.assertEqual(lines[0]["qid"], "A-01")
+        self.assertEqual(lines[0]["note"], note)
+
+        # SKILL.md must call log_doubt.py, not python -c one-liner
+        skill_text = (ROOT / "skills" / "exam-assist" / "SKILL.md").read_text()
+        self.assertIn("log_doubt.py", skill_text)
+        self.assertNotIn("type': 'doubt', 'qid': '<QUESTION-ID>'", skill_text)
+
+    def test_evaluate_in_flight_concurrent_call_returns_409(self):
+        """0.7.0 finding 2: evaluation route has no lock / in-flight guard."""
+        import threading
+        import types
+
+        started = threading.Event()
+        proceed = threading.Event()
+
+        def slow_llm(kw):
+            started.set()
+            proceed.wait(timeout=5)
+            return types.SimpleNamespace(parsed=self.GOOD, text="", model="m", provider="p")
+
+        self._fake_llm(slow_llm)
+        aid = self.start()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
+        client.post(f"/attempts/{aid}/submit")
+
+        results = []
+        def run_eval():
+            r = client.post(f"/attempts/{aid}/evaluate?force=true")
+            results.append(r.status_code)
+
+        t = threading.Thread(target=run_eval)
+        t.start()
+
+        self.assertTrue(started.wait(timeout=5))
+        # Second call while in-flight must 409
+        r2 = client.post(f"/attempts/{aid}/evaluate?force=true")
+        self.assertEqual(r2.status_code, 409)
+        self.assertIn("already running", r2.text)
+
+        proceed.set()
+        t.join(timeout=5)
+        self.assertEqual(results, [200])
+
+    def test_writes_are_not_blocked_by_in_flight_evaluation(self):
+        """0.7.0 finding 2: the slow LLM loop must not hold the attempt lock."""
+        import threading
+        import types
+
+        started, proceed = threading.Event(), threading.Event()
+
+        def slow_llm(kw):
+            started.set()
+            proceed.wait(timeout=5)
+            return types.SimpleNamespace(parsed=self.GOOD, text="", model="m", provider="p")
+
+        self._fake_llm(slow_llm)
+        aid = self.start()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
+        client.post(f"/attempts/{aid}/submit")
+
+        out = {}
+        t = threading.Thread(target=lambda: out.__setitem__(
+            "eval", client.post(f"/attempts/{aid}/evaluate?force=true")))
+        t.start()
+        self.assertTrue(started.wait(timeout=5))
+
+        # Another request on the same attempt must not queue behind the LLM call. A late
+        # patch on a submitted attempt is a no-op by contract — the point here is that it
+        # returns instead of hanging on the lock for up to three 180 s provider timeouts.
+        done = threading.Event()
+
+        def touch():
+            out["patch"] = client.patch(f"/attempts/{aid}", json={"marked": ["A-01"]})
+            done.set()
+
+        threading.Thread(target=touch, daemon=True).start()
+        self.assertTrue(done.wait(timeout=3), "request blocked behind an in-flight evaluation")
+        self.assertEqual(out["patch"].status_code, 200)
+
+        proceed.set()
+        t.join(timeout=5)
+        self.assertEqual(out["eval"].status_code, 200)
+
+        # The evaluation landed and the pre-existing state is intact.
+        a = json.loads((DATA / "attempts" / f"{aid}.json").read_text())
+        self.assertIn("evaluation", a)
+        self.assertEqual(a["answers"], {"A-01": 1})
+
+    def test_log_events_is_plain_function_not_contextmanager(self):
+        """0.7.0 finding 3: log_events is decorated @contextmanager but is not a generator."""
+        import inspect
+        self.assertFalse(inspect.isgeneratorfunction(store.log_events))
+        self.assertFalse(hasattr(store.log_events, "__wrapped__"))
+        # Calling it as a normal function returns None and doesn't raise
+        ret = store.log_events("a-test", [{"type": "mark", "qid": "A-01"}])
+        self.assertIsNone(ret)
+
+    def test_event_log_cap_writes_marker_at_most_once(self):
+        """0.7.0 finding 4: event-log cap appends a marker on every event forever."""
+        aid = "a-cap-test"
+        log_file = DATA / "attempts" / f"{aid}.log.jsonl"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        # Seed file with valid JSON lines to exceed EVENT_MAX_BYTES
+        line = json.dumps({"type": "open", "qid": "A-01"}) + "\n"
+        count = (store.EVENT_MAX_BYTES // len(line)) + 10
+        log_file.write_text(line * count)
+
+        # First call writes the truncated marker
+        store.log_events(aid, [{"type": "open", "qid": "A-01"}])
+        size_after_marker = log_file.stat().st_size
+        self.assertGreater(size_after_marker, store.EVENT_MAX_BYTES)
+
+        # Subsequent calls must not keep appending truncated markers
+        for i in range(5):
+            store.log_events(aid, [{"type": "open", "qid": f"A-0{i}"}])
+        self.assertEqual(log_file.stat().st_size, size_after_marker)
+
+        # Ensure the last line is the single truncated marker
+        tail = log_file.read_bytes()[-200:].decode("utf-8", errors="ignore").strip().splitlines()
+        self.assertEqual(json.loads(tail[-1])["type"], "truncated")
+
+    def test_prune_attempts_holds_attempt_lock_during_delete(self):
+        """0.7.0 finding 5: prune_attempts deletes without the attempt lock."""
+        import unittest.mock
+        aid = self.start()
+        client.post(f"/attempts/{aid}/abandon")
+
+        locked_aids = []
+        orig_lock = store.attempt_lock
+
+        def tracked_lock(target_aid):
+            locked_aids.append(target_aid)
+            return orig_lock(target_aid)
+
+        with unittest.mock.patch.object(store, "attempt_lock", side_effect=tracked_lock):
+            removed = store.prune_attempts(statuses=["abandoned"])
+
+        self.assertIn(aid, removed)
+        self.assertIn(aid, locked_aids)
+
+    def test_load_attempt_cli_rejects_path_traversal_ids(self):
+        """0.7.0 finding 6: load_attempt.py resolves user-supplied ids as paths."""
+        import importlib.util
+        script = ROOT / "skills" / "attempt-review" / "scripts" / "load_attempt.py"
+        spec = importlib.util.spec_from_file_location("load_attempt_cli", script)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        # Traversal / non-plain attempt_id rejected before touching disk
+        self.assertEqual(mod.main(["../../etc/passwd", "--data-dir", str(DATA)]), 1)
+        self.assertEqual(mod.main(["bad_id!", "--data-dir", str(DATA)]), 1)
+        self.assertEqual(mod.main(["A-01", "--data-dir", str(DATA)]), 1)
+
+        # If attempt has invalid exam_id, also rejected before reading pack
+        aid = self.start()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
+        client.post(f"/attempts/{aid}/submit")
+        f = DATA / "attempts" / f"{aid}.json"
+        data = json.loads(f.read_text())
+        data["exam_id"] = "../evil-pack"
+        f.write_text(json.dumps(data))
+
+        self.assertEqual(mod.main([aid, "--data-dir", str(DATA)]), 1)
+
+    def test_pack_asset_whitelists_raster_images_and_sets_security_headers(self):
+        """0.7.0 finding 7: pack asset route serves any file type."""
+        assets_dir = DATA / "packs" / "gat-b-demo.assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        (assets_dir / "valid.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        (assets_dir / "vector.svg").write_text("<svg></svg>")
+        (assets_dir / "page.html").write_text("<html></html>")
+
+        # Raster image succeeds with required security headers
+        r = client.get("/packs/gat-b-demo/assets/valid.png")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(r.headers.get("content-security-policy"), "default-src 'none'")
+
+        # Non-raster files return 404
+        self.assertEqual(client.get("/packs/gat-b-demo/assets/vector.svg").status_code, 404)
+        self.assertEqual(client.get("/packs/gat-b-demo/assets/page.html").status_code, 404)
+
+    def test_msq_grading_handles_mixed_types_without_raising(self):
+        """0.7.0 finding 8: MSQ grading raises on mixed types."""
+        q = {"type": "msq", "answer": [0, 1]}
+        # Strings and ints should compare without raising TypeError
+        self.assertTrue(grading.is_correct(q, [0, "1"]))
+        self.assertFalse(grading.is_correct(q, [1, "1"]))
+        self.assertTrue(grading.is_correct(q, ["0", "1"]))
+        self.assertTrue(grading.is_correct({"type": "msq", "answer": [0, "1"]}, [0, 1]))
+
+    def test_is_numeric_rejects_nan_and_inf_strings(self):
+        """0.7.0 finding 9: _is_numeric accepts 'nan' / 'inf' / '-inf' strings."""
+        q = {"type": "nat", "answer": "2.0"}
+        for bad in ("nan", "inf", "-inf", "+inf", "NaN", "Infinity", "-Infinity", float("nan"), float("inf")):
+            self.assertIsNotNone(pack_mod.answer_error(q, bad), f"expected error for {bad!r}")
+        for good in ("2.0", "0", "-5.5", 3, 3.14):
+            self.assertIsNone(pack_mod.answer_error(q, good), f"expected no error for {good!r}")
+
+    def test_pack_validation_enforces_strict_question_ids(self):
+        """0.7.0 finding 10: question ids are not schema-validated."""
+        p = base_pack()
+        p["questions"][0]["id"] = "A 01"
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("invalid id" in e for e in errs), errs)
+
+        p = base_pack()
+        p["questions"][0]["id"] = "Q@1"
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("invalid id" in e for e in errs), errs)
+
+        p = base_pack()
+        p["questions"][0]["id"] = 123
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("invalid id" in e for e in errs), errs)
+
+        # Valid identifier with letters, digits, _, -
+        p = base_pack()
+        p["questions"][0]["id"] = "sec_1-Q01"
+        self.assertEqual(pack_mod.validate_pack(p), [])
+
+    def test_readme_documents_isolation_constraint(self):
+        """0.7.0 finding 11: LLM bridge under plugins.isolation: host constraint documented."""
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn("plugins.isolation: in_process", readme)
+
+
 if __name__ == "__main__":
     unittest.main()

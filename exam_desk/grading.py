@@ -30,7 +30,7 @@ def is_correct(q, given):
     if t == "msq":
         key = q.get("answer")
         return (isinstance(given, list) and isinstance(key, list)
-                and sorted(set(given)) == sorted(set(key)))
+                and {str(x) for x in given} == {str(x) for x in key})
     if t == "nat":
         a, g = _num(q.get("answer")), _num(given)
         if a is None or g is None:

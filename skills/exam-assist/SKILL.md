@@ -39,7 +39,7 @@ Don't use for: exam (non-assisted) mode — there is no live file and there must
    **Completion criterion:** the doubt is answered without revealing any answer-key content beyond what the file shows.
 
 4. **Log the doubt — once per doubt you answer.** The analysis after the exam is only as good as what was asked mid-exam, so append an event to the attempt's behaviour stream; never edit anything else about the attempt:
-   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import json, time; p = plugin_data_dir('exam-desk') / 'attempts' / '<ATTEMPT-ID>.log.jsonl'; p.parent.mkdir(parents=True, exist_ok=True); open(p, 'a', encoding='utf-8').write(json.dumps({'t': time.time(), 'type': 'doubt', 'qid': '<QUESTION-ID>', 'note': 'what was asked, one short phrase'}) + chr(10))\"")`
+   `terminal(command="{venv-python} {skill}/scripts/log_doubt.py --attempt-id <ATTEMPT-ID> --qid <QUESTION-ID> --note \"what was asked, one short phrase\"", timeout=10)`
    `<ATTEMPT-ID>` and `<QUESTION-ID>` come from the live file you already read. Skip the log when the doubt was about nothing on the paper (small talk, tech trouble). **Completion criterion:** one appended line per answered doubt.
 
 5. **Stay in your lane:** no asking for exam photos; no querying the cbt backend or editing the attempt from here (the exam panel owns state) — the doubt line above is the single exception and holds no answer-key content; no mid-exam tool calls beyond reading the live file (and `web_search` for a genuinely needed external fact). If the exam has been submitted, the live file is gone — point the user at the result page and evaluation instead.

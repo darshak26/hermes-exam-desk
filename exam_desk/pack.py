@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 
 SCHEMA = "cbt-pack/1"
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+QID = re.compile(r"^[A-Za-z0-9_-]+$")
 QTYPES = ("mcq", "msq", "nat")
 DIFFICULTIES = ("easy", "medium", "hard")
 # How much the pack's `answer` fields can be trusted. Absent means "official"
@@ -64,8 +65,7 @@ def _is_numeric(val):
         return math.isfinite(val)
     if isinstance(val, str):
         try:
-            float(val)
-            return True
+            return math.isfinite(float(val))
         except ValueError:
             return False
     return False
@@ -211,6 +211,8 @@ def validate_pack(pack):
         qid = q.get("id")
         if not qid:
             errs.append(f"{tag}: missing id")
+        elif not isinstance(qid, str) or not QID.match(qid):
+            errs.append(f"{tag}: invalid id (must match letters, digits, _, -)")
         elif qid in seen:
             errs.append(f"{tag}: duplicate id")
         else:

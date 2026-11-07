@@ -10,6 +10,7 @@ two tabs (or a tab racing the server-side auto-submit) cannot lose an answer.
 """
 import importlib.util
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 
 VERSION = "0.7.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
+ALLOWED_ASSET_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 _pkg = Path(__file__).resolve().parents[1] / "exam_desk"
 _name = "_exam_desk_http"
@@ -100,11 +102,17 @@ def get_pack_asset(exam_id: str, name: str):
         raise HTTPException(400, "bad asset path")
     if base != target and base not in target.parents:
         raise HTTPException(400, "asset path leaves the pack directory")
+    if target.suffix.lower() not in ALLOWED_ASSET_EXTS:
+        raise HTTPException(404, "unsupported asset type")
     if not target.is_file():
         raise HTTPException(404, "no such asset")
     if target.stat().st_size > ASSET_MAX_BYTES:
         raise HTTPException(413, "asset is too large to serve")
-    return FileResponse(target)
+    headers = {
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'",
+    }
+    return FileResponse(target, headers=headers)
 
 
 @router.get("/packs/{exam_id}")
@@ -286,6 +294,8 @@ def prune_attempts(body: PruneBody = PruneBody()):
 # recovers on its own without a restart.
 _SHAPE_ORDER = ("json_schema", "json_mode", "text")
 _SHAPE_OK = {"name": None}
+_EVAL_IN_FLIGHT = set()
+_EVAL_LOCK = threading.Lock()
 
 
 def _shape_attempts():
@@ -315,48 +325,62 @@ def evaluate(aid: str, force: bool = False):
     if pack_mod.key_status(pack) == "random":
         raise HTTPException(409, "this pack has no real answer key (key_status 'random'), so the "
                                  "scoreline is noise — grade it against an official key first")
-    llm = _llm()
-    if llm is None:
-        raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
-                                 "enable the plugin in plugins.enabled and restart the gateway")
-    # Context for this run: the behaviour view + the student's own last runs on the
-    # same paper (submitted only, newest first, exclusive of this attempt).
-    tl = timeline_mod.build(a, pack)
-    prior = [p for p in store_mod.list_attempts(30)
-             if p.get("exam_id") == a["exam_id"] and p.get("id") != a["id"]
-             and p.get("status") == "submitted"][:3]
-    blob = prompt_mod.evaluation_input(pack, a, prior=prior, timeline_view=tl)
-    data, model, provider, last_err = None, "", "", None
-    # Degrade through the structured shapes providers actually support: a schema,
-    # then json_object, then plain text with the JSON dug out of the reply. Atlas /
-    # opencode-go answers a json_schema request with 400 "not yet supported".
-    for shape, extra in _shape_attempts():
-        try:
-            r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
-                                        input=[{"type": "text", "text": blob}],
-                                        temperature=0.2, max_tokens=2000, timeout=180,
-                                        purpose="exam-desk.evaluate", **extra)
-        except Exception as e:                          # provider refused this shape
-            last_err = e
-            continue
-        parsed = r.parsed if isinstance(r.parsed, dict) else prompt_mod.parse_json_block(getattr(r, "text", ""))
-        data = prompt_mod.validate_evaluation(parsed)
-        if data is not None:
-            model, provider = getattr(r, "model", ""), getattr(r, "provider", "")
-            _SHAPE_OK["name"] = shape                     # start here next time
-            break
-        last_err = ValueError("model returned unparseable evaluation")
-    if data is None:
-        # A failed analysis used to leave no trace on the attempt, so the panel's red
-        # badge was the only record. Keep the reason where a reload can show it.
-        a["evaluation_error"] = {"message": f"evaluation failed: {last_err}", "at": time.time()}
-        store_mod.save_attempt(a, durable=True)
-        raise HTTPException(502, f"evaluation failed: {last_err}")
-    a["evaluation"] = {"data": data, "model": model, "provider": provider,
-                       "generated_at": time.time()}
-    a.pop("evaluation_error", None)
-    store_mod.save_attempt(a, durable=True)
-    return a["evaluation"]
+    with _EVAL_LOCK:
+        if aid in _EVAL_IN_FLIGHT:
+            raise HTTPException(409, "evaluation already running")
+        _EVAL_IN_FLIGHT.add(aid)
+    try:
+        llm = _llm()
+        if llm is None:
+            raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
+                                     "enable the plugin in plugins.enabled and restart the gateway")
+        # Context for this run: the behaviour view + the student's own last runs on the
+        # same paper (submitted only, newest first, exclusive of this attempt).
+        tl = timeline_mod.build(a, pack)
+        prior = [p for p in store_mod.list_attempts(30)
+                 if p.get("exam_id") == a["exam_id"] and p.get("id") != a["id"]
+                 and p.get("status") == "submitted"][:3]
+        blob = prompt_mod.evaluation_input(pack, a, prior=prior, timeline_view=tl)
+        data, model, provider, last_err = None, "", "", None
+        # Degrade through the structured shapes providers actually support: a schema,
+        # then json_object, then plain text with the JSON dug out of the reply. Atlas /
+        # opencode-go answers a json_schema request with 400 "not yet supported".
+        for shape, extra in _shape_attempts():
+            try:
+                r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
+                                            input=[{"type": "text", "text": blob}],
+                                            temperature=0.2, max_tokens=2000, timeout=180,
+                                            purpose="exam-desk.evaluate", **extra)
+            except Exception as e:                          # provider refused this shape
+                last_err = e
+                continue
+            parsed = r.parsed if isinstance(r.parsed, dict) else prompt_mod.parse_json_block(getattr(r, "text", ""))
+            data = prompt_mod.validate_evaluation(parsed)
+            if data is not None:
+                model, provider = getattr(r, "model", ""), getattr(r, "provider", "")
+                _SHAPE_OK["name"] = shape                     # start here next time
+                break
+            last_err = ValueError("model returned unparseable evaluation")
+        # The LLM loop above is the slow part (three shapes × 180 s) and holds no lock on
+        # purpose: a mark toggle on the result page must not queue behind it. Only this
+        # write is serialised, and it merges onto a fresh read so a concurrent save made
+        # during the run is not overwritten by the copy read before it.
+        with store_mod.attempt_lock(aid):
+            fresh = store_mod.get_attempt(aid)
+            if data is None:
+                # A failed analysis used to leave no trace on the attempt, so the panel's red
+                # badge was the only record. Keep the reason where a reload can show it.
+                fresh["evaluation_error"] = {"message": f"evaluation failed: {last_err}", "at": time.time()}
+                store_mod.save_attempt(fresh, durable=True)
+                raise HTTPException(502, f"evaluation failed: {last_err}")
+            fresh["evaluation"] = {"data": data, "model": model, "provider": provider,
+                                   "generated_at": time.time()}
+            fresh.pop("evaluation_error", None)
+            store_mod.save_attempt(fresh, durable=True)
+            return fresh["evaluation"]
+    finally:
+        with _EVAL_LOCK:
+            _EVAL_IN_FLIGHT.discard(aid)
 
 
 # --------------------------------------------------------------------------- #

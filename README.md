@@ -127,6 +127,11 @@ question keeps the full width in a narrow split.
   answer, never corrupt the file). On this host that is 0.31 ms vs 1.12 ms per write.
 - **Packs are cached on mtime+size.** A 160-question paper is parsed and validated
   once per change instead of once per answer save (0.66 ms → 0.023 ms here).
+- **Plugin isolation constraint (`plugins.isolation: in_process`).** The dashboard
+  API and LLM evaluation bridge require running in-process with the Hermes gateway
+  (`sys.modules["exam_desk_ctx_bridge"]`). Under out-of-process isolation
+  (`plugins.isolation: host`), dashboard routes cannot reach the gateway LLM bridge
+  and post-exam AI evaluation returns 503.
 
 ## Develop
 

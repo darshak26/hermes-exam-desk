@@ -146,7 +146,6 @@ _LOCKS = {}
 _LOCKS_GUARD = threading.Lock()
 
 
-@contextmanager
 def log_events(aid, events, *, now=None):
     """Append behaviour events to `attempts/<aid>.log.jsonl` — the process record.
 
@@ -172,9 +171,32 @@ def log_events(aid, events, *, now=None):
         now = time.time() if now is None else now
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists() and path.stat().st_size >= EVENT_MAX_BYTES:
-            marker = {"t": now, "type": "truncated"}
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(marker, separators=(",", ":")) + "\n")
+            already_truncated = False
+            try:
+                with open(path, "rb") as f:
+                    f.seek(0, os.SEEK_END)
+                    size = f.tell()
+                    f.seek(max(0, size - 1024), os.SEEK_SET)
+                    lines = f.read().decode("utf-8", errors="ignore").strip().splitlines()
+                    for line in reversed(lines):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            idx = line.find("{")
+                            if idx != -1:
+                                obj = json.loads(line[idx:])
+                                if obj.get("type") == "truncated":
+                                    already_truncated = True
+                                    break
+                        except ValueError:
+                            pass
+            except (OSError, ValueError):
+                pass
+            if not already_truncated:
+                marker = {"t": now, "type": "truncated"}
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(marker, separators=(",", ":")) + "\n")
             return
         with open(path, "a", encoding="utf-8") as f:
             for e in events:
@@ -361,8 +383,9 @@ def prune_attempts(statuses=("abandoned",), exam_id=None):
         if exam_id and a.get("exam_id") != exam_id:
             continue
         try:
-            if delete_attempt(a["id"]):
-                removed.append(a["id"])
+            with attempt_lock(a["id"]):
+                if delete_attempt(a["id"]):
+                    removed.append(a["id"])
         except (KeyError, ValueError):
             continue
     return removed

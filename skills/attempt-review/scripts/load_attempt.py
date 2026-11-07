@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import exam_desk
 from exam_desk import timeline as timeline_mod                # noqa: E402
+from exam_desk.store import _ID                               # noqa: E402
 
 DATA = os.environ.get("EXAM_DESK_DATA_DIR") or os.path.expanduser(
     "~/.hermes/plugin-data/exam-desk")
@@ -22,6 +23,10 @@ def main(argv):
     ap.add_argument("attempt_id")
     ap.add_argument("--data-dir", default=DATA, help="plugin data root (for tests)")
     a = ap.parse_args(argv)
+
+    if not _ID.match(str(a.attempt_id or "")):
+        print(f"FAIL invalid attempt id {a.attempt_id!r}")
+        return 1
 
     atts = Path(a.data_dir) / "attempts"
     f = atts / f"{a.attempt_id}.json"
@@ -34,7 +39,12 @@ def main(argv):
               "submitted attempts are reviewable")
         return 1
 
-    pack_path = Path(a.data_dir) / "packs" / f"{att['exam_id']}.json"
+    exam_id = att.get("exam_id")
+    if not _ID.match(str(exam_id or "")):
+        print(f"FAIL invalid exam id {exam_id!r}")
+        return 1
+
+    pack_path = Path(a.data_dir) / "packs" / f"{exam_id}.json"
     if not pack_path.is_file():
         print(f"FAIL the pack vanished; attempt {a.attempt_id} is orphaned")
         return 1
