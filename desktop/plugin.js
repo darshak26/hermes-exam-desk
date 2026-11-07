@@ -122,7 +122,12 @@ const CSS = `
 .cbt.cbt-result > *{max-width:1280px}
 .cbt .cbt-result-top{display:grid;grid-template-columns:minmax(0,1fr) 640px;gap:32px;align-items:start}
 .cbt .cbt-result-top.one-col{grid-template-columns:minmax(0,1fr)}
-@media (max-width:1180px){.cbt .cbt-result-top{grid-template-columns:minmax(0,1fr);gap:0}}
+@media (max-width:1180px){
+  .cbt .cbt-result-top{grid-template-columns:minmax(0,1fr);gap:0;align-items:start}
+  /* Stacked, the score strip and the sections table become peers — the strip's own
+     8px margin plus this 8px margin-top make the same 16px seam the sections use. */
+  .cbt .cbt-result-top > :not(:first-child){margin-top:8px}
+}
 /* review pager: 20 rows a page keeps the page finite whatever the paper size */
 .cbt .cbt-pager{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
@@ -153,7 +158,11 @@ const CSS = `
 }
 /* result statistics: computed from the attempt record — nothing here is model output */
 .cbt .cbt-stats{table-layout:fixed;width:auto;min-width:560px}
-.cbt .cbt-stats th:nth-child(2),.cbt .cbt-stats td:nth-child(2){width:210px}
+/* the measured column carries sentences, not single tokens — left-aligned so a
+   three-line value does not hang off the right edge of its cell, and one notch
+   more row padding than the numeric tables: the wrapped lines meet the hairline */
+.cbt .cbt-stats td:nth-child(2){width:300px;text-align:left;font-variant-numeric:tabular-nums}
+.cbt .cbt-stats td{padding-top:10px;padding-bottom:10px}
 .cbt .cbt-topic{table-layout:fixed;width:auto;min-width:620px}
 .cbt .cbt-topic th:nth-child(2),.cbt .cbt-topic td:nth-child(2){width:64px}
 .cbt .cbt-topic th:nth-child(3),.cbt .cbt-topic td:nth-child(3){width:104px}
@@ -1680,8 +1689,8 @@ function ResultStats({ attempt, pack, tl }) {
       metrics.push([`Under the limit (${s.id})`, `${counted} of the ${s.attempt_limit} allowed answers spent — ${s.attempt_limit - counted} unused`])
   }
   if (skipped)
-    metrics.push(['Seen but skipped', `${seenBlank} opened and then left blank`])
-  metrics.push(['Never reached', `${neverSeen} of the paper were never visited`])
+    metrics.push(['Seen but skipped', `${seenBlank} question${seenBlank === 1 ? '' : 's'} opened and then left blank`])
+  metrics.push(['Never reached', `${neverSeen} question${neverSeen === 1 ? '' : 's'} of the paper were never visited`])
   // With the behaviour stream, dwell is real: per-question time, mind changes, doubts.
   // Without it (an attempt recorded before the stream existed) the wall clock is the
   // only truth, and the row says exactly that. Sub-second median dwell (machine-speed
@@ -1944,7 +1953,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           ] })
         : null,
     ] }),
-    jsxs('div', { className: 'cbt-row', children: [
+    jsxs('div', { className: 'cbt-row', style: { marginTop: 16 }, children: [
       jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
       jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
     ] }),
