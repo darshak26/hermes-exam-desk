@@ -1697,7 +1697,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
             jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
           ] }, k)) }),
       ] }),
-      jsx('div', { className: 'cbt-sub', children: [
+      jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: [
         `${r.totals.correct} of ${total} questions correct · ${pct}%`,
         penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
         penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
@@ -1759,7 +1759,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         : attempt.evaluation
           ? jsxs('div', { children: [
               pack.key_status && pack.key_status !== 'official'
-                ? jsx('div', { className: 'cbt-row cbt-sub', children:
+                ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginBottom: 12 }, children:
                     `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
                 : null,
               evaluationCard(attempt.evaluation.data, pack),
