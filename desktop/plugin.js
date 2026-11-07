@@ -91,6 +91,22 @@ const CSS = `
 .cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
 .cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
 .cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
+/* result page: score strip on the left, the four verdict tiles on the right */
+.cbt .cbt-score-strip{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:8px}
+.cbt .cbt-score-strip .cbt-score{margin:2px 0 4px}
+.cbt .cbt-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(80px,1fr));gap:8px}
+.cbt .cbt-stat{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.cbt .cbt-stat .k{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);white-space:nowrap}
+.cbt .cbt-stat .v{font-size:16px;line-height:1.25;font-weight:600;font-variant-numeric:tabular-nums}
+.cbt .cbt-stat.correct .v{color:var(--ui-success)}
+.cbt .cbt-stat.wrong .v{color:var(--ui-red)}
+/* evaluation blocks reuse the how-it-works card: label row, hairline, body row */
+.cbt .cbt-eval-title{font-size:12px;font-weight:600;color:var(--ui-text-secondary)}
+.cbt .cbt-eval-body{font-size:12.5px;line-height:1.55}
+.cbt .cbt-lead-row{justify-content:space-between;gap:16px}
+.cbt .cbt-plan{margin:0;padding-left:20px}
+.cbt .cbt-plan li{margin:0 0 6px}
+.cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
@@ -1523,28 +1539,61 @@ function fmtAns(q, v) {
 const VERDICT_CLS = { correct: 'ok', wrong: 'err', skipped: '', not_counted: 'acc' }
 const VERDICT_LABEL = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped', not_counted: 'Not counted' }
 
-function evaluationCard(d) {
+// The model answers in ids ('A', 'B'); the paper owns the human titles.
+function evalSectionTitle(pack, id) {
+  const s = (pack?.pattern?.sections || []).find(x =>
+    x.id === id || String(x.title || '').toLowerCase().startsWith(String(id).toLowerCase()))
+  return s?.title || String(id)
+}
+
+const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
+
+function evaluationCard(d, pack) {
   if (!d) return null
+  const sections = d.sections || []
+  const topics = d.weak_topics || []
+  const notes = d.wrong_answer_notes || []
+  const plan = d.study_plan || []
   return jsxs('div', { children: [
-    jsx('p', { children: d.overall_comment }),
-    (d.sections || []).map((s, i) => jsx('p', { key: i, className: 'muted', children: `${s.section_id}: ${s.comment}` })),
-    (d.weak_topics || []).length
-      ? jsxs('div', { children: [
-          jsx('h4', { children: 'Weak topics' }),
-          jsx('ul', { className: 'list', children: d.weak_topics.map((w, i) =>
-            jsxs('li', { key: i, children: [`${w.topic} `, jsx('span', { className: 'muted', children: `· ${w.priority} priority` })] })) }),
+    d.overall_comment
+      ? jsxs('div', { className: 'cbt-how', children: [
+          jsx('div', { className: 'cbt-how-row', children: d.overall_comment }),
         ] })
       : null,
-    (d.wrong_answer_notes || []).length
+    sections.length
       ? jsxs('div', { children: [
-          jsx('h4', { children: 'Where it slipped' }),
-          ...d.wrong_answer_notes.map((n, i) => jsx('p', { key: i, className: 'note', children: [jsx('strong', { children: `${n.question_id}: ` }), n.note] })),
+          jsx('div', { className: 'cbt-section', children: 'By section' }),
+          jsx('div', { className: 'cbt-how', children: sections.map((s, i) =>
+            jsxs('div', { className: 'cbt-how-row', key: i, children: [
+              jsx('div', { className: 'cbt-eval-title', children: evalSectionTitle(pack, s.section_id) }),
+              jsx('div', { className: 'cbt-eval-body', children: s.comment }),
+            ] })) }),
         ] })
       : null,
-    (d.study_plan || []).length
+    topics.length
       ? jsxs('div', { children: [
-          jsx('h4', { children: 'Study plan' }),
-          jsx('ol', { className: 'list', children: d.study_plan.map((s, i) => jsx('li', { key: i, children: s })) }),
+          jsx('div', { className: 'cbt-section', children: 'Weak topics' }),
+          jsx('div', { className: 'cbt-how', children: topics.map((w, i) =>
+            jsxs('div', { className: 'cbt-how-row cbt-lead-row', key: i, children: [
+              jsx('span', { children: w.topic }),
+              jsx(Badge, { size: 'xs', variant: PRIORITY_VARIANT[String(w.priority || '').toLowerCase()] || 'muted', children: w.priority }),
+            ] })) }),
+        ] })
+      : null,
+    notes.length
+      ? jsxs('div', { children: [
+          jsx('div', { className: 'cbt-section', children: 'Where it slipped' }),
+          jsx('div', { className: 'cbt-how', children: notes.map((n, i) =>
+            jsxs('div', { className: 'cbt-how-row', key: i, children: [
+              jsx('div', { className: 'cbt-eval-title', children: n.question_id }),
+              jsx('div', { className: 'cbt-eval-body', children: n.note }),
+            ] })) }),
+        ] })
+      : null,
+    plan.length
+      ? jsxs('div', { children: [
+          jsx('div', { className: 'cbt-section', children: 'Study plan' }),
+          jsx('ol', { className: 'cbt-list cbt-plan', children: plan.map((s, i) => jsx('li', { key: i, children: s })) }),
         ] })
       : null,
   ] })
@@ -1613,25 +1662,20 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, attempt.mode), children: 'Retake' }) }) : null,
       jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
     ] }),
-    jsx('div', { className: 'cbt-label', children: 'Score' }),
-    jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
-    jsxs('div', { className: 'row sub', children: [
-      jsx('span', { className: 'cbt-sub', children: `${r.totals.correct} of ${total} correct · ${pct}%` }),
-      (() => {
-        // marking can be set on the pattern or overridden per section; show the one
-        // that actually applied to this paper
-        const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
-        return w < 0 ? jsx('span', { className: 'cbt-sub', children: `· ${w} per wrong answer` }) : null
-      })(),
-      jsx('span', { style: { flex: 1 } }),
-      ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
-        jsx(Badge, {
-          key: k, size: 'xs',
-          variant: k === 'correct' ? 'success' : k === 'wrong' ? 'destructive' : k === 'skipped' ? 'muted' : 'outline',
-          children: `${VERDICT_LABEL[k]} ${r.totals[k]}`,
-        })),
+    jsx(Separator, { className: 'cbt-sep' }),
+    jsxs('div', { className: 'cbt-score-strip', children: [
+      jsxs('div', { children: [
+        jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
+        jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+        jsx('div', { className: 'cbt-sub', children: `${r.totals.correct} of ${total} correct · ${pct}%` }),
+      ] }),
+      jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
+        jsxs('div', { className: `cbt-stat ${k}`, children: [
+          jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
+          jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
+        ] }, k)) }),
     ] }),
-    pack.pattern.sections.length > 1 ? jsx('h3', { children: 'Sections' }) : null,
+    pack.pattern.sections.length > 1 ? jsx('div', { className: 'cbt-section', children: 'Sections' }) : null,
     pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
       jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => {
@@ -1644,8 +1688,18 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
           jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
         ] })
-      }) }) ] }),
-    jsx('h3', { children: 'AI evaluation' }),
+      }) }),
+      jsx('tfoot', { children: jsxs('tr', { children: [
+        jsx('td', { children: 'Total' }),
+        jsx('td', { className: 'num', children: fmtScore(r.score) }),
+        jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
+        jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
+        jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
+        jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
+      ] }) }),
+    ] }),
+    jsx(Separator, { className: 'cbt-sep' }),
+    jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI evaluation' }),
     evalBusy
       ? jsxs('div', { className: 'cbt-row cbt-sub', children: [
           jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
@@ -1665,7 +1719,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           ] })
         : attempt.evaluation
           ? jsxs('div', { children: [
-              evaluationCard(attempt.evaluation.data),
+              evaluationCard(attempt.evaluation.data, pack),
               jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
                 jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                 jsx('span', { style: { flex: 1 } }),
@@ -1678,8 +1732,9 @@ function CbtResult({ attemptId, onHome, onRetake }) {
               jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Analyse this attempt' }),
               jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
             ] }),
-    jsxs('div', { className: 'cbt-row', style: { marginTop: 24 }, children: [
-      jsx('h3', { style: { margin: 0 }, children: 'Review' }),
+    jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
+    jsxs('div', { className: 'cbt-row', children: [
+      jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Review' }),
       jsx('span', { className: 'cbt-sub', children: `${rows.length} shown` }),
       jsx('span', { style: { flex: 1 } }),
       jsx(SegmentedControl, {
