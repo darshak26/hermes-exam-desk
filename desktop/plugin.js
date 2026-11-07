@@ -68,6 +68,13 @@ const CSS = `
 .cbt .right{text-align:right}
 .cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
+/* attempt history: declared column grid, so every header sits over its own values.
+   The last column stays auto — it carries the Delete-confirm row. */
+.cbt .cbt-hist{table-layout:fixed}
+.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:84px}
+.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:118px}
+.cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:76px}
+.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:108px}
 
 /* home: a paper and its history */
 .cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
@@ -869,8 +876,10 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
                   jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(), children: 'Clear discarded' }) })
               : null,
           ] }),
-          isOpen ? jsxs('table', { className: 'cbt-table', children: [
-            jsx('thead', { children: jsx('tr', { children: ['Mode', 'Status', 'Score', 'When', ''].map(h => jsx('th', { key: h, children: h })) }) }),
+          isOpen ? jsxs('table', { className: 'cbt-table cbt-hist', children: [
+            jsx('thead', { children: jsx('tr', { children: [
+              ['Mode', ''], ['Status', ''], ['Score', 'num'], ['When', 'num'], ['', 'right'],
+            ].map(([h, cls]) => jsx('th', { key: h || 'actions', className: cls || undefined, children: h })) }) }),
             jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
               jsx('td', { children: jsx(Badge, { variant: 'outline', size: 'xs', children: MODE_LABEL[a.mode] || a.mode }) }),
               jsx('td', { children: jsx(Badge, {
@@ -879,7 +888,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
                 children: STATUS_LABEL[a.status] || a.status,
               }) }),
               jsx('td', { className: a.score == null ? 'num muted' : 'num', children: fmtScore(a.score) }),
-              jsx('td', { className: 'muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
+              jsx('td', { className: 'num muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
               jsx('td', { className: 'right', children: confirmDel === a.id
                 ? jsxs('div', { className: 'cbt-row', children: [
                     jsx('span', { className: 'cbt-sub', children: 'Delete this attempt?' }),
