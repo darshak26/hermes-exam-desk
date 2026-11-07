@@ -132,6 +132,25 @@ const CSS = `
 .cbt .cbt-more{padding:9px 12px;font-size:12px;color:var(--ui-text-secondary);border-top:1px solid var(--ui-stroke-secondary);display:flex;align-items:center;gap:8px}
 .cbt .cbt-more button{font:inherit;color:var(--ui-accent);background:none;border:0;padding:0;cursor:pointer}
 .cbt .cbt-more button:hover{text-decoration:underline}
+/* Scrollbars: a plugin scroller is its own element, so the app's global fade does not
+   reach it and Chromium draws the platform's white bar over the dark surface. Copy the
+   app's treatment (apps/desktop/src/styles.css): 0.5rem, transparent track, a rounded
+   thumb that fades in while the scroller is hovered. */
+/* scrollbar-width and scrollbar-color inherit, and Chromium 121+ then ignores the
+   ::-webkit-scrollbar rules below and draws the platform's own bar (white on Windows).
+   Reset them here so the pseudo-element styling always wins. */
+.cbt.cbt-page,.cbt .cbt-qbody,.cbt .cbt-pal-scroll{scrollbar-width:auto;scrollbar-color:auto}
+.cbt.cbt-page::-webkit-scrollbar,.cbt .cbt-qbody::-webkit-scrollbar,.cbt .cbt-pal-scroll::-webkit-scrollbar{width:.5rem;height:.5rem}
+.cbt.cbt-page::-webkit-scrollbar-track,.cbt.cbt-page::-webkit-scrollbar-corner,
+.cbt .cbt-qbody::-webkit-scrollbar-track,.cbt .cbt-qbody::-webkit-scrollbar-corner,
+.cbt .cbt-pal-scroll::-webkit-scrollbar-track,.cbt .cbt-pal-scroll::-webkit-scrollbar-corner{background:transparent}
+.cbt.cbt-page::-webkit-scrollbar-thumb,.cbt .cbt-qbody::-webkit-scrollbar-thumb,.cbt .cbt-pal-scroll::-webkit-scrollbar-thumb{background:transparent;border:0;border-radius:9999rem;background-clip:padding-box}
+.cbt.cbt-page:hover::-webkit-scrollbar-thumb,.cbt .cbt-qbody:hover::-webkit-scrollbar-thumb,.cbt .cbt-pal-scroll:hover::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 18%,transparent)}
+.cbt.cbt-page:hover::-webkit-scrollbar-thumb:hover,.cbt .cbt-qbody:hover::-webkit-scrollbar-thumb:hover,.cbt .cbt-pal-scroll:hover::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 40%,transparent)}
+.cbt.cbt-page::-webkit-scrollbar-button,.cbt .cbt-qbody::-webkit-scrollbar-button,.cbt .cbt-pal-scroll::-webkit-scrollbar-button{display:none}
+@supports not selector(::-webkit-scrollbar){
+  .cbt.cbt-page,.cbt .cbt-qbody,.cbt .cbt-pal-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 30%,transparent) transparent}
+}
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
@@ -1576,7 +1595,7 @@ const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
 // the rest sit behind a count the reader can open.
 const NOTES_OPEN = 6
 
-function evaluationCard(d, pack) {
+function EvaluationCard({ d, pack }) {
   const [showAllNotes, setShowAllNotes] = useState(false)
   if (!d) return null
   const sections = d.sections || []
@@ -1816,7 +1835,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
                 ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginBottom: 12 }, children:
                     `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
                 : null,
-              jsx(evaluationCard, { d: attempt.evaluation.data, pack }),
+              jsx(EvaluationCard, { d: attempt.evaluation.data, pack }),
               jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
                 jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                 jsx('span', { style: { flex: 1 } }),
