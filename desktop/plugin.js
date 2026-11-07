@@ -92,7 +92,7 @@ const CSS = `
 .cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
 .cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
 /* result page: score strip on the left, the four verdict tiles on the right */
-.cbt .cbt-score-strip{display:flex;align-items:flex-end;gap:40px;flex-wrap:wrap;margin-bottom:8px}
+.cbt .cbt-score-strip{display:flex;align-items:center;gap:40px;flex-wrap:wrap;margin-bottom:8px}
 .cbt .cbt-score-strip .cbt-score{margin:2px 0 4px}
 .cbt .cbt-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(80px,1fr));gap:8px}
 .cbt .cbt-stat{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
