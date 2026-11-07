@@ -151,6 +151,16 @@ const CSS = `
 @supports not selector(::-webkit-scrollbar){
   .cbt.cbt-page,.cbt .cbt-qbody,.cbt .cbt-pal-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 30%,transparent) transparent}
 }
+/* result statistics: computed from the attempt record — nothing here is model output */
+.cbt .cbt-stats{table-layout:fixed;width:auto;min-width:560px}
+.cbt .cbt-stats th:nth-child(2),.cbt .cbt-stats td:nth-child(2){width:210px}
+.cbt .cbt-topic{table-layout:fixed;width:auto;min-width:620px}
+.cbt .cbt-topic th:nth-child(2),.cbt .cbt-topic td:nth-child(2){width:64px}
+.cbt .cbt-topic th:nth-child(3),.cbt .cbt-topic td:nth-child(3){width:104px}
+.cbt .cbt-topic th:nth-child(4),.cbt .cbt-topic td:nth-child(4){width:80px}
+.cbt .cbt-topic th:nth-child(5),.cbt .cbt-topic td:nth-child(5){width:80px}
+.cbt .cbt-topic th:nth-child(6),.cbt .cbt-topic td:nth-child(6){width:88px}
+.cbt .cbt-topic th:nth-child(7),.cbt .cbt-topic td:nth-child(7){width:110px}
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
@@ -1621,6 +1631,118 @@ function evalSectionTitle(pack, id) {
 
 const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
 
+function fmtFor(sec) {
+  const s = Math.max(0, Math.round(sec || 0))
+  if (s >= 3600) return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`
+  return s > 0 ? `${Math.round(s / 60)} min` : '—'
+}
+function fmtPct(num, den) { return den ? `${Math.round((1000 * num) / den) / 10}%` : '—' }
+
+// Statistics — every number comes off the attempt record and the pack; nothing here
+// asks a model. This is the set the standard platforms report: attempts, accuracy,
+// penalty paid, over-limit waste, a topic roll-up. The columns they add that this
+// record cannot support (time per question, topper/cutoff comparison) stay out rather
+// than being faked.
+function ResultStats({ attempt, pack }) {
+  const [allTopics, setAllTopics] = useState(false)
+  const r = attempt.result
+  const rows = r.questions || []
+  const total = rows.length
+  const correct = r.totals.correct ?? 0
+  const wrong = r.totals.wrong ?? 0
+  const skipped = r.totals.skipped ?? 0
+  const attempted = correct + wrong
+  const answered = attempted
+  const visited = new Set(attempt.visited || [])
+  const seenBlank = rows.filter(row => row.verdict === 'skipped' && visited.has(row.id)).length
+  const neverSeen = rows.filter(row => row.verdict === 'skipped' && !visited.has(row.id)).length
+  const lost = rows.reduce((n, row) => n + Math.min(0, Number(row.awarded) || 0), 0)
+  const wall = Math.min((attempt.submitted_at ?? 0) - (attempt.started_at ?? 0),
+                        attempt.duration_seconds ?? Infinity)
+  const per = answered ? (wall / answered / 60).toFixed(1) : null
+  const penalty = pack.pattern.sections.some(s => (s.marks_wrong ?? 0) < 0)
+
+  const metrics = [
+    ['Answered', `${answered} of ${total} — ${fmtPct(answered, total)} of the paper`],
+    ['Accuracy', correct ? `${fmtPct(correct, attempted)} — ${correct} right of the ${attempted} attempted`
+      : 'no right answer recorded'],
+  ]
+  if (penalty && wrong)
+    metrics.push(['Penalty paid', `${fmtScore(lost)} lost across ${wrong} wrong answer${wrong === 1 ? '' : 's'}`])
+  for (const s of pack.pattern.sections) {
+    if (!s.attempt_limit) continue
+    const counted = rows.filter(row => row.section === s.id && row.verdict !== 'not_counted').length
+    const wasted = rows.filter(row => row.section === s.id && row.verdict === 'not_counted').length
+    if (wasted)
+      metrics.push([`Over the limit (${s.id})`, `${wasted} answer${wasted === 1 ? '' : 's'} beyond the first ${s.attempt_limit} are graded 0 — that is their whole cost`])
+    else if (counted < s.attempt_limit)
+      metrics.push([`Under the limit (${s.id})`, `${counted} of the ${s.attempt_limit} allowed answers spent — ${s.attempt_limit - counted} unused`])
+  }
+  if (skipped)
+    metrics.push(['Seen but skipped', `${seenBlank} opened and then left blank`])
+  metrics.push(['Never reached', `${neverSeen} of the paper were never visited`])
+  metrics.push(['Pace', `${fmtFor(wall)} wall clock for ${answered} recorded answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each, averaged` : ''} (per-question times are not recorded)`])
+
+  // Topic roll-up sorted by marks: the biggest losses to the top. A question may land
+  // under the topic its pack gives it; blanks count as skips there, so a topic with
+  // all its rows blank obviously shows zero accuracy.
+  const roll = new Map()
+  for (const row of rows) {
+    const q = pack.questions.find(x => x.id === row.id) || {}
+    const t = String(q.topic || '—')
+    const cur = roll.get(t) || { q: 0, attempted: 0, correct: 0, wrong: 0, skipped: 0, awarded: 0 }
+    cur.q++; cur.correct += (row.verdict === 'correct' ? 1 : 0); cur.awarded += Number(row.awarded) || 0
+    if (row.verdict !== 'not_counted' && row.verdict !== 'skipped') cur.attempted++
+    if (row.verdict === 'wrong') cur.wrong++
+    if (row.verdict === 'skipped') cur.skipped++
+    roll.set(t, cur)
+  }
+  const topics = [...roll.entries()].map(([topic, cur]) => ({ topic, ...cur }))
+    .sort((a, b) => a.awarded - b.awarded || b.skipped - a.skipped || a.topic.localeCompare(b.topic))
+  const showTopics = allTopics ? topics : topics.slice(0, 6)
+
+  return jsxs('div', { className: 'cbt-eval', children: [
+    jsxs('table', { className: 'cbt-table cbt-stats', children: [
+      jsx('thead', { children: jsx('tr', { children: [
+        jsx('th', { children: 'Statistic' }),
+        jsx('th', { children: 'Measured' }),
+      ] }) }),
+      jsx('tbody', { children: metrics.map(([label, value]) => jsxs('tr', { key: label, children: [
+        jsx('td', { children: label }),
+        jsx('td', { className: 'num', children: value }),
+      ] })) }),
+    ] }),
+    topics.length > 1
+      ? jsxs('div', { children: [
+          jsx('div', { className: 'cbt-section', children: 'Topics' }),
+          jsxs('table', { className: 'cbt-table cbt-topic', children: [
+            jsx('thead', { children: jsx('tr', { children:
+              ['Topic', 'Q', 'Attempted', 'Correct', 'Wrong', 'Marks', 'Accuracy']
+                .map((htitle, i) => jsx('th', { key: htitle, className: i ? 'num' : undefined, children: htitle })) }) }),
+            jsx('tbody', { children: showTopics.map(cur => jsxs('tr', { key: cur.topic, children: [
+              jsx('td', { children: cur.topic }),
+              jsx('td', { className: 'num', children: String(cur.q) }),
+              jsx('td', { className: 'num', children: String(cur.attempted) }),
+              jsx('td', { className: 'num', children: String(cur.correct) }),
+              jsx('td', { className: 'num', children: String(cur.wrong) }),
+              jsx('td', { className: `num${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
+              jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : 'skip' }),
+            ] })) }),
+          ] }),
+          topics.length > 6
+            ? jsx('div', { className: 'cbt-more', children:
+                jsx('button', {
+                  type: 'button',
+                  'aria-expanded': allTopics,
+                  onClick: () => setAllTopics(v => !v),
+                  children: allTopics ? 'Show fewer topics' : `Show all ${topics.length} topics`,
+                }) })
+            : null,
+        ] })
+      : null,
+  ] })
+}
+
 // The result page carries the BASIC analysis only: overall comment, sections, weak
 // topics. Per-question notes and the 2-week plan are the chat's job ("Discuss in
 // chat" opens a session loaded with the attempt-review skill), and the per-question
@@ -1669,6 +1791,9 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const [evalBusy, setEvalBusy] = useState(false)
   const [evalError, setEvalError] = useState(null)
   const [evalTried, setEvalTried] = useState(false)
+  // Analysis is a section the reader opens: default closed so the numbers tell the
+  // story first and the model call happens only once someone asks for it.
+  const [showEval, setShowEval] = useState(false)
   // `force` re-runs the LLM; without it the server returns the stored evaluation and
   // the call is free, so opening a result twice never costs a second model call.
   const runEval = async force => {
@@ -1683,15 +1808,6 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     } catch (e) { setEvalError(e?.message || String(e)) }
     setEvalBusy(false)
   }
-  useEffect(() => {
-    const a = q.data?.attempt
-    // A stored failure means the last run already failed: show it instead of paying
-    // for another model call on every open.
-    if (a?.status === 'submitted' && a.result && !a.evaluation && !a.evaluation_error && !evalTried && !evalBusy) {
-      setEvalTried(true)
-      void runEval(false)
-    }
-  }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, q.data?.attempt?.evaluation_error, evalTried, evalBusy])
   const discuss = () => {
     const a = q.data?.attempt
     if (!a) return
@@ -1807,47 +1923,58 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           ] })
         : null,
     ] }),
+    jsxs('div', { className: 'cbt-row', children: [
+      jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
+      jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
+    ] }),
+    jsx(ResultStats, { attempt, pack }),
     jsx(Separator, { className: 'cbt-sep' }),
-    jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI evaluation' }),
-    evalBusy
-      ? jsxs('div', { className: 'cbt-row cbt-sub', children: [
-          jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
-          'Analysing your attempt — this calls the model once and takes a few seconds.',
-        ] })
-      : evalFailure
-        ? jsxs('div', { children: [
-            jsxs('div', { className: 'cbt-row', children: [
-              jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
-              attempt.evaluation_error && !evalError
-                ? jsx('span', { className: 'cbt-sub', children: `recorded ${relTime(attempt.evaluation_error.at)}` })
-                : null,
-              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
-              jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss with the agent instead' }),
-            ] }),
-            jsxs('details', { style: { marginTop: 8 }, children: [
-              jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
-              jsx('pre', { className: 'cbt-pre', children: evalFailure }),
-            ] }),
+    jsxs('div', { className: 'cbt-row', children: [
+      jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI analysis' }),
+      jsx(Badge, { variant: 'muted', size: 'xs', children: 'model output' }),
+      jsx('span', { style: { flex: 1 } }),
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
+      attempt.evaluation
+        ? jsx(Button, { variant: 'outline', size: 'sm', onClick: () => setShowEval(v => !v),
+            children: showEval ? 'Hide analysis' : 'Show analysis' })
+        : jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy,
+            onClick: () => { setShowEval(true); void runEval(false) }, children: 'Analyse this attempt' }),
+    ] }),
+    pack.key_status && pack.key_status !== 'official'
+      ? jsx('div', { className: 'cbt-row cbt-sub', style: { margin: '12px 0' }, children:
+          `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
+      : null,
+    showEval && jsxs('div', { children: [
+      evalBusy
+        ? jsxs('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children: [
+            jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
+            'Analysing your attempt — this calls the model once and takes a few seconds.',
           ] })
-        : attempt.evaluation
+        : evalFailure
           ? jsxs('div', { children: [
-              pack.key_status && pack.key_status !== 'official'
-                ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginBottom: 12 }, children:
-                    `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
-                : null,
-              jsx(EvaluationCard, { d: attempt.evaluation.data, pack }),
               jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
-                jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
-                jsx('span', { style: { flex: 1 } }),
-                jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
-                jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
+                jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
+                attempt.evaluation_error && !evalError
+                  ? jsx('span', { className: 'cbt-sub', children: `recorded ${relTime(attempt.evaluation_error.at)}` })
+                  : null,
+                jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
+              ] }),
+              jsxs('details', { style: { marginTop: 8 }, children: [
+                jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
+                jsx('pre', { className: 'cbt-pre', children: evalFailure }),
               ] }),
             ] })
-          : jsxs('div', { className: 'cbt-row', children: [
-              jsx('span', { className: 'cbt-sub', children: 'No evaluation yet.' }),
-              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Analyse this attempt' }),
-              jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
-            ] }),
+          : attempt.evaluation
+            ? jsxs('div', { children: [
+                jsx(EvaluationCard, { d: attempt.evaluation.data, pack }),
+                jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
+                  jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
+                  jsx('span', { style: { flex: 1 } }),
+                  jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
+                ] }),
+              ] })
+            : null,
+    ] }),
     jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
     jsxs('div', { className: 'cbt-row', children: [
       jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Review' }),
