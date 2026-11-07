@@ -1700,12 +1700,18 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     ] }),
     pack.pattern.sections.length > 1 ? jsx('div', { className: 'cbt-section', children: 'Sections' }) : null,
     pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
+      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
+        ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
+        : h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => {
         const st = r.sections[s.id] || {}
         return jsxs('tr', { key: s.id, children: [
-          jsx('td', { children: s.title }),
-          jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: String(st.score ?? '—') }),
+          jsxs('td', { children: [
+            jsx(Badge, { variant: 'outline', size: 'xs', children: s.id }),
+            ' ',
+            s.title,
+          ] }),
+          jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: st.score == null ? '—' : fmtScore(st.score) }),
           jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
           jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
           jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
