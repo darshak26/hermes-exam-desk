@@ -212,6 +212,40 @@ class LlmApiTests(unittest.TestCase):
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 503)
 
+    def test_refused_schema_is_not_re_asked_every_call(self):
+        """A provider refusing json_schema refuses it every time: try it once, then
+        start from the shape that worked, so no evaluation pays a wasted 400."""
+        class RefusingLlm(FakeLlm):
+            def complete_structured(self, **kw):
+                self.calls.append(kw)
+                if "json_schema" in kw:
+                    raise RuntimeError('400 "json_schema not yet supported"')
+                return FakeResult(parsed={"overall_comment": "ok",
+                                          "sections": [{"section_id": "A", "comment": "c"}],
+                                          "weak_topics": [{"topic": "t", "evidence": "e", "priority": "high"}],
+                                          "wrong_answer_notes": [], "study_plan": []})
+
+        prev_shape = plugin_api._SHAPE_OK["name"]
+        plugin_api._SHAPE_OK["name"] = None
+        llm = RefusingLlm()
+        sys.modules["cbt_exam_ctx_bridge"].ctx.llm = llm
+        try:
+            first = self._attempt()
+            client.post(f"/attempts/{first}/submit")
+            self.assertEqual(client.post(f"/attempts/{first}/evaluate").status_code, 200)
+            self.assertIn("json_schema", llm.calls[0], "the richest shape must be tried first")
+            self.assertIn("json_mode", llm.calls[1], "then json_object")
+
+            second = self._attempt()
+            client.post(f"/attempts/{second}/submit")
+            self.assertEqual(client.post(f"/attempts/{second}/evaluate").status_code, 200)
+            self.assertNotIn("json_schema", llm.calls[2],
+                             "a shape this provider just refused must not be re-asked")
+            self.assertIn("json_mode", llm.calls[2])
+        finally:
+            plugin_api._SHAPE_OK["name"] = prev_shape
+            sys.modules["cbt_exam_ctx_bridge"].ctx.llm = FAKE_LLM
+
     def test_live_context_lifecycle(self):
         aid = self._attempt("assisted")              # create writes the file (first question)
         live = DATA / "live" / f"{aid}.md"

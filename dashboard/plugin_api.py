@@ -262,6 +262,29 @@ def prune_attempts(body: PruneBody = PruneBody()):
     return {"deleted": len(gone), "ids": gone}
 
 
+# Richest constraint first: a real json_schema, then json_object, then plain text.
+# `_SHAPE_OK` remembers which one this process last got a usable answer from, because a
+# provider that refuses json_schema refuses it on EVERY call — re-asking costs a wasted
+# 400 round trip per evaluation. The remembered shape goes first; the rest stay behind
+# it, so a provider change (or a model that suddenly accepts a schema) degrades and
+# recovers on its own without a restart.
+_SHAPE_ORDER = ("json_schema", "json_mode", "text")
+_SHAPE_OK = {"name": None}
+
+
+def _shape_attempts():
+    """(shape name, complete_structured kwargs) in the order to try them."""
+    attempts = [
+        ("json_schema", {"json_schema": prompt_mod.EVAL_SCHEMA, "schema_name": "cbt.evaluation"}),
+        ("json_mode", {"json_mode": True, "schema_name": "cbt.evaluation"}),
+        ("text", {}),
+    ]
+    known = _SHAPE_OK["name"]
+    if known:
+        attempts.sort(key=lambda item: 0 if item[0] == known else 1)   # stable sort
+    return attempts
+
+
 @router.post("/attempts/{aid}/evaluate")
 def evaluate(aid: str, force: bool = False):
     a, pack = _load(aid, touch=True)
@@ -278,9 +301,7 @@ def evaluate(aid: str, force: bool = False):
     # Degrade through the structured shapes providers actually support: a schema,
     # then json_object, then plain text with the JSON dug out of the reply. Atlas /
     # opencode-go answers a json_schema request with 400 "not yet supported".
-    for extra in ({"json_schema": prompt_mod.EVAL_SCHEMA, "schema_name": "cbt.evaluation"},
-                  {"json_mode": True, "schema_name": "cbt.evaluation"},
-                  {}):
+    for shape, extra in _shape_attempts():
         try:
             r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
                                         input=[{"type": "text", "text": blob}],
@@ -293,6 +314,7 @@ def evaluate(aid: str, force: bool = False):
         data = prompt_mod.validate_evaluation(parsed)
         if data is not None:
             model, provider = getattr(r, "model", ""), getattr(r, "provider", "")
+            _SHAPE_OK["name"] = shape                     # start here next time
             break
         last_err = ValueError("model returned unparseable evaluation")
     if data is None:
