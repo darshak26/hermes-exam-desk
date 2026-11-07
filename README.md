@@ -34,6 +34,13 @@ The skills load on the next gateway start. `hermes gateway restart` is the clean
 if you are mid-conversation and would rather not drop it, the panel works with the
 Python half alone and the AI evaluation appears after the restart.
 
+Updating the plugin is the same story, with one more step: the panel's HTTP routes are
+mounted **once**, when the dashboard process boots. Pull a new version while the
+dashboard is running and it keeps answering with the route table it loaded — a route
+added since then returns `{"detail": "Not Found"}` even though the file on disk has it.
+So after an update, restart the dashboard too (the desktop app's own chat survives
+long enough to reconnect). The panel's buttons say this instead of showing a bare 404.
+
 **2. The desktop half** (the panel itself) is a separate switch. It ships **disabled
 on purpose** — a dropped package stays inert until you say otherwise:
 

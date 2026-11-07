@@ -38,7 +38,7 @@ const CSS = `
 /* Dialogs are portalled to the document body, so they are NOT inside .cbt and every
    .cbt-scoped rule above stops at the dialog edge. These rules hang off .cbt-dlg
    itself, or the content would inherit the browser's centred table defaults. */
-.cbt-dlg [data-slot="dialog-description"]{margin:0 0 14px}
+.cbt-dlg .cbt-desc{margin:0 0 14px}
 .cbt-dlg .cbt-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0}
 .cbt-dlg .cbt-sub{color:var(--ui-text-secondary);font-size:12px}
 .cbt-dlg p{margin:0}
@@ -500,36 +500,16 @@ function fmtHMS(seconds) {
   return `${h}:${m}:${sec}`
 }
 
-// The app drops its ENTIRE titlebar cluster on a plugin page when any plugin
-// claims the titlebar band (`pageOwnsTitlebar` in the app's titlebar-controls),
-// which takes the sidebar toggle with it. The in-page twin below only exists for
-// that case — when the real toggle IS on screen a second one just shoves the
-// heading out of line, so measure instead of assuming.
-function appTitlebarTogglePresent() {
-  const left = document.querySelector('[data-titlebar-cluster="left"]')
-  if (!left) return false
-  const box = left.getBoundingClientRect()
-  // present AND on screen: a cluster the app rendered but hid is just as gone
-  return box.width > 0 && box.height > 0 && Boolean(left.querySelector('button'))
-}
-
-function useAppTitlebarToggle() {
-  const [present, setPresent] = useState(true)     // assume present until measured
-  useEffect(() => {
-    let raf = 0
-    const check = () => { raf = 0; setPresent(appTitlebarTogglePresent()) }
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(check) }
-    check()
-    const mo = new MutationObserver(schedule)
-    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] })
-    return () => { mo.disconnect(); if (raf) cancelAnimationFrame(raf) }
-  }, [])
-  return present
-}
-
+// The app keeps its titlebar cluster on a contributed full page only while the
+// page mounts nothing into the titleBar band (hidesFixedTitlebarClusters +
+// pageOwnsTitlebar in the app's titlebar-controls). This plugin claims no
+// chrome there, but another claimed band hides the toggle on OUR route too, and
+// the SDK offers no queryable signal for that. So the page keeps its own
+// affordance instead of reading app DOM (catalog rule 8): a mounted, always-on
+// stand-in in the page's own header row. With the cluster up it reads as part
+// of the header grid — the redirect Tip says what changed.
 function SidebarButton() {
-  const appHasToggle = useAppTitlebarToggle()
-  if (!ctxRunAction || appHasToggle) return null
+  if (!ctxRunAction) return null
   return jsx(Tip, {
     label: 'Show or hide the sidebar (Ctrl+B)',
     children: jsx(Button, {
@@ -756,13 +736,22 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
   const best = scores.length ? Math.max(...scores) : null
   const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
 
+  // A route this build asks for and the server does not serve means the dashboard is
+  // still running the plugin it loaded at boot — its Python routes are mounted once, so a
+  // plugin updated on disk keeps answering with the old route table. The bare "Not Found"
+  // that comes back is a restart instruction, not a bug report.
+  const routeGone = 'the dashboard is running an older build of this plugin — restart the dashboard, then retry'
+  const failed = (what, e) => {
+    const msg = String(e?.message ?? e)
+    return /(^|[^0-9])404([^0-9]|$)|not found/i.test(msg) ? `${what} failed: ${routeGone}` : `${what} failed: ${msg}`
+  }
   const del = async id => {
     setBusy(true)
     try {
       await rest(`/attempts/${id}`, { method: 'DELETE' })
       setConfirmDel(null)
       qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
-    } catch (e) { host.notifyError?.(`Delete failed: ${e?.message || e}`) }
+    } catch (e) { host.notifyError?.(failed('Delete', e)) }
     setBusy(false)
   }
   const clearDiscarded = async () => {
@@ -770,7 +759,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
     try {
       await rest('/attempts/prune', { method: 'POST', body: { exam_id: pack.exam_id } })
       qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
-    } catch (e) { host.notifyError?.(`Clear failed: ${e?.message || e}`) }
+    } catch (e) { host.notifyError?.(failed('Clear', e)) }
     setBusy(false)
   }
 
@@ -973,7 +962,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
       children: [
         jsxs(DialogHeader, { children: [
           jsx(DialogTitle, { children: 'Submit the paper?' }),
-          jsx(DialogDescription, { children: 'This cannot be undone.' }),
+          jsx(DialogDescription, { className: 'cbt-desc', children: 'This cannot be undone.' }),
         ] }),
         jsxs('div', { className: 'cbt-row cbt-gap-sm', children: [
           jsx(Badge, { variant: 'outline', children: `${totals.total} questions` }),
@@ -1459,7 +1448,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         children: [
           jsxs(DialogHeader, { children: [
             jsx(DialogTitle, { children: pack.title || pack.exam_id }),
-            jsx(DialogDescription, { children: 'A read-only copy of the paper. Close with Esc.' }),
+            jsx(DialogDescription, { className: 'cbt-desc', children: 'A read-only copy of the paper. Close with Esc.' }),
           ] }),
           ...sections.map(s => jsxs('div', { key: s.id, children: [
             jsx('h3', { children: s.title }),
