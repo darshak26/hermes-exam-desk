@@ -57,6 +57,8 @@ const CSS = `
 .cbt-dlg th:last-child,.cbt-dlg td:last-child{padding-right:0}
 .cbt-dlg tbody tr:last-child td{border-bottom:0}
 .cbt-dlg .num{text-align:right;font-variant-numeric:tabular-nums;width:86px}
+/* submit-dialog section counts — Section | Answered | Marked | Blank | Not visited */
+.cbt-dlg .cbt-stats th:nth-child(n+2),.cbt-dlg .cbt-stats td:nth-child(n+2){width:88px}
 .cbt-dlg .cbt-paper-q{margin:8px 0}
 .cbt-dlg .cbt-paper-q p{font-size:13px;margin:0}
 
@@ -89,9 +91,8 @@ const CSS = `
 .cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
 .cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
 .cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
-/* submit-dialog section counts — Section | Answered | Marked | Blank | Not visited */
-.cbt .cbt-stats{table-layout:fixed}
-.cbt .cbt-stats th:nth-child(n+2),.cbt .cbt-stats td:nth-child(n+2){width:88px}
+/* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
+   .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
 /* home: a paper and its history */
 .cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
