@@ -92,7 +92,7 @@ const CSS = `
 .cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
 .cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
 /* result page: score strip on the left, the four verdict tiles on the right */
-.cbt .cbt-score-strip{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:8px}
+.cbt .cbt-score-strip{display:flex;align-items:flex-end;gap:40px;flex-wrap:wrap;margin-bottom:8px}
 .cbt .cbt-score-strip .cbt-score{margin:2px 0 4px}
 .cbt .cbt-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(80px,1fr));gap:8px}
 .cbt .cbt-stat{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
@@ -100,7 +100,10 @@ const CSS = `
 .cbt .cbt-stat .v{font-size:16px;line-height:1.25;font-weight:600;font-variant-numeric:tabular-nums}
 .cbt .cbt-stat.correct .v{color:var(--ui-success)}
 .cbt .cbt-stat.wrong .v{color:var(--ui-red)}
-/* evaluation blocks reuse the how-it-works card: label row, hairline, body row */
+/* evaluation blocks reuse the how-it-works card: label row, hairline, body row.
+   Prose caps at the same measure as the review body, so a long comment does not
+   run the full width of a 1440px window. */
+.cbt .cbt-eval{max-width:820px}
 .cbt .cbt-eval-title{font-size:12px;font-weight:600;color:var(--ui-text-secondary)}
 .cbt .cbt-eval-body{font-size:12.5px;line-height:1.55}
 .cbt .cbt-lead-row{justify-content:space-between;gap:16px}
@@ -1554,7 +1557,7 @@ function evaluationCard(d, pack) {
   const topics = d.weak_topics || []
   const notes = d.wrong_answer_notes || []
   const plan = d.study_plan || []
-  return jsxs('div', { children: [
+  return jsxs('div', { className: 'cbt-eval', children: [
     d.overall_comment
       ? jsxs('div', { className: 'cbt-how', children: [
           jsx('div', { className: 'cbt-how-row', children: d.overall_comment }),
@@ -1667,7 +1670,15 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       jsxs('div', { children: [
         jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
         jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
-        jsx('div', { className: 'cbt-sub', children: `${r.totals.correct} of ${total} correct · ${pct}%` }),
+        jsx('div', { className: 'cbt-sub', children: [
+          `${r.totals.correct} of ${total} correct · ${pct}%`,
+          (() => {
+            // marking can be set on the pattern or overridden per section; show the one
+            // that actually applied to this paper
+            const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
+            return w < 0 ? ` · ${w} per wrong answer` : ''
+          })(),
+        ] }),
       ] }),
       jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
         jsxs('div', { className: `cbt-stat ${k}`, children: [
@@ -1682,7 +1693,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         const st = r.sections[s.id] || {}
         return jsxs('tr', { key: s.id, children: [
           jsx('td', { children: s.title }),
-          jsx('td', { className: 'num', children: String(st.score ?? '—') }),
+          jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: String(st.score ?? '—') }),
           jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
           jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
           jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
