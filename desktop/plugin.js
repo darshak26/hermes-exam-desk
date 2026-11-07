@@ -91,9 +91,11 @@ const CSS = `
 .cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
 .cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
 .cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
-/* result page: score strip on the left, the four verdict tiles on the right */
-.cbt .cbt-score-strip{display:flex;align-items:center;gap:40px;flex-wrap:wrap;margin-bottom:8px}
-.cbt .cbt-score-strip .cbt-score{margin:2px 0 4px}
+/* result page: SCORE label, then the number and the four verdict tiles on one
+   centred row, then the caption — so tiles centre on the number, not the column */
+.cbt .cbt-score-strip{margin-bottom:8px}
+.cbt .cbt-score-row{display:flex;align-items:center;gap:40px;flex-wrap:wrap}
+.cbt .cbt-score-row .cbt-score{margin:0}
 .cbt .cbt-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(80px,1fr));gap:8px}
 .cbt .cbt-stat{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
 .cbt .cbt-stat .k{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);white-space:nowrap}
@@ -1667,24 +1669,24 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     ] }),
     jsx(Separator, { className: 'cbt-sep' }),
     jsxs('div', { className: 'cbt-score-strip', children: [
-      jsxs('div', { children: [
-        jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
+      jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
+      jsxs('div', { className: 'cbt-score-row', children: [
         jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
-        jsx('div', { className: 'cbt-sub', children: [
-          `${r.totals.correct} of ${total} correct · ${pct}%`,
-          (() => {
-            // marking can be set on the pattern or overridden per section; show the one
-            // that actually applied to this paper
-            const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
-            return w < 0 ? ` · ${w} per wrong answer` : ''
-          })(),
-        ] }),
+        jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
+          jsxs('div', { className: `cbt-stat ${k}`, children: [
+            jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
+            jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
+          ] }, k)) }),
       ] }),
-      jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
-        jsxs('div', { className: `cbt-stat ${k}`, children: [
-          jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
-          jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
-        ] }, k)) }),
+      jsx('div', { className: 'cbt-sub', children: [
+        `${r.totals.correct} of ${total} correct · ${pct}%`,
+        (() => {
+          // marking can be set on the pattern or overridden per section; show the one
+          // that actually applied to this paper
+          const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
+          return w < 0 ? ` · ${w} per wrong answer` : ''
+        })(),
+      ] }),
     ] }),
     pack.pattern.sections.length > 1 ? jsx('div', { className: 'cbt-section', children: 'Sections' }) : null,
     pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
