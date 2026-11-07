@@ -34,6 +34,14 @@ const CSS = `
 .cbt .cbt-keys{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ui-text-secondary)}
 .cbt .cbt-loading{display:flex;align-items:center;gap:6px;color:var(--ui-text-secondary)}
 .cbt .cbt-error{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:8px 0}
+/* instructions page: meta chips, section labels, hairline-divided guidance rows */
+.cbt .cbt-sep{margin:16px 0}
+.cbt .cbt-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.cbt .cbt-section{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);margin:24px 0 8px}
+.cbt .cbt-how{border:1px solid var(--ui-stroke-secondary);border-radius:8px;overflow:hidden}
+.cbt .cbt-how-row{padding:9px 12px;font-size:12.5px;line-height:1.55;color:var(--ui-text-primary)}
+.cbt .cbt-how-row+.cbt-how-row{border-top:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-keys{margin-top:16px}
 
 /* Dialogs are portalled to the document body, so they are NOT inside .cbt and every
    .cbt-scoped rule above stops at the dialog edge. These rules hang off .cbt-dlg
@@ -665,16 +673,23 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
   }
   const marks = marksLabel(pack.pattern.sections[0] || {}, pack.pattern)
+  const duration = `${hours ? hours + ' h ' : ''}${mins} min`
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
       jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
     ] }),
-    jsx('p', { className: 'cbt-sub', children: `Duration ${hours ? hours + ' h ' : ''}${mins} min · ${pack.questions.length} questions · ${types.map(t => QTYPE_LABEL[t] || t).join(' + ')}${marks ? ` · ${marks}` : ''}` }),
-    jsx('h3', { children: 'Pattern' }),
+    jsx(Separator, { className: 'cbt-sep' }),
+    jsxs('div', { className: 'cbt-meta', children: [
+      jsx(Badge, { variant: 'outline', children: duration }),
+      jsx(Badge, { variant: 'outline', children: `${pack.questions.length} questions` }),
+      types.map(t => jsx(Badge, { variant: 'outline', key: t, children: QTYPE_LABEL[t] || t })),
+      marks ? jsx(Badge, { variant: 'outline', children: marks }) : null,
+    ] }),
+    jsx('div', { className: 'cbt-section', children: 'Pattern' }),
     jsxs('table', { className: 'cbt-table', children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Questions', 'To attempt', 'Marks'].map(h => jsx('th', { key: h, children: h })) }) }),
+      jsx('thead', { children: jsx('tr', { children: ['Section', 'Questions', 'To attempt', 'Marks'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => jsxs('tr', { key: s.id, children: [
         jsx('td', { children: s.title }),
         jsx('td', { className: 'num', children: String(s.question_count) }),
@@ -682,20 +697,22 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
         jsx('td', { className: 'num', children: marksLabel(s, pack.pattern) }),
       ] })) }),
     ] }),
-    jsx('h3', { children: 'How the paper works' }),
-    jsx('ul', { className: 'cbt-list', children: [
+    jsx(Separator, { className: 'cbt-sep' }),
+    jsx('div', { className: 'cbt-section', children: 'How the paper works' }),
+    jsx('div', { className: 'cbt-how', children: [
       'Select an answer, then Save to stay or Save & Next to move on. Leaving a question without saving keeps the pick on screen but does not record it.',
       'Only answers are evaluated — marking a question for review without answering it does not score.',
       'The question map shows each question’s state; click a number to jump there.',
-      `The timer starts when you begin and runs ${hours ? hours + ' h ' : ''}${mins} min. At zero the paper submits itself.`,
+      `The timer starts when you begin and runs ${duration}. At zero the paper submits itself.`,
       mode === 'assisted'
         ? 'The paper opens in a pane beside your chat, so you can ask doubts while you work.'
         : 'Full page, nothing else competing for the screen. Start an assisted attempt instead if you want the chat beside the paper.',
-    ].map((t, i) => jsx('li', { key: i, children: t })) }),
+    ].map((t, i) => jsx('div', { className: 'cbt-how-row', key: i, children: t })) }),
     jsxs('div', { className: 'cbt-row', style: { marginTop: 24 }, children: [
       jsx(Button, { variant: 'default', size: 'default', loading: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
       jsx(Button, { variant: 'ghost', size: 'default', disabled: starting, onClick: onBack, children: 'Back' }),
     ] }),
+    jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
     jsxs('div', { className: 'cbt-keys', children: [
       'Keys inside the paper: ',
       jsx(Kbd, { children: '1–9' }), ' answer · ',
