@@ -90,6 +90,9 @@ const CSS = `
 .cbt .opt:hover{background:var(--chrome-action-hover)}
 .cbt .opt.sel{border-color:var(--ui-accent)}
 .cbt .opt-body{display:flex;flex-direction:column;gap:8px;min-width:0}
+/* the control is 13px against a 13px×1.5 line box: align its middle to the FIRST
+   line of the option, not the row's top edge — a wrapped option keeps it on line 1 */
+.cbt .opt input{flex:0 0 auto;margin:3px 0 0}
 .cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap}
 .cbt .cbt-review-body{padding:8px 0 12px 20px;max-width:820px}
 .cbt .cbt-ans{display:flex;gap:8px;font-size:13px;margin-top:4px}
