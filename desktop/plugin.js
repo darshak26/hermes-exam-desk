@@ -116,6 +116,22 @@ const CSS = `
 .cbt .cbt-plan{margin:0;padding-left:20px}
 .cbt .cbt-plan li{margin:0 0 6px}
 .cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
+/* result page: the whole window, not a 1040px ribbon. Score and the sections table
+   share one band (they are 1fr + 640px), so a 160-question paper does not push the
+   review a full screen down. Below 1180px the two cells stack. */
+.cbt.cbt-result > *{max-width:1280px}
+.cbt .cbt-result-top{display:grid;grid-template-columns:minmax(0,1fr) 640px;gap:32px;align-items:start}
+.cbt .cbt-result-top.one-col{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1180px){.cbt .cbt-result-top{grid-template-columns:minmax(0,1fr);gap:0}}
+/* review pager: 20 rows a page keeps the page finite whatever the paper size */
+.cbt .cbt-pager{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
+.cbt .cbt-pager .cbt-pager-sp{flex:1}
+/* evaluation notes: the first few, the rest behind a count — a 160-question attempt
+   can carry ~94 notes, which is a screenful of prose on its own */
+.cbt .cbt-more{padding:9px 12px;font-size:12px;color:var(--ui-text-secondary);border-top:1px solid var(--ui-stroke-secondary);display:flex;align-items:center;gap:8px}
+.cbt .cbt-more button{font:inherit;color:var(--ui-accent);background:none;border:0;padding:0;cursor:pointer}
+.cbt .cbt-more button:hover{text-decoration:underline}
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
@@ -1556,13 +1572,18 @@ function evalSectionTitle(pack, id) {
 }
 
 const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
+// A 160-question attempt can carry ~94 notes; six of them is already a screenful, so
+// the rest sit behind a count the reader can open.
+const NOTES_OPEN = 6
 
 function evaluationCard(d, pack) {
+  const [showAllNotes, setShowAllNotes] = useState(false)
   if (!d) return null
   const sections = d.sections || []
   const topics = d.weak_topics || []
   const notes = d.wrong_answer_notes || []
   const plan = d.study_plan || []
+  const shownNotes = showAllNotes ? notes : notes.slice(0, NOTES_OPEN)
   return jsxs('div', { className: 'cbt-eval', children: [
     d.overall_comment
       ? jsxs('div', { className: 'cbt-how', children: [
@@ -1592,11 +1613,24 @@ function evaluationCard(d, pack) {
     notes.length
       ? jsxs('div', { children: [
           jsx('div', { className: 'cbt-section', children: 'Where it slipped' }),
-          jsx('div', { className: 'cbt-how', children: notes.map((n, i) =>
-            jsxs('div', { className: 'cbt-how-row', key: i, children: [
-              jsx('div', { className: 'cbt-eval-title', children: n.question_id }),
-              jsx('div', { className: 'cbt-eval-body', children: n.note }),
-            ] })) }),
+          jsxs('div', { className: 'cbt-how', children: [
+            shownNotes.map((n, i) =>
+              jsxs('div', { className: 'cbt-how-row', key: n.question_id || i, children: [
+                jsx('div', { className: 'cbt-eval-title', children: n.question_id }),
+                jsx('div', { className: 'cbt-eval-body', children: n.note }),
+              ] })),
+            notes.length > NOTES_OPEN
+              ? jsx('div', { className: 'cbt-more', children:
+                  jsx('button', {
+                    type: 'button',
+                    'aria-expanded': showAllNotes,
+                    onClick: () => setShowAllNotes(v => !v),
+                    children: showAllNotes
+                      ? 'Show fewer'
+                      : `Show all ${notes.length} notes`,
+                  }) })
+              : null,
+          ] }),
         ] })
       : null,
     plan.length
@@ -1613,6 +1647,9 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const qc = useQueryClient()
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(null)
+  // A real paper is 160 questions: rendering every review row at once made the page
+  // 6,000 px tall. Twenty a page keeps it finite and keeps the pager on screen.
+  const [page, setPage] = useState(0)
   const [evalBusy, setEvalBusy] = useState(false)
   const [evalError, setEvalError] = useState(null)
   const [evalTried, setEvalTried] = useState(false)
@@ -1669,9 +1706,17 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const maxTotal = r.questions.reduce((n, row) => n + marksOf(row), 0)
   const penalties = [...new Set(pack.pattern.sections.map(s => s.marks_wrong).filter(w => typeof w === 'number'))]
   const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
+  // 25 a page: a 160-question review is 7 pages of 25 rows instead of one 5,800 px list,
+  // and an ordinary 37-question paper still reads in two short screens.
+  const REVIEW_PAGE = 25
+  const pageCount = Math.max(1, Math.ceil(rows.length / REVIEW_PAGE))
+  const safePage = Math.min(page, pageCount - 1)
+  const shownFrom = safePage * REVIEW_PAGE
+  const shownTo = Math.min(shownFrom + REVIEW_PAGE, rows.length)
+  const pageRows = rows.slice(shownFrom, shownTo)
   const total = (r.totals.correct || 0) + (r.totals.wrong || 0) + (r.totals.skipped || 0) + (r.totals.not_counted || 0)
   const pct = total ? Math.round((1000 * (r.totals.correct || 0)) / total) / 10 : 0
-  return jsxs('div', { className: 'cbt cbt-page', children: [
+  return jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
       jsx('h2', { children: pack.title || pack.exam_id }),
@@ -1684,55 +1729,64 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
     ] }),
     jsx(Separator, { className: 'cbt-sep' }),
-    jsxs('div', { className: 'cbt-score-strip', children: [
-      jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
-      jsxs('div', { className: 'cbt-score-row', children: [
-        jsxs('div', { className: 'cbt-score-pair', children: [
-          jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
-          maxTotal ? jsx('span', { className: 'cbt-score-max', children: `/ ${maxTotal}` }) : null,
-        ] }),
-        jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
-          jsxs('div', { className: `cbt-stat ${k}`, children: [
-            jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
-            jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
-          ] }, k)) }),
-      ] }),
-      jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: [
-        `${r.totals.correct} of ${total} questions correct · ${pct}%`,
-        penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
-        penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
-      ] }),
-    ] }),
-    pack.pattern.sections.length > 1 ? jsx('div', { className: 'cbt-section', children: 'Sections' }) : null,
-    pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
-        ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
-        : h })) }) }),
-      jsx('tbody', { children: pack.pattern.sections.map(s => {
-        const st = r.sections[s.id] || {}
-        return jsxs('tr', { key: s.id, children: [
-          jsxs('td', { children: [
-            jsx(Badge, { variant: 'outline', size: 'xs', children: s.id }),
-            ' ',
-            s.title,
+    // One band: score on the left, sections on the right. A 160-question paper's table
+    // is three rows tall, so stacking it under the score cost a screen of height for
+    // nothing.
+    jsxs('div', { className: `cbt-result-top${pack.pattern.sections.length > 1 ? '' : ' one-col'}`, children: [
+      jsxs('div', { className: 'cbt-score-strip', children: [
+        jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
+        jsxs('div', { className: 'cbt-score-row', children: [
+          jsxs('div', { className: 'cbt-score-pair', children: [
+            jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+            maxTotal ? jsx('span', { className: 'cbt-score-max', children: `/ ${maxTotal}` }) : null,
           ] }),
-          jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: st.score == null ? '—' : fmtScore(st.score) }),
-          jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
-          jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
-          jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
-          jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
-          jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
-        ] })
-      }) }),
-      jsx('tfoot', { children: jsxs('tr', { children: [
-        jsx('td', { children: 'Total' }),
-        jsx('td', { className: 'num', children: fmtScore(r.score) }),
-        jsx('td', { className: 'num', children: String(maxTotal || '—') }),
-        jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
-        jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
-        jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
-        jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
-      ] }) }),
+          jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
+            jsxs('div', { className: `cbt-stat ${k}`, children: [
+              jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
+              jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
+            ] }, k)) }),
+        ] }),
+        jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: [
+          `${r.totals.correct} of ${total} questions correct · ${pct}%`,
+          penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
+          penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
+        ] }),
+      ] }),
+      pack.pattern.sections.length > 1
+        ? jsxs('div', { children: [
+            jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Sections' }),
+            jsxs('table', { className: 'cbt-table cbt-sec', children: [
+              jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
+                ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
+                : h })) }) }),
+              jsx('tbody', { children: pack.pattern.sections.map(s => {
+                const st = r.sections[s.id] || {}
+                return jsxs('tr', { key: s.id, children: [
+                  jsxs('td', { children: [
+                    jsx(Badge, { variant: 'outline', size: 'xs', children: s.id }),
+                    ' ',
+                    s.title,
+                  ] }),
+                  jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: st.score == null ? '—' : fmtScore(st.score) }),
+                  jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
+                  jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
+                  jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
+                  jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
+                  jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
+                ] })
+              }) }),
+              jsx('tfoot', { children: jsxs('tr', { children: [
+                jsx('td', { children: 'Total' }),
+                jsx('td', { className: 'num', children: fmtScore(r.score) }),
+                jsx('td', { className: 'num', children: String(maxTotal || '—') }),
+                jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
+                jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
+                jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
+                jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
+              ] }) }),
+            ] }),
+          ] })
+        : null,
     ] }),
     jsx(Separator, { className: 'cbt-sep' }),
     jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI evaluation' }),
@@ -1762,7 +1816,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
                 ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginBottom: 12 }, children:
                     `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
                 : null,
-              evaluationCard(attempt.evaluation.data, pack),
+              jsx(evaluationCard, { d: attempt.evaluation.data, pack }),
               jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
                 jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                 jsx('span', { style: { flex: 1 } }),
@@ -1778,11 +1832,13 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
     jsxs('div', { className: 'cbt-row', children: [
       jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Review' }),
-      jsx('span', { className: 'cbt-sub', children: `${rows.length} shown` }),
+      jsx('span', { className: 'cbt-sub', children: rows.length
+        ? `${shownFrom + 1}–${shownTo} of ${rows.length}`
+        : 'nothing here' }),
       jsx('span', { style: { flex: 1 } }),
       jsx(SegmentedControl, {
         value: filter,
-        onChange: f => setFilter(f),
+        onChange: f => { setFilter(f); setPage(0); setOpen(null) },
         sizing: 'content',
         options: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) => ({
           id: f,
@@ -1790,7 +1846,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         })),
       }),
     ] }),
-    jsx('div', { style: { marginTop: 8 }, children: rows.map(row => {
+    jsx('div', { style: { marginTop: 8 }, children: pageRows.map(row => {
       const qq = qmap[row.id]
       const expanded = open === row.id
       const isMarked = (attempt.marked || []).includes(row.id)
@@ -1837,6 +1893,22 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         ] }),
       ] })
     }) }),
+    pageCount > 1
+      ? jsxs('div', { className: 'cbt-pager', children: [
+          jsx(Button, {
+            variant: 'outline', size: 'sm', disabled: safePage === 0,
+            onClick: () => { setPage(Math.max(0, safePage - 1)); setOpen(null) },
+            children: 'Previous',
+          }),
+          jsx('span', { className: 'cbt-pager-n', children: `Page ${safePage + 1} of ${pageCount}` }),
+          jsx('span', { className: 'cbt-pager-sp' }),
+          jsx(Button, {
+            variant: 'outline', size: 'sm', disabled: safePage >= pageCount - 1,
+            onClick: () => { setPage(Math.min(pageCount - 1, safePage + 1)); setOpen(null) },
+            children: 'Next',
+          }),
+        ] })
+      : null,
   ] })
 }
 
