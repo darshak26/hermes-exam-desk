@@ -84,13 +84,17 @@ const CSS = `
 /* instructions pattern — Section | Questions | To attempt | Marks */
 .cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:520px}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
-/* result sections — Section | Score | Correct | Wrong | Skipped | Not counted */
-.cbt .cbt-sec{table-layout:fixed;width:auto;min-width:560px}
-.cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:76px}
-.cbt .cbt-sec th:nth-child(3),.cbt .cbt-sec td:nth-child(3){width:72px}
-.cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
-.cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
-.cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
+/* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
+.cbt .cbt-sec{table-layout:fixed;width:auto;min-width:620px}
+.cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:72px}
+.cbt .cbt-sec th:nth-child(3),.cbt .cbt-sec td:nth-child(3){width:64px}
+.cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:72px}
+.cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:68px}
+.cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:76px}
+.cbt .cbt-sec th:nth-child(7),.cbt .cbt-sec td:nth-child(7){width:96px}
+/* the score pair: the number, then its ceiling in a lighter weight */
+.cbt .cbt-score-pair{display:flex;align-items:baseline;gap:8px}
+.cbt .cbt-score-max{font-size:19px;font-weight:600;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
 /* result page: SCORE label, then the number and the four verdict tiles on one
    centred row, then the caption — so tiles centre on the number, not the column */
 .cbt .cbt-score-strip{margin-bottom:8px}
@@ -1652,6 +1656,13 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   }
   const r = attempt.result
   const qmap = Object.fromEntries(pack.questions.map(x => [x.id, x]))
+  // Full marks per section, from the marking each question actually carried. A row the
+  // grader left out ('not counted') contributes nothing, so the ceiling matches the score.
+  const marksOf = row => (row.verdict === 'not_counted' ? 0 : (Array.isArray(row.marks) ? row.marks[0] : 0))
+  const maxBySection = {}
+  for (const row of r.questions) maxBySection[row.section] = (maxBySection[row.section] || 0) + marksOf(row)
+  const maxTotal = r.questions.reduce((n, row) => n + marksOf(row), 0)
+  const penalties = [...new Set(pack.pattern.sections.map(s => s.marks_wrong).filter(w => typeof w === 'number'))]
   const rows = r.questions.filter(row => filter === 'all' || row.verdict === filter)
   const total = (r.totals.correct || 0) + (r.totals.wrong || 0) + (r.totals.skipped || 0) + (r.totals.not_counted || 0)
   const pct = total ? Math.round((1000 * (r.totals.correct || 0)) / total) / 10 : 0
@@ -1671,7 +1682,10 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     jsxs('div', { className: 'cbt-score-strip', children: [
       jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
       jsxs('div', { className: 'cbt-score-row', children: [
-        jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+        jsxs('div', { className: 'cbt-score-pair', children: [
+          jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+          maxTotal ? jsx('span', { className: 'cbt-score-max', children: `/ ${maxTotal}` }) : null,
+        ] }),
         jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
           jsxs('div', { className: `cbt-stat ${k}`, children: [
             jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
@@ -1679,23 +1693,20 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           ] }, k)) }),
       ] }),
       jsx('div', { className: 'cbt-sub', children: [
-        `${r.totals.correct} of ${total} correct · ${pct}%`,
-        (() => {
-          // marking can be set on the pattern or overridden per section; show the one
-          // that actually applied to this paper
-          const w = pack.pattern?.marks_wrong ?? pack.pattern?.sections?.[0]?.marks_wrong
-          return w < 0 ? ` · ${w} per wrong answer` : ''
-        })(),
+        `${r.totals.correct} of ${total} questions correct · ${pct}%`,
+        penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
+        penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
       ] }),
     ] }),
     pack.pattern.sections.length > 1 ? jsx('div', { className: 'cbt-section', children: 'Sections' }) : null,
     pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
+      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => {
         const st = r.sections[s.id] || {}
         return jsxs('tr', { key: s.id, children: [
           jsx('td', { children: s.title }),
           jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: String(st.score ?? '—') }),
+          jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
           jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
           jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
           jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
@@ -1705,6 +1716,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       jsx('tfoot', { children: jsxs('tr', { children: [
         jsx('td', { children: 'Total' }),
         jsx('td', { className: 'num', children: fmtScore(r.score) }),
+        jsx('td', { className: 'num', children: String(maxTotal || '—') }),
         jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
         jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
         jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
