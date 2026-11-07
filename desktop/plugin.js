@@ -2,7 +2,7 @@
 import {
   host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient,
   Badge, Button, Codicon, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  EmptyState, Kbd, SegmentedControl, Tip, icons,
+  EmptyState, Kbd, SegmentedControl, Separator, Tip, icons,
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
