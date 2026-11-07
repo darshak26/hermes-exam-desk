@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import grading, pack as pack_mod
 
-ENV_DATA_DIR = "CBT_EXAM_DATA_DIR"
+ENV_DATA_DIR = "EXAM_DESK_DATA_DIR"
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -34,7 +34,7 @@ def _root_for(override):
     if override:
         return Path(override)
     from plugins.plugin_storage import plugin_data_dir
-    return plugin_data_dir("cbt-exam")
+    return plugin_data_dir("exam-desk")
 
 
 def data_root():

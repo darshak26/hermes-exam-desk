@@ -1,4 +1,4 @@
-# cbt-exam
+# Exam Desk
 
 Exam-agnostic CBT practice panel for Hermes Desktop. Built with Hermes Agent:
 the panel, the backend and both skills were written in an agent session, and the
@@ -10,15 +10,15 @@ Three parts:
 
 | Part | File | Job |
 |---|---|---|
-| Desktop panel | `desktop/plugin.js` | route `/cbt` — home, instructions, exam shell, result |
-| Dashboard API | `dashboard/plugin_api.py` | mounted at `/api/plugins/cbt-exam/*` |
+| Desktop panel | `desktop/plugin.js` | route `/exam-desk` — home, instructions, exam shell, result |
+| Dashboard API | `dashboard/plugin_api.py` | mounted at `/api/plugins/exam-desk/*` |
 | Agent half | `__init__.py` + `skills/` | bundles `pyq-sourcing` and `exam-assist`, exposes the plugin `ctx` for the LLM bridge |
 
 ## Install
 
 > **The repo is private while it is being built.** Installing from it needs access —
 > authenticate first (`gh auth login`, or an SSH key GitHub knows), or clone it and
-> install from the local path (`hermes plugins install file:///path/to/hermes-cbt-exam`).
+> install from the local path (`hermes plugins install file:///path/to/hermes-exam-desk`).
 > Nothing below is reachable for someone without that access.
 
 Two halves, and they install in different places — this trips people up, so read both.
@@ -26,8 +26,8 @@ Two halves, and they install in different places — this trips people up, so re
 **1. The agent half** (API routes, pack store, the two skills) goes where Hermes runs:
 
 ```bash
-hermes plugins install https://github.com/darshak26/hermes-cbt-exam
-hermes plugins enable cbt-exam
+hermes plugins install https://github.com/darshak26/hermes-exam-desk
+hermes plugins enable exam-desk
 ```
 
 The skills load on the next gateway start. `hermes gateway restart` is the clean way;
@@ -45,8 +45,8 @@ long enough to reconnect). The panel's buttons say this instead of showing a bar
 on purpose** — a dropped package stays inert until you say otherwise:
 
 - **Hermes on this machine:** it is already copied to
-  `~/.hermes/desktop-plugins/cbt-exam/`. Open **Capabilities → Plugins**, find
-  *CBT Exams* under Desktop, and enable it.
+  `~/.hermes/desktop-plugins/exam-desk/`. Open **Capabilities → Plugins**, find
+  *Exam Desk* under Desktop, and enable it.
 - **Hermes on another machine** (a VPS, with the desktop app on your laptop): the
   app's copy does not exist yet — the Plugins page shows *unavailable (remote
   backend)*. Install again from the app with **Desktop** as the target
@@ -54,7 +54,7 @@ on purpose** — a dropped package stays inert until you say otherwise:
   with the desktop component checked). Enabling it on the server does not help; the
   panel runs in the app's renderer.
 
-Then open **CBT Exams** in the sidebar, or ⌘K → *Open CBT Exams*.
+Then open **Exam Desk** in the sidebar, or ⌘K → *Open Exam Desk*.
 
 ## First run
 
@@ -64,14 +64,14 @@ numerical, marking on. Use it to see how the timer, palette and result page beha
 then delete it.
 
 For real papers, click **Source more papers**: it opens a chat and the agent runs
-`cbt-exam:pyq-sourcing` — it asks which exam and which year (one question at a time),
+`exam-desk:pyq-sourcing` — it asks which exam and which year (one question at a time),
 finds the official paper, extracts the questions, validates and files them. That
 needs web tools enabled on the agent; without them, write a pack by hand against
 `skills/pyq-sourcing/references/pack-schema.md` and drop it in the packs directory.
 
 ## Packs
 
-`~/.hermes/plugin-data/cbt-exam/packs/<exam_id>.json` (or `$CBT_EXAM_DATA_DIR`).
+`~/.hermes/plugin-data/exam-desk/packs/<exam_id>.json` (or `$EXAM_DESK_DATA_DIR`).
 Schema and every rule the grader enforces: `skills/pyq-sourcing/references/pack-schema.md`.
 
 ```bash

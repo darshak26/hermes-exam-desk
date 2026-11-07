@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-os.environ.setdefault("CBT_EXAM_DATA_DIR", tempfile.mkdtemp(prefix="cbt-reg-"))
+os.environ.setdefault("EXAM_DESK_DATA_DIR", tempfile.mkdtemp(prefix="cbt-reg-"))
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "dashboard"))
 
@@ -21,13 +21,13 @@ import plugin_api                                    # noqa: E402
 from fastapi import FastAPI                          # noqa: E402
 from fastapi.testclient import TestClient            # noqa: E402
 
-from cbt_exam import grading, pack as pack_mod, store  # noqa: E402
+from exam_desk import grading, pack as pack_mod, store  # noqa: E402
 from tests.helpers import base_pack                   # noqa: E402
 
 app = FastAPI()
 app.include_router(plugin_api.router)
 client = TestClient(app, raise_server_exceptions=False)
-DATA = Path(os.environ["CBT_EXAM_DATA_DIR"])
+DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 
 def write_pack(pack, name=None):
@@ -55,8 +55,8 @@ def big_pack(count=160):
 
 class Base(unittest.TestCase):
     def setUp(self):
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
         for p in DATA.rglob("*"):
             if p.is_file():
                 p.unlink()
@@ -65,7 +65,7 @@ class Base(unittest.TestCase):
 
     def tearDown(self):
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
     def start(self, mode="exam", exam="gat-b-demo"):
         r = client.post("/attempts", json={"exam_id": exam, "mode": mode})
@@ -178,8 +178,8 @@ class SeedPacks(Base):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         with tempfile.TemporaryDirectory() as tmp:
-            old = os.environ.get("CBT_EXAM_DATA_DIR")
-            os.environ["CBT_EXAM_DATA_DIR"] = tmp
+            old = os.environ.get("EXAM_DESK_DATA_DIR")
+            os.environ["EXAM_DESK_DATA_DIR"] = tmp
             try:
                 mod._seed_packs()
                 target = Path(tmp) / "packs" / "demo-basics.json"
@@ -189,9 +189,9 @@ class SeedPacks(Base):
                 self.assertEqual(target.read_text(), '{"mine": true}')
             finally:
                 if old is None:
-                    os.environ.pop("CBT_EXAM_DATA_DIR", None)
+                    os.environ.pop("EXAM_DESK_DATA_DIR", None)
                 else:
-                    os.environ["CBT_EXAM_DATA_DIR"] = old
+                    os.environ["EXAM_DESK_DATA_DIR"] = old
 
 
 class AnswerSemantics(Base):
@@ -372,9 +372,9 @@ class Evaluation(Base):
                     "weak_topics": [], "wrong_answer_notes": [], "study_plan": ["revise"]},
                     model="m", provider="p")
 
-        m = types.ModuleType("cbt_exam_ctx_bridge")
+        m = types.ModuleType("exam_desk_ctx_bridge")
         setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
-        sys.modules["cbt_exam_ctx_bridge"] = m
+        sys.modules["exam_desk_ctx_bridge"] = m
         try:
             aid = self.start()
             client.post(f"/attempts/{aid}/submit")
@@ -384,7 +384,7 @@ class Evaluation(Base):
             client.post(f"/attempts/{aid}/evaluate?force=true")
             self.assertEqual(len(calls), 2)
         finally:
-            sys.modules.pop("cbt_exam_ctx_bridge", None)
+            sys.modules.pop("exam_desk_ctx_bridge", None)
 
     def _fake_llm(self, behaviour):
         """Install a fake bridge for the duration of one test."""
@@ -396,10 +396,10 @@ class Evaluation(Base):
                 calls.append(kw)
                 return behaviour(kw)
 
-        m = types.ModuleType("cbt_exam_ctx_bridge")
+        m = types.ModuleType("exam_desk_ctx_bridge")
         setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
-        sys.modules["cbt_exam_ctx_bridge"] = m
-        self.addCleanup(lambda: sys.modules.pop("cbt_exam_ctx_bridge", None))
+        sys.modules["exam_desk_ctx_bridge"] = m
+        self.addCleanup(lambda: sys.modules.pop("exam_desk_ctx_bridge", None))
         return calls
 
     GOOD = {"overall_comment": "ok", "sections": [{"section_id": "A", "comment": "c"}],

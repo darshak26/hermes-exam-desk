@@ -1,5 +1,5 @@
 """Shared test fixtures."""
-from cbt_exam.pack import SCHEMA
+from exam_desk.pack import SCHEMA
 
 
 def base_pack():

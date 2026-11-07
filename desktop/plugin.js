@@ -1,4 +1,4 @@
-// cbt-exam — exam-agnostic CBT practice panel (route /cbt)
+// exam-desk — exam-agnostic CBT practice panel (route /exam-desk)
 import {
   host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient,
   Badge, Button, Codicon, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -303,7 +303,7 @@ async function readActiveAttempt() {
 // so the chat must stay on screen. `host.openWorkspace` docks a plugin pane into
 // the main zone and reveals it; docking to the RIGHT of `workspace` is what makes
 // exam and chat sit side by side instead of sharing one tab strip.
-const EXAM_PANE_ID = 'cbt-exam:exam'
+const EXAM_PANE_ID = 'exam-desk:exam'
 let closeExamPane = null
 
 function goToChat() {
@@ -317,7 +317,7 @@ let pendingResult = null
 
 function showResult(attemptId) {
   pendingResult = attemptId || null
-  host.navigate('/cbt')
+  host.navigate('/exam-desk')
 }
 
 function openExamPane(attemptId, onFinished) {
@@ -335,7 +335,7 @@ function openExamPane(attemptId, onFinished) {
     // (closing the pane does NOT end the attempt — the status-bar timer and the
     // Home table's Resume bring it back).
     minWidth: '26rem',
-    title: 'CBT Exam',
+    title: 'Exam Desk',
     onClose: () => { closeExamPane = null },
     render: () => jsx(ExamPane, { attemptId, onFinished: finish }),
   })
@@ -406,7 +406,7 @@ function mediaSrc(examId, src) {
   const clean = String(src || '')
   if (/^https?:\/\//i.test(clean)) return clean
   const path = clean.split('/').filter(Boolean).map(encodeURIComponent).join('/')
-  return `/api/plugins/cbt-exam/packs/${encodeURIComponent(examId)}/assets/${path}`
+  return `/api/plugins/exam-desk/packs/${encodeURIComponent(examId)}/assets/${path}`
 }
 
 // A figure that 404s (or is unreadable) otherwise collapses to a broken-image
@@ -635,7 +635,7 @@ async function goToChatAndStage(text) {
 // One click to add a paper. A plugin cannot push a skill into a live session, and
 // plugin skills are namespaced and absent from the agent's skill index, so the turn
 // has to name it exactly: an unnamed "add a paper" would never find it.
-const SOURCE_PROMPT = 'Load the skill cbt-exam:pyq-sourcing and help me add a paper. '
+const SOURCE_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a paper. '
   + 'Ask me which exam and which year first — one question at a time — then find the '
   + 'official paper, validate it and file it.'
 
@@ -668,7 +668,7 @@ async function launchSourcing() {
 }
 
 async function primeAssistedChat(attemptId) {
-  await goToChatAndStage('Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam (attempt '
+  await goToChatAndStage('Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam (attempt '
     + attemptId + '). Answer my doubts using the live question context file.')
 }
 
@@ -695,7 +695,7 @@ function ErrorBox({ what, onRetry }) {
   return jsxs('div', { className: 'cbt-error', children: [
     jsxs('div', { className: 'cbt-row', children: [
       jsx(Badge, { variant: 'destructive', size: 'xs', children: `${what} failed` }),
-      jsx('span', { className: 'cbt-sub', children: 'The plugin backend did not answer — is cbt-exam enabled and the gateway up?' }),
+      jsx('span', { className: 'cbt-sub', children: 'The plugin backend did not answer — is exam-desk enabled and the gateway up?' }),
     ] }),
     onRetry
       ? jsx(Button, { type: 'button', variant: 'outline', size: 'sm', onClick: onRetry, children: 'Retry' })
@@ -980,7 +980,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx(SidebarButton, {}),
-      jsx('h2', { children: 'CBT Exams' }),
+      jsx('h2', { children: 'Exam Desk' }),
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
       jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
@@ -1639,7 +1639,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   }, [q.data?.attempt?.evaluation, q.data?.attempt?.status, evalTried, evalBusy])
   const discuss = () => {
     const a = q.data?.attempt
-    void stageInChat(`Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the cbt-exam plugin result page.`)
+    void stageInChat(`Discuss my CBT attempt: ${q.data.pack.title || q.data.pack.exam_id} — score ${a.result.score} (correct ${a.result.totals.correct}, wrong ${a.result.totals.wrong}, skipped ${a.result.totals.skipped}). The full review and AI evaluation are in the exam-desk plugin result page.`)
   }
   if (q.isLoading) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
   if (q.isError || !q.data) return jsx('div', { className: 'cbt cbt-page', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })
@@ -1851,7 +1851,7 @@ function CbtPage() {
       if (live?.attempt?.status === 'in_progress') {
         // never override a view the user already reached while this was in flight
         void setActiveAttempt(id)          // announce it: the status-bar timer listens
-        // Assisted attempts are a side pane, not this page — opening CBT Exams must not
+        // Assisted attempts are a side pane, not this page — opening Exam Desk must not
         // bounce the user to chat. The Home table's Resume opens the pane; exam-mode
         // attempts keep the old behaviour of landing straight in the paper.
         if (live.attempt.mode !== 'assisted') {
@@ -1915,27 +1915,27 @@ function TimerChip() {
     label: 'Open the running attempt',
     children: jsx(Button, {
       variant: 'ghost', size: 'micro', 'aria-label': 'Open the running attempt',
-      onClick: () => host.navigate('/cbt'),
+      onClick: () => host.navigate('/exam-desk'),
       children: [jsx(Codicon, { key: 'c', name: 'watch', size: 12 }), fmtHMS(q.data.remaining_seconds)],
     }),
   })
 }
 
 export default {
-  id: 'cbt-exam',
-  name: 'CBT Exams',
+  id: 'exam-desk',
+  name: 'Exam Desk',
   defaultEnabled: false,
   register(ctx) {
     ctxRest = (p, o) => ctx.rest(p, o)
     ctxStorage = ctx.storage
     ctxRunAction = ctx.runAction ? (id) => ctx.runAction(id) : null
     // Hydrate the stored attempt once at boot: the status-bar countdown is mounted
-    // outside this page and otherwise stays blank until CBT Exams is opened.
+    // outside this page and otherwise stays blank until Exam Desk is opened.
     void readActiveAttempt().then(() => announceActiveAttempt())
     ctx.registerMany([
-      { id: 'page', area: ROUTES_AREA, data: { path: '/cbt' }, render: () => jsx(CbtPage, {}) },
-      { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/cbt', label: 'CBT Exams', codicon: 'checklist' } },
-      { id: 'open', area: PALETTE_AREA, data: { id: 'cbt.open', label: 'Open CBT Exams', keywords: ['cbt', 'exam', 'mock'], run: () => host.navigate('/cbt') } },
+      { id: 'page', area: ROUTES_AREA, data: { path: '/exam-desk' }, render: () => jsx(CbtPage, {}) },
+      { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/exam-desk', label: 'Exam Desk', codicon: 'checklist' } },
+      { id: 'open', area: PALETTE_AREA, data: { id: 'exam-desk.open', label: 'Open Exam Desk', keywords: ['exam desk', 'cbt', 'exam', 'mock'], run: () => host.navigate('/exam-desk') } },
       { id: 'timer', area: STATUSBAR_AREAS.right, render: () => jsx(TimerChip, {}) },
     ])
   },

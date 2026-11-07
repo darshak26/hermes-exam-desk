@@ -12,23 +12,23 @@ metadata:
 ---
 # exam-assist Skill
 
-Mid-exam tutor for the cbt-exam plugin's ASSESM MODE. The user takes the exam in the CBT panel (route `/cbt`) and asks doubts in THIS chat. The plugin mirrors the question currently on screen into a live context file; you read it and answer like a hint-first tutor.
+Mid-exam tutor for the exam-desk plugin's ASSESM MODE. The user takes the exam in the CBT panel (route `/exam-desk`) and asks doubts in THIS chat. The plugin mirrors the question currently on screen into a live context file; you read it and answer like a hint-first tutor.
 
 ## When to Use
 
-- The cbt-exam plugin primes you with a message when an assisted attempt starts ("Load the skill cbt-exam:exam-assist — I am starting an assisted CBT exam"). After that, the user's doubts about exam questions are yours to answer.
+- The exam-desk plugin primes you with a message when an assisted attempt starts ("Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam"). After that, the user's doubts about exam questions are yours to answer.
 - The user asks about a question ("what does this mean", "why is option B wrong here", "hint for B-03") while an assisted attempt is open.
 
-Don't use for: exam (non-assisted) mode — there is no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`cbt-exam:pyq-sourcing`).
+Don't use for: exam (non-assisted) mode — there is no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`exam-desk:pyq-sourcing`).
 
 ## Procedure
 
 1. **Find the live file.** The newest file in the plugin data root's `live/` folder:
-   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('cbt-exam') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). If there is no file, there is no active assisted exam — say so and stop.
+   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('exam-desk') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). If there is no file, there is no active assisted exam — say so and stop.
    **Completion criterion:** the newest live file's path.
 
 2. **Prove it is still live, then read it.** The header line of the file carries the attempt id. Confirm that attempt is still running before answering anything:
-   `terminal(command="{venv-python} -c \"import json;from plugins.plugin_storage import plugin_data_dir;d=plugin_data_dir('cbt-exam');a=json.loads((d/'attempts'/'<ATTEMPT-ID>.json').read_text());print(a['status'], int(a['duration_seconds']-(__import__('time').time()-a['started_at'])))\"")`
+   `terminal(command="{venv-python} -c \"import json;from plugins.plugin_storage import plugin_data_dir;d=plugin_data_dir('exam-desk');a=json.loads((d/'attempts'/'<ATTEMPT-ID>.json').read_text());print(a['status'], int(a['duration_seconds']-(__import__('time').time()-a['started_at'])))\"")`
    If the status is not `in_progress`, or the remaining time is ≤ 0, this context is stale: say the exam appears to have ended and stop — do not answer from it. (The plugin prunes files for finished attempts, so a live-looking file for a dead attempt means someone is mid-write; treat it as stale.)
    Then `read_file` the live file. It contains: attempt id, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
 

@@ -1,6 +1,6 @@
 # Pack schema (`cbt-pack/1`) — field reference
 
-A plain-English mirror of what `cbt_exam/pack.py` + `scripts/validate_pack.py` enforce. When in doubt, the validator's error line is the spec.
+A plain-English mirror of what `exam_desk/pack.py` + `scripts/validate_pack.py` enforce. When in doubt, the validator's error line is the spec.
 
 ## Pack level
 

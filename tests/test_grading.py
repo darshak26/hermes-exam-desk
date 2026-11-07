@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tests.helpers import base_pack
-from cbt_exam.grading import is_correct, grade_attempt
+from exam_desk.grading import is_correct, grade_attempt
 
 PACK = base_pack()
 Q = {q["id"]: q for q in PACK["questions"]}

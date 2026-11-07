@@ -1,13 +1,13 @@
 import json, os, shutil, sys, tempfile, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-os.environ["CBT_EXAM_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-store-test-")
+os.environ["EXAM_DESK_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-store-test-")
 sys.path.insert(0, str(ROOT))
 
 from tests.helpers import base_pack
-from cbt_exam import store
+from exam_desk import store
 
-DATA = Path(os.environ["CBT_EXAM_DATA_DIR"])
+DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 def write_pack(pack, name=None):
     d = DATA / "packs"
@@ -16,12 +16,12 @@ def write_pack(pack, name=None):
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
         shutil.rmtree(DATA, ignore_errors=True)   # deterministic clean root per test
     def tearDown(self):
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
     def test_list_packs_empty_then_one(self):
         self.assertEqual(store.list_packs(), [])
         write_pack(base_pack())

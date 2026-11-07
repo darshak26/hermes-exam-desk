@@ -1,4 +1,4 @@
-"""cbt-exam — exam-agnostic CBT practice plugin (backend + desktop panel + sourcing skill).
+"""exam-desk — exam-agnostic CBT practice plugin (backend + desktop panel + sourcing skill).
 
 The agent half is deliberately thin: it bundles the two skills and publishes the
 plugin `ctx` under a canonical `sys.modules` name, because `dashboard/plugin_api.py`
@@ -12,11 +12,11 @@ import types
 from pathlib import Path
 
 VERSION = "0.7.0"
-BRIDGE = "cbt_exam_ctx_bridge"
+BRIDGE = "exam_desk_ctx_bridge"
 
 
 def register(ctx):
-    # 1) bundle every skills/<name>/SKILL.md as cbt-exam:<name>. A missing or empty
+    # 1) bundle every skills/<name>/SKILL.md as exam-desk:<name>. A missing or empty
     #    skills/ dir must not take plugin registration down with it.
     skills_dir = Path(__file__).parent / "skills"
     if skills_dir.is_dir():
@@ -45,12 +45,12 @@ def _seed_packs() -> None:
     if not seed.is_dir():
         return
     try:
-        override = os.environ.get("CBT_EXAM_DATA_DIR")
+        override = os.environ.get("EXAM_DESK_DATA_DIR")
         if override:
             root = Path(override)
         else:
             from plugins.plugin_storage import plugin_data_dir
-            root = Path(plugin_data_dir("cbt-exam"))
+            root = Path(plugin_data_dir("exam-desk"))
         target = root / "packs"
         target.mkdir(parents=True, exist_ok=True)
         for src in sorted(seed.glob("*.json")):

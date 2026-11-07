@@ -1,17 +1,17 @@
 import json, os, shutil, sys, tempfile, time, types, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-os.environ["CBT_EXAM_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-test-")
-sys.path.insert(0, str(ROOT))          # for cbt_exam.* and tests.*
+os.environ["EXAM_DESK_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-test-")
+sys.path.insert(0, str(ROOT))          # for exam_desk.* and tests.*
 sys.path.insert(0, str(ROOT / "dashboard"))
-import plugin_api                       # noqa: E402  (loads cbt_exam via its own importlib dance)
+import plugin_api                       # noqa: E402  (loads exam_desk via its own importlib dance)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 app = FastAPI(); app.include_router(plugin_api.router)
 client = TestClient(app)
 
 from tests.helpers import base_pack     # noqa: E402
-DATA = Path(os.environ["CBT_EXAM_DATA_DIR"])
+DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 def seed_pack():
     (DATA / "packs").mkdir(parents=True, exist_ok=True)
@@ -30,13 +30,13 @@ def expire(aid):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)   # other test modules also set this env at import
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)   # other test modules also set this env at import
         shutil.rmtree(DATA, ignore_errors=True)
         seed_pack()
     def tearDown(self):
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
     def test_health(self):
         r = client.get("/health")
         self.assertEqual(r.status_code, 200)
@@ -161,20 +161,20 @@ FAKE_LLM = FakeLlm()
 
 class LlmApiTests(unittest.TestCase):
     def setUp(self):
-        self._prev = sys.modules.get("cbt_exam_ctx_bridge")
-        m = types.ModuleType("cbt_exam_ctx_bridge")
+        self._prev = sys.modules.get("exam_desk_ctx_bridge")
+        m = types.ModuleType("exam_desk_ctx_bridge")
         m.ctx = types.SimpleNamespace(llm=FAKE_LLM)
-        sys.modules["cbt_exam_ctx_bridge"] = m
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        sys.modules["exam_desk_ctx_bridge"] = m
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
         shutil.rmtree(DATA, ignore_errors=True)
         seed_pack()
     def tearDown(self):
-        sys.modules.pop("cbt_exam_ctx_bridge", None)
+        sys.modules.pop("exam_desk_ctx_bridge", None)
         if self._prev is not None:
-            sys.modules["cbt_exam_ctx_bridge"] = self._prev
+            sys.modules["exam_desk_ctx_bridge"] = self._prev
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
     def _attempt(self, mode="assisted"):
         r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": mode})
@@ -206,7 +206,7 @@ class LlmApiTests(unittest.TestCase):
             FAKE_LLM.return_parsed_none = False
 
     def test_evaluate_without_bridge_503(self):
-        sys.modules.pop("cbt_exam_ctx_bridge", None)
+        sys.modules.pop("exam_desk_ctx_bridge", None)
         aid = self._attempt()
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
@@ -228,7 +228,7 @@ class LlmApiTests(unittest.TestCase):
         prev_shape = plugin_api._SHAPE_OK["name"]
         plugin_api._SHAPE_OK["name"] = None
         llm = RefusingLlm()
-        sys.modules["cbt_exam_ctx_bridge"].ctx.llm = llm
+        sys.modules["exam_desk_ctx_bridge"].ctx.llm = llm
         try:
             first = self._attempt()
             client.post(f"/attempts/{first}/submit")
@@ -244,7 +244,7 @@ class LlmApiTests(unittest.TestCase):
             self.assertIn("json_mode", llm.calls[2])
         finally:
             plugin_api._SHAPE_OK["name"] = prev_shape
-            sys.modules["cbt_exam_ctx_bridge"].ctx.llm = FAKE_LLM
+            sys.modules["exam_desk_ctx_bridge"].ctx.llm = FAKE_LLM
 
     def test_live_context_lifecycle(self):
         aid = self._attempt("assisted")              # create writes the file (first question)
@@ -268,14 +268,14 @@ class DeleteTests(unittest.TestCase):
     """History has to be prunable, or a week of practice buries the start screen."""
 
     def setUp(self):
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
         shutil.rmtree(DATA, ignore_errors=True)
         seed_pack()
 
     def tearDown(self):
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
     def finished(self):
         aid = make_attempt()
@@ -340,8 +340,8 @@ class MediaTests(unittest.TestCase):
     """Figures live beside the JSON and are served as bytes, never inlined."""
 
     def setUp(self):
-        self._old = os.environ.get("CBT_EXAM_DATA_DIR")
-        os.environ["CBT_EXAM_DATA_DIR"] = str(DATA)
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
         shutil.rmtree(DATA, ignore_errors=True)
         seed_pack()
         self.assets = DATA / "packs" / "gat-b-demo.assets"
@@ -350,7 +350,7 @@ class MediaTests(unittest.TestCase):
 
     def tearDown(self):
         if self._old is not None:
-            os.environ["CBT_EXAM_DATA_DIR"] = self._old
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
     def test_serves_a_figure(self):
         r = client.get("/packs/gat-b-demo/assets/figures/gel.png")

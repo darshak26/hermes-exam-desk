@@ -1,6 +1,6 @@
 ---
 name: pyq-sourcing
-description: Source PYQ papers and exam patterns into cbt-exam packs.
+description: Source PYQ papers and exam patterns into exam-desk packs.
 version: 0.1.0
 author: Swapnil Padmane (darshak26)
 license: MIT
@@ -12,7 +12,7 @@ metadata:
 ---
 # pyq-sourcing Skill
 
-Turn an exam + year into a validated `cbt-pack/1` JSON installed in the cbt-exam plugin's data directory, so the user can take it as a CBT practice attempt. Exam-agnostic: the SAME procedure works for GAT-B, GATE, JAM, JEE, CUET — every pattern number comes from the official source, never from habit.
+Turn an exam + year into a validated `cbt-pack/1` JSON installed in the exam-desk plugin's data directory, so the user can take it as a CBT practice attempt. Exam-agnostic: the SAME procedure works for GAT-B, GATE, JAM, JEE, CUET — every pattern number comes from the official source, never from habit.
 
 ## When to Use
 
@@ -58,9 +58,9 @@ affected, and let the user decide whether to keep the pack.
 
 ## Prerequisites
 
-- The `cbt-exam` plugin exists as a package on this machine (`~/.hermes/plugins/cbt-exam/`).
+- The `exam-desk` plugin exists as a package on this machine (`~/.hermes/plugins/exam-desk/`).
 - The packs directory — compute it, never hardcode it (profile/symlink safe):
-  `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; print(plugin_data_dir('cbt-exam') / 'packs')\"", timeout=60)` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). The printed path is the install target; `CBT_EXAM_DATA_DIR` env var may override it — check with `terminal(command="echo $CBT_EXAM_DATA_DIR")` first.
+  `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; print(plugin_data_dir('exam-desk') / 'packs')\"", timeout=60)` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). The printed path is the install target; `EXAM_DESK_DATA_DIR` env var may override it — check with `terminal(command="echo $EXAM_DESK_DATA_DIR")` first.
 - The validator at `skills/pyq-sourcing/scripts/validate_pack.py` inside the plugin package.
 
 ## How to Run
@@ -79,7 +79,7 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 
 5. **Validate:** `terminal(command="python3 <plugin>/skills/pyq-sourcing/scripts/validate_pack.py <scratch pack>", timeout=60)`. Must print `PASS: <id> — N questions, S sections, D min` (exit 0). Fix and re-run until PASS — section `question_count` MUST equal the actual per-section question count; answer indices are **0-based**; `marks_wrong` is negative. Then read every `WARN:` line it prints (OCR debris, placeholder topics, duplicated options) and fix them too: they don't block grading, but a question whose options are transcription noise is unanswerable. **Completion criterion:** exit 0 and no `WARN:` lines you can fix.
 
-6. **Install:** copy the validated pack into the packs directory from Prerequisites as `<exam_id>.json`. Verify with `web_extract` or the CBT plugin's home page (ask the user to look, or check via the plugin's own tests) that the pack appears in the list. **Completion criterion:** the pack shows up in `GET /api/plugins/cbt-exam/packs` (desktop home page).
+6. **Install:** copy the validated pack into the packs directory from Prerequisites as `<exam_id>.json`. Verify with `web_extract` or the CBT plugin's home page (ask the user to look, or check via the plugin's own tests) that the pack appears in the list. **Completion criterion:** the pack shows up in `GET /api/plugins/exam-desk/packs` (desktop home page).
 
 7. **Report provenance to the user**, concisely: which year/exam, official vs memory-based, answer-key source, number of questions per section, and any gaps (missing questions → say how many and why).
 
@@ -99,5 +99,5 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 ## Verification
 
 - Validator prints PASS on the installed file path.
-- The pack appears on the CBT plugin's home page (or via `GET /api/plugins/cbt-exam/packs`).
+- The pack appears on the CBT plugin's home page (or via `GET /api/plugins/exam-desk/packs`).
 - A 1-question smoke attempt starts and submits against it (the plugin's own flow; if in doubt, say so — don't fake it).

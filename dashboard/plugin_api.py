@@ -1,4 +1,4 @@
-"""HTTP namespace for the cbt-exam desktop panel → mounted at /api/plugins/cbt-exam/*.
+"""HTTP namespace for the exam-desk desktop panel → mounted at /api/plugins/exam-desk/*.
 
 Shapes: every response is ``{attempt, pack, remaining_seconds}``. The `pack` in
 that envelope is the *sanitised* one (no answers, no explanations, no
@@ -21,8 +21,8 @@ from pydantic import BaseModel, Field
 VERSION = "0.7.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 
-_pkg = Path(__file__).resolve().parents[1] / "cbt_exam"
-_name = "_cbt_exam_http"
+_pkg = Path(__file__).resolve().parents[1] / "exam_desk"
+_name = "_exam_desk_http"
 if _name not in sys.modules:
     _spec = importlib.util.spec_from_file_location(_name, _pkg / "__init__.py",
                                                    submodule_search_locations=[str(_pkg)])
@@ -34,7 +34,7 @@ store_mod = importlib.import_module(_name + ".store")
 prompt_mod = importlib.import_module(_name + ".prompts")
 
 router = APIRouter()
-BRIDGE = "cbt_exam_ctx_bridge"          # set by the plugin's register(ctx)
+BRIDGE = "exam_desk_ctx_bridge"         # set by the plugin's register(ctx)
 MODES = ("assisted", "exam")
 HISTORY_LIMIT = 50
 
@@ -294,7 +294,7 @@ def evaluate(aid: str, force: bool = False):
         return a["evaluation"]                          # idempotent: no second LLM call
     llm = _llm()
     if llm is None:
-        raise HTTPException(503, "AI unavailable: the cbt-exam agent half is not loaded — "
+        raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
                                  "enable the plugin in plugins.enabled and restart the gateway")
     blob = prompt_mod.evaluation_input(pack, a)
     data, model, provider, last_err = None, "", "", None
@@ -306,7 +306,7 @@ def evaluate(aid: str, force: bool = False):
             r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
                                         input=[{"type": "text", "text": blob}],
                                         temperature=0.2, max_tokens=2000, timeout=180,
-                                        purpose="cbt-exam.evaluate", **extra)
+                                        purpose="exam-desk.evaluate", **extra)
         except Exception as e:                          # provider refused this shape
             last_err = e
             continue

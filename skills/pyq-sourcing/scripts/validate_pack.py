@@ -12,8 +12,8 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import cbt_exam
-from cbt_exam.pack import lint_pack, validate_pack             # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import exam_desk
+from exam_desk.pack import lint_pack, validate_pack             # noqa: E402
 
 def main(argv):
     if len(argv) != 2:
