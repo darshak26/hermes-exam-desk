@@ -242,6 +242,61 @@ class LlmApiTests(unittest.TestCase):
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 503)
 
+    def test_patch_records_behaviour_and_envelope_carries_stats(self):
+        aid = self._attempt()
+        r = client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}, "current": "A-02"})
+        self.assertEqual(r.status_code, 200)
+        log = []
+        from exam_desk import store as st
+        for ln in st.read_events(aid):
+            log.append(ln["type"])                        # save + open, once
+        self.assertEqual(log.count("save"), 1)
+        self.assertEqual(log.count("open"), 1)
+        # a change of mind is its own save with prev
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 2}})
+        from exam_desk import store as st2
+        save_events = [e for e in st2.read_events(aid) if e["type"] == "save"]
+        self.assertTrue(any(e["prev"] == 1 and e["value"] == 2 and e["qid"] == "A-01"
+                            for e in save_events), f"expected a mind-change save, saw {save_events}")
+        client.patch(f"/attempts/{aid}", json={"marked": ["A-01"]})
+        events = st.read_events(aid)
+        self.assertTrue(any(e["type"] == "mark" and e["on"] for e in events))
+
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-02": 3}})
+        client.post(f"/attempts/{aid}/submit")
+        got = client.get(f"/attempts/{aid}").json()
+        self.assertIn("stats", got)
+        self.assertGreater(got["stats"]["totals"]["events"], 0)
+        self.assertEqual(got["stats"]["totals"]["changed"], 1)
+        self.assertIn("A-01", got["stats"]["per_question"])
+
+    def test_delete_removes_the_stream_too(self):
+        aid = self._answer(self._attempt())
+        from exam_desk import store as st
+        client.patch(f"/attempts/{aid}", json={"current": "A-02"})
+        r = client.post(f"/attempts/{aid}/submit")
+        self.assertTrue(r.json()["attempt"]["status"] == "submitted")
+        client.delete(f"/attempts/{aid}")
+        self.assertFalse(st.event_log_path(aid).exists())
+
+    def test_evaluate_context_carries_process_and_history(self):
+        baseline = self._answer(self._attempt())
+        client.post(f"/attempts/{baseline}/submit")            # history row (no events)
+        aid = self._answer(self._attempt())
+        client.patch(f"/attempts/{aid}", json={"current": "A-02"})   # an open event
+        import time; time.sleep(0.3)                           # real dwell between the open and its save
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-02": 3}})
+        client.post(f"/attempts/{aid}/submit")
+        before = len(FAKE_LLM.calls)
+        r = client.post(f"/attempts/{aid}/evaluate")
+        self.assertEqual(r.status_code, 200)
+        kw = FAKE_LLM.calls[before]
+        text = kw["input"][0]["text"]
+        self.assertIn("PROCESS:", text, "the behaviour block rides the prompt")
+        self.assertIn("Time on question:", text, "the dwell summary rides the prompt")
+        self.assertIn("HISTORY:", text, "the earlier attempt rides the prompt")
+        self.assertIn("spent≈", text, "per-question behaviour is named")
+
     def test_refused_schema_is_not_re_asked_every_call(self):
         """A provider refusing json_schema refuses it every time: try it once, then
         start from the shape that worked, so no evaluation pays a wasted 400."""

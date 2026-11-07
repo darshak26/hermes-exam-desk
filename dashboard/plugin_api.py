@@ -32,6 +32,7 @@ if _name not in sys.modules:
 pack_mod = importlib.import_module(_name + ".pack")
 store_mod = importlib.import_module(_name + ".store")
 prompt_mod = importlib.import_module(_name + ".prompts")
+timeline_mod = importlib.import_module(_name + ".timeline")
 
 router = APIRouter()
 BRIDGE = "exam_desk_ctx_bridge"         # set by the plugin's register(ctx)
@@ -169,29 +170,44 @@ def patch_attempt(aid: str, patch: AnswerPatch):
             return _view(a, pack)                      # late write: never resurrect
         qmap = {q["id"]: q for q in pack["questions"]}
 
-        for qid, val in patch.answers.items():
+        # The behaviour stream: events are recorded for what the panel *did*, once per
+        # interaction, irrespective of how the attempt ended. A failed/current-first
+        # patch still records its open even when nothing was saved on it.
+        stream = []                                           # built as we apply the patch
+
+        for qid, val in patch.answers.items():                # saves: with the value replaced
             q = qmap.get(qid)
             if q is None:
                 raise HTTPException(422, f"unknown question {qid!r}")
             why = pack_mod.answer_error(q, val)
             if why:
                 raise HTTPException(422, f"{qid}: {why}")
+            prev = a["answers"].get(qid)                      # what a cleared answer erases
             if pack_mod.is_clear(val):
-                a["answers"].pop(qid, None)            # Clear Response
+                a["answers"].pop(qid, None)                   # Clear Response
             else:
-                if qid not in a["answer_seq"]:         # only the first real save uses a slot
+                if qid not in a["answer_seq"]:                # only the first real save uses a slot
                     a["answer_seq"].append(qid)
                 a["answers"][qid] = val
+            stream.append({"type": "save", "qid": qid, "value": None if pack_mod.is_clear(val) else val,
+                           "prev": prev})
 
         if patch.marked is not None:
+            old_flagged = set(a["marked"])
             a["marked"] = [q for q in dict.fromkeys(patch.marked) if q in qmap]
+            for qid in sorted(old_flagged ^ {q for q in a["marked"]}):
+                stream.append({"type": "mark", "qid": qid, "on": qid in a["marked"]})
         arrived = [q for q in dict.fromkeys(patch.visited or []) if q in qmap]
         for qid in arrived:
             if qid not in a["visited"]:
                 a["visited"].append(qid)               # insertion order = recency
         target = patch.current if patch.current in qmap else (arrived[-1] if arrived else None)
-        if target:
+        if target and target != a.get("current"):
             a["current"] = target                      # what the live context describes
+            stream.append({"type": "open", "qid": target})
+
+        if stream:
+            store_mod.log_events(aid, stream)
 
         if a["mode"] == "assisted":
             store_mod.write_live_context(a, pack, a.get("current"))
@@ -303,7 +319,13 @@ def evaluate(aid: str, force: bool = False):
     if llm is None:
         raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
                                  "enable the plugin in plugins.enabled and restart the gateway")
-    blob = prompt_mod.evaluation_input(pack, a)
+    # Context for this run: the behaviour view + the student's own last runs on the
+    # same paper (submitted only, newest first, exclusive of this attempt).
+    tl = timeline_mod.build(a, pack)
+    prior = [p for p in store_mod.list_attempts(30)
+             if p.get("exam_id") == a["exam_id"] and p.get("id") != a["id"]
+             and p.get("status") == "submitted"][:3]
+    blob = prompt_mod.evaluation_input(pack, a, prior=prior, timeline_view=tl)
     data, model, provider, last_err = None, "", "", None
     # Degrade through the structured shapes providers actually support: a schema,
     # then json_object, then plain text with the JSON dug out of the reply. Atlas /
@@ -377,7 +399,15 @@ def _reap(a, pack=None):
 def _view(a, pack):
     """The one envelope shape the panel understands."""
     if a["status"] == "submitted":
-        return {"attempt": a, "pack": pack, "remaining_seconds": 0.0}
+        out = {"attempt": a, "pack": pack, "remaining_seconds": 0.0}
+        # The timeline view rides the same envelope: the result page computes its
+        # statistics from it, and an attempt written before the stream existed
+        # simply gets an empty one (per_question entries stay all-zero/absent).
+        try:
+            out["stats"] = timeline_mod.build(a, pack)
+        except (OSError, ValueError):
+            pass
+        return out
     # in_progress and abandoned both hide the key; only a submitted attempt reveals it
     return {"attempt": a, "pack": store_mod.get_pack_view(a["exam_id"]),
             "remaining_seconds": max(0.0, store_mod.remaining_seconds(a))}

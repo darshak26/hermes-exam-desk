@@ -17,6 +17,10 @@ EVAL_INSTRUCTIONS = (
     "answer differs from the pack's key, say so and label the item MIS-KEYED rather than "
     "coaching the student toward a wrong key. (3) The KEY line states how far the key can "
     "be trusted; when it is not official, name the items you could not verify. "
+    "PROCESS lines record behaviour the panel logged live (time on screen, revisits, "
+    "answer changes, tutor doubts); HISTORY summarises earlier attempts of this paper. "
+    "Use PROCESS to separate a habit from a one-off and HISTORY to say whether something "
+    "is improving — a study-plan step without a history delta stays a study-plan step. "
     "All strings in English."
 )
 
@@ -39,7 +43,10 @@ EVAL_SCHEMA = {
     "required": ["overall_comment", "sections", "weak_topics", "wrong_answer_notes", "study_plan"]
 }
 
-def evaluation_input(pack, attempt):
+def evaluation_input(pack, attempt, prior=None, timeline_view=None):
+    """The one context the model analyses. `prior` carries up to 3 earlier attempts
+    of the same pack (newest first) and `timeline_view` the behaviour view; both are
+    optional so old callers keep working."""
     r = attempt["result"]
     lines = [f"EXAM: {pack.get('title', pack['exam_id'])} ({pack.get('provenance', '')})",
              f"MODE: {attempt['mode']}"]
@@ -55,8 +62,21 @@ def evaluation_input(pack, attempt):
     lines += [f"SCORE: {r['score']}  TOTALS: {r['totals']}", "SECTIONS:"]
     for sid, st in r["sections"].items():
         lines.append(f"  {sid}: {st}")
+    if prior:
+        lines.append("HISTORY: earlier attempts on this same paper, newest first")
+        for p in prior[:3]:
+            rr = (p.get("result") or {}).get("totals") or {}
+            lines.append(f"  {p['id']}: score={rr.get('score')} correct={rr.get('correct')} "
+                         f"wrong={rr.get('wrong')} skipped={rr.get('skipped')}")
+    tl = timeline_view or {}
+    tl_lines = (timeline_mod_metric_lines(tl) if tl else [])
+    if tl_lines:
+        lines.append("PROCESS: how this sitting was taken (behaviour the panel recorded live)")
+        for label, sentence in tl_lines:
+            lines.append(f"  {label}: {sentence}")
     lines.append("QUESTIONS:")
     qmap = {q["id"]: q for q in pack["questions"]}
+    per_q = (tl or {}).get("per_question") or {}
     for row in r["questions"]:
         head = (f"  {row['id']} | {row['type']} | {row.get('topic', '')} | "
                 f"verdict={row['verdict']} | awarded={row['awarded']} | marks={row['marks']}")
@@ -72,7 +92,21 @@ def evaluation_input(pack, attempt):
             if opts:
                 lines.append(f"    options: {opts}")
             lines.append(f"    student chose: {given}   correct: {q['answer']}")
+            pq = per_q.get(row["id"]) or {}
+            behaviour = [f"spent≈{round(pq['spent'])}s" if pq.get("spent") else None,
+                         f"{pq['opens']} visit(s)" if pq.get("opens") else None,
+                         "answer was changed before the final save" if pq.get("changes") else None,
+                         f"asked the tutor {pq['doubts']}x" if pq.get("doubts") else None]
+            behaviour = [b for b in behaviour if b]
+            if behaviour:
+                lines.append("    behaviour: " + "; ".join(behaviour))
     return "\n".join(lines)
+
+
+def timeline_mod_metric_lines(tl):
+    """Imported lazily so prompts stays importable when only the HTTP half runs."""
+    from . import timeline  # noqa: PLC0415  (the data module owns these sentences)
+    return timeline.metric_lines(tl)
 
 def parse_json_block(text):
     """The first {...} block in a model reply, parsed. None when there isn't one.

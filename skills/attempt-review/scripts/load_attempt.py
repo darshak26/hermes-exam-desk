@@ -10,6 +10,9 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import exam_desk
+from exam_desk import timeline as timeline_mod                # noqa: E402
+
 DATA = os.environ.get("EXAM_DESK_DATA_DIR") or os.path.expanduser(
     "~/.hermes/plugin-data/exam-desk")
 
@@ -52,6 +55,19 @@ def main(argv):
     else:
         print("STORED AI ANALYSIS: none — 'Analyse this attempt' on the result page creates one")
 
+    tl = timeline_mod.build(att, pack)
+    t = tl.get("totals", {})
+    if t.get("events"):
+        print("BEHAVIOUR (recorded live: opens/saves/marks by the panel, doubts by the tutor)")
+        print(f"  events {t['events']} | mind changes {t['changed']} | doubts asked {t['doubts']}")
+        if t.get("median_spent") is not None:
+            print(f"  time on question: median {round(t['median_spent'])}s, "
+                  f"longest {round(t.get('longest_spent') or 0)}s over the {t['covered']} touched")
+        for sid, sec in (tl.get("sections") or {}).items():
+            if sec.get("dwell"):
+                print(f"  time in section {sid}: {timeline_mod.fmt_sec(sec['dwell'])} "
+                      f"across {sec['questions']} questions")
+
     print("QUESTION REVIEW (text, options, student's answer, keyed answer, explanation)")
     rows = {row["id"]: row for row in (r or {}).get("questions", [])}
     for q in pack["questions"]:
@@ -81,6 +97,15 @@ def main(argv):
         else:
             student = f"{chr(65+given)}" if isinstance(given, int) and q.get("options") else given
         print(f"    correct: {keystr} | student: {student}")
+        pq = (tl.get("per_question") or {}).get(q["id"]) or {}
+        if t.get("events") and (pq.get("spent") or pq.get("opens")):
+            bits = [f"on screen {round(pq['spent'])}s" if pq.get("spent") else None,
+                    f"{pq['opens']} visit(s)" if pq.get("opens") else None,
+                    "answer changed before the final save" if pq.get("changes") else None,
+                    f"asked the tutor {pq['doubts']}x" if pq.get("doubts") else None]
+            bits = [b for b in bits if b]
+            if bits:
+                print(f"    behaviour: {'; '.join(bits)}")
         if q.get("explanation"):
             print(f"    explanation: {q['explanation']}")
 

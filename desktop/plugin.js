@@ -1634,7 +1634,8 @@ const PRIORITY_VARIANT = { high: 'destructive', medium: 'warn', low: 'muted' }
 function fmtFor(sec) {
   const s = Math.max(0, Math.round(sec || 0))
   if (s >= 3600) return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`
-  return s > 0 ? `${Math.round(s / 60)} min` : '—'
+  if (s >= 60) return `${Math.round(s / 60)} min`
+  return `${s} s`
 }
 function fmtPct(num, den) { return den ? `${Math.round((1000 * num) / den) / 10}%` : '—' }
 
@@ -1643,7 +1644,7 @@ function fmtPct(num, den) { return den ? `${Math.round((1000 * num) / den) / 10}
 // penalty paid, over-limit waste, a topic roll-up. The columns they add that this
 // record cannot support (time per question, topper/cutoff comparison) stay out rather
 // than being faked.
-function ResultStats({ attempt, pack }) {
+function ResultStats({ attempt, pack, tl }) {
   const [allTopics, setAllTopics] = useState(false)
   const r = attempt.result
   const rows = r.questions || []
@@ -1681,7 +1682,27 @@ function ResultStats({ attempt, pack }) {
   if (skipped)
     metrics.push(['Seen but skipped', `${seenBlank} opened and then left blank`])
   metrics.push(['Never reached', `${neverSeen} of the paper were never visited`])
-  metrics.push(['Pace', `${fmtFor(wall)} wall clock for ${answered} recorded answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each, averaged` : ''} (per-question times are not recorded)`])
+  // With the behaviour stream, dwell is real: per-question time, mind changes, doubts.
+  // Without it (an attempt recorded before the stream existed) the wall clock is the
+  // only truth, and the row says exactly that. Sub-second median dwell (machine-speed
+  // retries, a corrupted stream) hides the row: a "median 0s" line would be noise.
+  const t = (tl && tl.totals) || null
+  if (t && t.events) {
+    if (t.changed)
+      metrics.push(['Mind changes', `${t.changed} answer${t.changed === 1 ? '' : 's'} changed after a first save`])
+    if (t.doubts)
+      metrics.push(['Asked the tutor', `${t.doubts} doubt${t.doubts === 1 ? '' : 's'} during the sitting`])
+    if (t.median_spent != null && t.median_spent > 0)
+      metrics.push(['Time on question', `median ${fmtFor(t.median_spent)}, longest ${fmtFor(t.longest_spent)} over the ${t.covered} touched`])
+    for (const [sid, sec] of Object.entries(tl.sections || {})) {
+      if (sec.dwell) metrics.push([`Time in section ${sid}`, `${fmtFor(sec.dwell)} across ${sec.questions} questions`])
+    }
+    if (!metrics.some(([label]) => label === 'Time on question' || label.startsWith('Time in section')))
+      metrics.push(['Time on question', 'the stream is too thin for a real median — opened and saved in the same instant'],
+      )
+  } else {
+    metrics.push(['Pace', `${fmtFor(wall)} wall clock for ${answered} recorded answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each, averaged` : ''} (per-question times are not recorded)`])
+  }
 
   // Topic roll-up sorted by marks: the biggest losses to the top. A question may land
   // under the topic its pack gives it; blanks count as skips there, so a topic with
@@ -1927,7 +1948,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
       jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
     ] }),
-    jsx(ResultStats, { attempt, pack }),
+    jsx(ResultStats, { attempt, pack, tl: q.data?.stats }),
     jsx(Separator, { className: 'cbt-sep' }),
     jsxs('div', { className: 'cbt-row', children: [
       jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI analysis' }),

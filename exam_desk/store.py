@@ -1,7 +1,9 @@
 """Packs (read-through, cached) + attempts (atomic, locked writes) under the data root.
 
-Storage is deliberately boring: one JSON file per pack, one per attempt. What is
-not boring is the failure handling:
+Storage is deliberately boring: one JSON file per pack, one per attempt, and — from
+the first answer save onward — an append-only behaviour stream per attempt
+(`attempts/<aid>.log.jsonl`, see `log_events`), which the timeline derives from at
+read time. What is not boring is the failure handling:
 
 * writes are `<name>.<pid>.<rand>.tmp` → fsync → `os.replace`, so a crash can
   never leave a half-written attempt and two writers can never share a temp file;
@@ -52,6 +54,11 @@ def attempts_dir():
 
 def live_dir():
     return data_root() / "live"
+
+
+EVENT_MAX_BYTES = 5 * 1024 * 1024      # a stream, not a diary — see log_events()
+EVENT_TRUNCATED = {"type": "truncated"}  # marker appended when the cap bites
+
 
 
 def pack_assets_dir(exam_id):
@@ -137,6 +144,80 @@ def _read_attempt(path):
 
 _LOCKS = {}
 _LOCKS_GUARD = threading.Lock()
+
+
+@contextmanager
+def log_events(aid, events, *, now=None):
+    """Append behaviour events to `attempts/<aid>.log.jsonl` — the process record.
+
+    Every question open, save, mark toggle and (from the agent half) tutor doubt
+    lands here, oldest first. The grading file stays pure state; this stream is
+    what the timeline derives spent/revisits/mind-changes from at read time, so
+    nothing derived is ever written back (module docstring at exam_desk/timeline).
+
+    Append-only on purpose: one short line per event is atomic enough that the
+    agent half can append to the same stream from its own process without locks.
+    A hard cap keeps a runaway script from lionising the disk; when it bites an
+    explicit truncated marker is recorded so downstream never silently loses data.
+    Best-effort: a stream failure must never break the exam flow (same contract
+    as the live context file). Returns nothing.
+    """
+    if not events:
+        return
+    try:
+        path = event_log_path(aid)
+    except ValueError:
+        return                                                # not a plain id: nothing to log
+    try:
+        now = time.time() if now is None else now
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size >= EVENT_MAX_BYTES:
+            marker = {"t": now, "type": "truncated"}
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(marker, separators=(",", ":")) + "\n")
+            return
+        with open(path, "a", encoding="utf-8") as f:
+            for e in events:
+                row = dict(e)
+                if not isinstance(row.get("t"), (int, float)):
+                    row["t"] = now
+                f.write(json.dumps(row, separators=(",", ":")) + "\n")
+    except OSError:
+        return
+
+
+def event_log_path(aid):
+    """Where an attempt's behaviour stream lives: `attempts/<aid>.log.jsonl` (may not exist)."""
+    if not _ID.match(str(aid or "")):
+        raise ValueError(f"attempt id {aid!r} is not a plain id")
+    return attempts_dir() / f"{aid}.log.jsonl"
+
+
+def read_events(aid):
+    """Parse `<aid>.log.jsonl`; skip torn/foreign lines, cap runtime work. [] if none."""
+    try:
+        path = event_log_path(aid)
+    except ValueError:
+        return []
+    if not path.is_file():
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            out = []
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    continue
+                if len(out) >= 20000:
+                    out.append(dict(EVENT_TRUNCATED, note="line cap reached"))
+                    break
+            return out
+    except OSError:
+        return []
 
 
 @contextmanager
@@ -255,7 +336,11 @@ def delete_attempt(aid):
     try:
         path.unlink()
     except FileNotFoundError:
-        return False
+        pass                                  # the attempt record is gone either way
+    try:
+        event_log_path(aid).unlink()          # a finished history without its stream is noise
+    except (ValueError, FileNotFoundError, OSError):
+        pass
     clear_live_context(a)
     return True
 
