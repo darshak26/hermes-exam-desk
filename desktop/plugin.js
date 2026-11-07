@@ -55,26 +55,43 @@ const CSS = `
 .cbt-dlg th,.cbt-dlg td{text-align:left;padding:9px 12px 9px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12.5px}
 .cbt-dlg th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary);padding-bottom:8px}
 .cbt-dlg th:last-child,.cbt-dlg td:last-child{padding-right:0}
+.cbt-dlg tbody tr:last-child td{border-bottom:0}
 .cbt-dlg .num{text-align:right;font-variant-numeric:tabular-nums;width:86px}
 .cbt-dlg .cbt-paper-q{margin:8px 0}
 .cbt-dlg .cbt-paper-q p{font-size:13px;margin:0}
 
-/* tables: one left edge, right gutter only, tabular figures for counts */
-.cbt table{width:100%;border-collapse:collapse}
+/* tables: ONE spec for the whole plugin — one left edge, right gutter only, tabular
+   figures, a header that sits over its own column. Every table declares its grid so
+   a header never drifts and a value never lands under the next label. */
+.cbt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .cbt th,.cbt td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12.5px;vertical-align:middle}
-.cbt th{font-weight:600;color:var(--ui-text-secondary);padding-top:0}
+.cbt th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary);padding-top:0}
 .cbt th:last-child,.cbt td:last-child{padding-right:0}
+.cbt tbody tr:last-child td{border-bottom:0}
 .cbt .num{text-align:right;font-variant-numeric:tabular-nums}
 .cbt .right{text-align:right}
 .cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
-/* attempt history: declared column grid, so every header sits over its own values.
-   The last column stays auto — it carries the Delete-confirm row. */
+/* attempt history — Mode | Status | Score | When | actions (auto: holds the confirm row) */
 .cbt .cbt-hist{table-layout:fixed}
 .cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:84px}
 .cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:118px}
 .cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:76px}
 .cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:108px}
+.cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
+/* instructions pattern — Section | Questions | To attempt | Marks */
+.cbt .cbt-pattern{table-layout:fixed}
+.cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
+/* result sections — Section | Score | Correct | Wrong | Skipped | Not counted */
+.cbt .cbt-sec{table-layout:fixed}
+.cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:76px}
+.cbt .cbt-sec th:nth-child(3),.cbt .cbt-sec td:nth-child(3){width:72px}
+.cbt .cbt-sec th:nth-child(4),.cbt .cbt-sec td:nth-child(4){width:68px}
+.cbt .cbt-sec th:nth-child(5),.cbt .cbt-sec td:nth-child(5){width:76px}
+.cbt .cbt-sec th:nth-child(6),.cbt .cbt-sec td:nth-child(6){width:96px}
+/* submit-dialog section counts — Section | Answered | Marked | Blank | Not visited */
+.cbt .cbt-stats{table-layout:fixed}
+.cbt .cbt-stats th:nth-child(n+2),.cbt .cbt-stats td:nth-child(n+2){width:88px}
 
 /* home: a paper and its history */
 .cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
@@ -186,6 +203,7 @@ const CSS = `
 .cbt .media-wrap{max-width:100%;overflow-x:auto}
 .cbt .media-table{border-collapse:collapse;margin:0 0 16px;font-size:12.5px}
 .cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cbt .media-table th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary)}
 .cbt .media-table caption{caption-side:bottom;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding-top:6px}
 .cbt .media-note{font-size:12px;color:var(--ui-text-secondary);border-left:2px solid var(--ui-stroke-secondary);padding-left:12px;margin:0 0 16px}
 .cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--ui-scrim,rgba(0,0,0,.8));cursor:zoom-out}
@@ -700,7 +718,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
       marks ? jsx(Badge, { variant: 'outline', children: marks }) : null,
     ] }),
     jsx('div', { className: 'cbt-section', children: 'Pattern' }),
-    jsxs('table', { className: 'cbt-table', children: [
+    jsxs('table', { className: 'cbt-table cbt-pattern', children: [
       jsx('thead', { children: jsx('tr', { children: ['Section', 'Questions', 'To attempt', 'Marks'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => jsxs('tr', { key: s.id, children: [
         jsx('td', { children: s.title }),
@@ -1004,7 +1022,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
             : null,
           totals.blank ? jsx(Badge, { variant: 'destructive', children: `${totals.blank} unanswered` }) : null,
         ] }),
-        jsxs('table', { className: 'cbt-table', children: [
+        jsxs('table', { className: 'cbt-table cbt-stats', children: [
           jsx('thead', { children: jsx('tr', { children: [
             jsx('th', { children: 'Section' }),
             jsx('th', { className: 'num', children: 'Answered' }),
@@ -1613,17 +1631,17 @@ function CbtResult({ attemptId, onHome, onRetake }) {
         })),
     ] }),
     pack.pattern.sections.length > 1 ? jsx('h3', { children: 'Sections' }) : null,
-    pack.pattern.sections.length > 1 && jsxs('table', { children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map(h => jsx('th', { key: h, children: h })) }) }),
+    pack.pattern.sections.length > 1 && jsxs('table', { className: 'cbt-table cbt-sec', children: [
+      jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
       jsx('tbody', { children: pack.pattern.sections.map(s => {
         const st = r.sections[s.id] || {}
         return jsxs('tr', { key: s.id, children: [
           jsx('td', { children: s.title }),
-          jsx('td', { children: String(st.score ?? '—') }),
-          jsx('td', { children: String(st.correct ?? 0) }),
-          jsx('td', { children: String(st.wrong ?? 0) }),
-          jsx('td', { children: String(st.skipped ?? 0) }),
-          jsx('td', { children: String(st.not_counted ?? 0) }),
+          jsx('td', { className: 'num', children: String(st.score ?? '—') }),
+          jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
+          jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
+          jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
+          jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
         ] })
       }) }) ] }),
     jsx('h3', { children: 'AI evaluation' }),
