@@ -26,15 +26,18 @@ const CSS = `
 .cbt p{margin:0 0 12px}
 .cbt .cbt-list,.cbt ul.list{margin:0 0 12px;padding-left:20px;color:var(--ui-text-primary)}
 .cbt .cbt-list li,.cbt ul.list li{margin:0 0 6px}
-/* the page root is both .cbt and .cbt-page, so it cannot be a descendant selector */
+/* the page root is both .cbt and .cbt-page, so it cannot be a descendant selector.
+   The ROOT must span the pane: it is the scroller (overflow:auto), and a max-width on
+   it drags the scrollbar into the middle of the window. Width is capped on the
+   CHILDREN instead, centred — same reading column, bar at the pane's right edge. */
 .cbt.cbt-page{display:block;padding:20px clamp(20px,4vw,56px);overflow:auto}
-.cbt.cbt-page > *{max-width:1040px}
+.cbt.cbt-page > *{max-width:1040px;margin-inline:auto}
 /* Home — the paper list sits on the same centred column as the result page, so the
    two screens share one width and one left edge instead of hugging the left of a
    wide window. Cards are the result page's cards: one radius, one padding, and the
    gap between them owned by the column, not by a margin on each card. */
-.cbt.cbt-home{--home-col:1040px;max-width:var(--home-col);margin-inline:auto;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
-.cbt.cbt-home > *{max-width:100%}
+.cbt.cbt-home{--home-col:1040px;width:100%;max-width:none;margin:0;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.cbt.cbt-home > *{max-width:var(--home-col);width:100%;margin-inline:auto}
 /* the page header closes with a hairline, so the first card is not read as part of it */
 .cbt.cbt-home .cbt-head-row{margin-bottom:0;padding-bottom:12px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt.cbt-home .cbt-card{border-radius:10px;padding:20px;margin-bottom:0}
@@ -133,8 +136,8 @@ const CSS = `
 .cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
 /* Result layout: centred column of rounded cards. Every block shares the measured
    column, and inside each card content sits 20px in on the same left edge. */
-.cbt.cbt-result{--rg-col:820px;max-width:var(--rg-col);margin-inline:auto;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
-.cbt.cbt-result > *{max-width:100%;box-sizing:border-box}
+.cbt.cbt-result{--rg-col:820px;width:100%;max-width:none;margin:0;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.cbt.cbt-result > *{max-width:var(--rg-col);width:100%;margin-inline:auto;box-sizing:border-box}
 .cbt.cbt-result .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:20px;margin-bottom:0;box-sizing:border-box}
 .cbt.cbt-result .cbt-card .cbt-more{padding:12px 0 0;margin-top:12px}
 .cbt.cbt-result .cbt-sec{width:100%;min-width:0}
@@ -259,8 +262,11 @@ const CSS = `
 .cbt .timer.low{color:var(--ui-text-warn,var(--ui-accent))}
 .cbt .timer.crit{color:var(--ui-red)}
 .cbt .cbt-tabs{padding:0 20px 0 18px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
-.cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt .cbt-qbody p{max-width:none}
+/* The paper body is the scroller for the question column, so IT must span its grid
+   cell: a max-width here parks the bar in the middle of the pane on a wide window.
+   The reading measure lives on the content instead. */
+.cbt-qbody{width:100%;max-width:none;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
+.cbt .cbt-qbody > *{max-width:820px}
 
 /* palette */
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%;border-left:1px solid var(--ui-stroke-secondary)}
