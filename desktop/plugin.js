@@ -145,7 +145,7 @@ const CSS = `
 .cbt.cbt-result .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:20px;margin-bottom:0;box-sizing:border-box}
 .cbt.cbt-result .cbt-card .cbt-more{padding:12px 0 0;margin-top:12px}
 .cbt.cbt-result .cbt-sec{width:100%;min-width:0}
-.cbt .cbt-attempt-nav{display:flex;justify-content:center;align-items:center;gap:8px;margin:0}
+.cbt .cbt-attempt-nav{display:flex;justify-content:center;align-items:center;gap:8px}
 .cbt .cbt-attempt-pill{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .cbt .cbt-chart-scroll{overflow-x:auto}
 .cbt .cbt-chart-scroll svg rect:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
