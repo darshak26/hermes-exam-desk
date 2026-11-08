@@ -23,9 +23,10 @@ Don't use for: writing study notes, explaining concepts, or non-CBT (pen-and-pap
 
 ## The interview (how a run usually starts)
 
-The CBT panel's "Source more papers" button sends a turn that names this skill and
-nothing else — no exam, no year. That is deliberate: the conversation is the form.
-Open with ONE question, never a checklist:
+The CBT panel has one button for adding material — **Add a paper** — and its turn names
+both this skill and `exam-desk:paper-gen`, with no exam or year: the conversation is the
+form. You are the first route, because an official paper is the better material whenever
+one exists. Open with ONE question, never a checklist:
 
 1. **Which exam?** Take a name, an abbreviation, or a description ("the DBT one").
    If the answer is vague, offer the two or three most likely candidates — prefer

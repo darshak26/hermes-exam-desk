@@ -25,13 +25,13 @@ Three parts:
 | Dashboard API | `dashboard/plugin_api.py` | mounted at `/api/plugins/exam-desk/*` |
 | Agent half | `__init__.py` + `skills/` | bundles `pyq-sourcing`, `paper-gen`, `exam-assist`, `attempt-review`; exposes the plugin `ctx` for the LLM bridge |
 
-Question packs come from two places, and the panel has a button for each:
+Question packs come from two routes, and the panel has one button for both:
 
-- **Source more papers** → `pyq-sourcing`: previous-year papers from official
-  sources, keys labelled by what could be verified.
-- **Draft a paper** → `paper-gen`: the model writes original questions to the
-  official pattern when no PYQ exists (or a topic needs more material). The
-  pack self-declares: badged AI-drafted, key `self-authored`.
+- **Add a paper** → the turn names `pyq-sourcing` first and `paper-gen` second. The
+  agent tries the official paper (previous years, keys labelled by what could be
+  verified) and only drafts one — badged AI-drafted, key `self-authored` — when no
+  official paper exists for that exam and year, or when you ask for extra practice on
+  specific topics. Which route ran is the agent's call, said out loud before it starts.
 
 After any submitted attempt, the result page offers **Drill misses**: one click
 files `<exam_id>-drill(-N)` — every miss, the source's answers kept as-is, section
@@ -86,11 +86,14 @@ first start so the panel is not empty — two sections, one multi-select, one
 numerical, marking on. Use it to see how the timer, palette and result page behave,
 then delete it.
 
-For real papers, click **Source more papers**: it opens a chat and the agent runs
+For real papers, click **Add a paper**: it opens a chat and the agent runs
 `exam-desk:pyq-sourcing` — it asks which exam and which year (one question at a time),
-finds the official paper, extracts the questions, validates and files them. That
-needs web tools enabled on the agent; without them, write a pack by hand against
-`skills/pyq-sourcing/references/pack-schema.md` and drop it in the packs directory.
+finds the official paper, extracts the questions, validates and files them. When no
+official paper exists for that year (or you ask for extra practice on specific topics),
+the same turn switches to `exam-desk:paper-gen` and drafts one to the official pattern,
+badged AI-drafted. Sourcing needs web tools enabled on the agent; without them, write a
+pack by hand against `skills/pyq-sourcing/references/pack-schema.md` and drop it in the
+packs directory.
 
 ## Packs
 

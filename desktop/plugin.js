@@ -721,17 +721,16 @@ async function goToChatAndStage(text) {
 // One click to add a paper. A plugin cannot push a skill into a live session, and
 // plugin skills are namespaced and absent from the agent's skill index, so the turn
 // has to name it exactly: an unnamed "add a paper" would never find it.
-const SOURCE_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a paper. '
-  + 'Ask me which exam and which year first — one question at a time — then find the '
-  + 'official paper, validate it and file it.'
-
-// The other question source: the model drafts one from the exam's syllabus and
-// blueprint when no official paper is available (or a gap needs more practice).
-// Drafted papers self-declare: provenance carries the generation note and the
-// key is `self-authored`, so its scoreline is always read as practice.
-const DRAFT_PROMPT = 'Load the skill exam-desk:paper-gen and draft a practice paper for me. '
-  + 'Ask me which exam and which topics first — one question at a time — then write the '
-  + 'questions to the official pattern, validate the pack and file it.'
+// One entry point for "I need a paper". Which route to take is the AGENT's call, not
+// the panel's: an official previous-year paper is the better material whenever it
+// exists, and only the skill can find out whether it does. So the turn names both
+// skills and states the order — never two buttons competing for the same click.
+const ADD_PAPER_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a paper. '
+  + 'Ask me which exam and which year first — one question at a time. Look for the official '
+  + 'paper first. If there is no official paper for that exam and year, or I tell you I want '
+  + 'extra practice on specific topics instead, switch to exam-desk:paper-gen and draft one '
+  + 'to the official pattern. Say which route you took and why before you start, then '
+  + 'validate the pack and file it.'
 
 // One click for the deep review. The result page keeps the AI's basic analysis; the
 // per-question walkthrough and the study plan live in a chat, so this opens a FRESH
@@ -766,7 +765,7 @@ async function launchDiscussion(att) {
 // the prompt cannot end up sitting in the input box as well as being sent. The retry
 // window is long on purpose: a fresh chat mounts its composer asynchronously, and
 // giving up early is what used to fall back to pasting the text.
-async function launchSourcing(prompt = SOURCE_PROMPT) {
+async function launchSourcing(prompt = ADD_PAPER_PROMPT) {
   goToChat()
   await new Promise(done => setTimeout(done, 250))
   const hadSession = !!host.state.activeSessionId.get()
@@ -1131,7 +1130,6 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   // Sourcing is an agent job, not a form — but the turn it starts must not be a
   // template the user has to edit before sending.
   const source = () => { void launchSourcing() }
-  const draft = () => { void launchSourcing(DRAFT_PROMPT) }
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
@@ -1142,10 +1140,8 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx('span', { style: { flex: 1 } }),
       jsx(SidebarButton, {}),
       jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
-      jsx(Tip, { label: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', children:
-        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Source more papers' }) }),
-      jsx(Tip, { label: 'No official paper anywhere (or a section needs more practice)? The agent drafts one to the exam\'s pattern — marked AI-drafted, key self-authored', children:
-        jsx(Button, { variant: 'ghost', size: 'sm', onClick: draft, children: 'Draft a paper' }) }),
+      jsx(Tip, { label: 'Opens a chat: the agent asks which exam and year, then brings the official paper — or drafts one to the same pattern when none exists', children:
+        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Add a paper' }) }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })

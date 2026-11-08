@@ -36,8 +36,12 @@ or writing study notes.
 
 ## The interview (how a run usually starts)
 
-The CBT panel's "Draft a paper" button sends a turn that names this skill and nothing
-else. Open with ONE question, never a checklist:
+You are the second half of the panel's one **Add a paper** button: the turn names both
+`exam-desk:pyq-sourcing` and this skill. pyq-sourcing goes first and checks for an
+official paper; you take over when it reports there is none for that exam and year, or
+when the user says they want extra practice on specific topics rather than another full
+paper. Do not start drafting before one of those two conditions is true. Open with ONE
+question, never a checklist:
 
 1. **Which exam?** The pattern must come from somewhere real: re-use an official
    pattern you know from a sourced pack, or fetch it (same official-bulletin rule
