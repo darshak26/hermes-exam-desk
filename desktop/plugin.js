@@ -1161,7 +1161,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
               : null,
             discarded && showDiscarded
               ? jsx(Tip, { label: 'Delete every discarded attempt of this paper', children:
-                  jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(), children: 'Clear discarded' }) })
+                  jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(), children: 'Delete discarded' }) })
               : null,
           ] }),
           isOpen ? jsxs('table', { className: 'cbt-table cbt-hist', children: [
@@ -1184,12 +1184,12 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
                     jsx(Button, { variant: 'ghost', size: 'xs', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
                   ] })
                 : jsxs('div', { className: 'cbt-row', children: [
-                    a.status === 'in_progress'
-                      ? jsx(Button, { variant: 'default', size: 'xs', onClick: () => onResume(a.id, a.mode), children: 'Resume' })
-                      : a.status === 'abandoned'
-                        ? jsx(Tip, { label: 'This attempt was thrown away — nothing was graded', children:
-                            jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => onViewResult(a.id), children: 'Details' }) })
-                        : jsx(Button, { variant: 'outline', size: 'xs', onClick: () => onViewResult(a.id), children: 'Result' }),
+                    // One verb for the row: "Open" either resumes a live sitting or lands
+                    // on its result/pending view. Residue splits like Resume/Details/Result
+                    // made the user learn three words for one destination.
+                    jsx(Button, { variant: 'outline', size: 'xs',
+                      onClick: a.status === 'in_progress' ? () => onResume(a.id, a.mode)
+                        : () => onViewResult(a.id), children: 'Open' }),
                     jsx(Tip, { label: 'Delete this attempt permanently', children:
                       jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }),
                   ] }) }),
@@ -2501,7 +2501,12 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
                   jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
                     jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
                     jsx('span', { style: { flex: 1 } }),
-                    jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
+                    // Re-running is an affordance of the attribution line it sits on, not
+                    // a third door into the AI content. Its cost says so in the tip.
+                    jsx(Tip, { label: 'Run the model again — a new call, the existing analysis is replaced',
+                      children: jsx(Button, { variant: 'text', size: 'sm', disabled: evalBusy,
+                        'aria-label': 'Re-run the analysis', onClick: () => void runEval(true),
+                        children: icon('sync', 'size-3.5') }) }),
                   ] }),
                 ] })
               : null,
