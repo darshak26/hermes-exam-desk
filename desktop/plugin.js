@@ -1099,6 +1099,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             ? jsx(Tip, { label: showWarn ? 'Hide the warnings' : 'Show what was flagged', children:
                 jsx(Button, {
                   variant: 'outline', size: 'micro', 'aria-expanded': showWarn,
+                  style: { background: 'color-mix(in srgb, #f59e0b 18%, transparent)', borderColor: '#f59e0b', color: '#b45309' },
                   onClick: () => setShowWarn(v => !v),
                   children: jsxs('span', { className: 'cbt-warn-count', children: [
                     icon('alert', 'size-3'),
@@ -1122,7 +1123,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
           ? jsx('div', { className: 'cbt-stat-row', children: [
               `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}`,
               discarded ? `${discarded} discarded` : null,
-              best != null ? `best ${fmtScore(best)}` : null,
+              best != null ? `best score ${fmtScore(best)}` : null,
               last ? `last ${relTime(last)}` : null,
             ].filter(Boolean).join(' · ') })
           : null,
@@ -1143,7 +1144,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
           : null,
         jsx(Tip, { label: 'Side pane beside the chat — ask doubts while you answer', children:
           jsx(Button, {
-            variant: 'secondary', size: 'sm',
+            variant: 'outline', size: 'sm',
             onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
           }) }),
         jsx(Tip, { label: 'Full page, no chat, no hints — the score that counts', children:
@@ -1155,15 +1156,15 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
     ] }),
     attempts.length
       ? jsxs('div', { className: 'cbt-card-body', children: [
+          jsx(Button, {
+            className: 'cbt-flush',
+            variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
+            style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)', marginBottom: 8 },
+            onClick: () => setOpen(!isOpen),
+            children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
+              isOpen ? 'Hide history' : `History · ${ordered.length}`],
+          }),
           jsxs('div', { className: 'cbt-row', style: { marginBottom: 8, alignItems: 'center' }, children: [
-            jsx(Button, {
-              className: 'cbt-flush',
-              variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
-              style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)' },
-              onClick: () => setOpen(!isOpen),
-              children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
-                isOpen ? 'Hide history' : `History · ${ordered.length}`],
-            }),
             // Mode filter: puts every sitting on the shelf except the chosen word.
             // A paper mixes assisted practice with mocks; the table should be able
             // to show just the scorables.
@@ -1181,6 +1182,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             discarded
               ? jsx(Button, {
                   variant: 'ghost', size: 'sm',
+                  style: { textDecoration: 'underline', color: 'var(--ui-accent, #2563eb)' },
                   onClick: () => setShowDiscarded(v => !v),
                   children: showDiscarded ? 'Hide discarded' : `Show ${discarded} discarded`,
                 })
