@@ -1159,7 +1159,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             jsx(Button, {
               className: 'cbt-flush',
               variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
-              style: { border: '1px solid var(--border, var(--ui-stroke-secondary, #c8c8c8))' },
+              style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)' },
               onClick: () => setOpen(!isOpen),
               children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
                 isOpen ? 'Hide history' : `History · ${ordered.length}`],
@@ -1168,7 +1168,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             // A paper mixes assisted practice with mocks; the table should be able
             // to show just the scorables.
             attempts.length
-              ? jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--border, var(--ui-stroke-secondary, #c8c8c8))', borderRadius: 6, padding: 2, gap: 2, background: 'var(--card, var(--ui-surface-background, #f5f5f5))' }, children: [
+              ? jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', borderRadius: 4, padding: 1, gap: 1, background: 'transparent' }, children: [
                   ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
                 ].map(([label, m]) => jsx(Button, {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
