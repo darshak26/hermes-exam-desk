@@ -1156,28 +1156,23 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
     ] }),
     attempts.length
       ? jsxs('div', { className: 'cbt-card-body', children: [
-          jsx(Button, {
-            className: 'cbt-flush',
-            variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
-            style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)', marginBottom: 8 },
-            onClick: () => setOpen(!isOpen),
-            children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
-              isOpen ? 'Hide history' : `History · ${ordered.length}`],
-          }),
           jsxs('div', { className: 'cbt-row', style: { marginBottom: 8, alignItems: 'center' }, children: [
-            // Mode filter: puts every sitting on the shelf except the chosen word.
-            // A paper mixes assisted practice with mocks; the table should be able
-            // to show just the scorables.
-            attempts.length
-              ? jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', borderRadius: 4, padding: 1, gap: 1, background: 'transparent' }, children: [
+            jsx(Button, {
+              className: 'cbt-flush',
+              variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
+              style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)' },
+              onClick: () => setOpen(!isOpen),
+              children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
+                isOpen ? 'Hide history' : `History · ${ordered.length}`],
+            }),
+            jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', borderRadius: 4, padding: 1, gap: 1, background: 'transparent' }, children: [
                   ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
                 ].map(([label, m]) => jsx(Button, {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
                   size: 'xs',
                   onClick: () => { setModeFilter(m); setOpen(true) },
                   children: `${label} ${m ? filterCount(m) : (showDiscarded ? attempts.length : kept.length)}`,
-                })) })
-              : null,
+                })) }),
             jsx('span', { style: { flex: 1 } }),
             discarded
               ? jsx(Button, {
