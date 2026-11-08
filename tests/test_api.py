@@ -77,6 +77,34 @@ class ApiTests(unittest.TestCase):
         self.assertGreater(body["remaining_seconds"], 0)
         for q in body["pack"]["questions"]:
             self.assertNotIn("answer", q)
+        self.assertIsNone(body["attempt"]["assisted_session_id"])
+
+    def test_create_attempt_records_the_assisted_chat(self):
+        """An assisted sitting carries the chat it happened in; a mock ignores it."""
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "assisted",
+                                           "assisted_session_id": "chat-abc"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["attempt"]["assisted_session_id"], "chat-abc")
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam",
+                                           "assisted_session_id": "chat-xyz"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.json()["attempt"]["assisted_session_id"])
+
+    def test_link_session_appends_idempotently_and_refuses_live(self):
+        aid = make_attempt()
+        client.post(f"/attempts/{aid}/submit")
+        r1 = client.post(f"/attempts/{aid}/link-session", json={"session_id": "rev-1"})
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.json()["review_session_ids"], ["rev-1"])
+        r2 = client.post(f"/attempts/{aid}/link-session", json={"session_id": "rev-1"})
+        self.assertEqual(r2.json()["review_session_ids"], ["rev-1"])   # no dup
+        r3 = client.post(f"/attempts/{aid}/link-session", json={"session_id": "rev-2"})
+        self.assertEqual(r3.json()["review_session_ids"], ["rev-1", "rev-2"])
+        live = make_attempt()
+        self.assertEqual(client.post(f"/attempts/{live}/link-session",
+                                     json={"session_id": "rev-9"}).status_code, 409)
+        self.assertEqual(client.post(f"/attempts/{aid}/link-session",
+                                     json={"session_id": ""}).status_code, 422)
 
     def test_patch_answer_and_404s(self):
         aid = make_attempt()

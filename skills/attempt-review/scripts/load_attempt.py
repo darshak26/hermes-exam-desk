@@ -53,6 +53,19 @@ def main(argv):
 
     print(f"ATTEMPT {att['id']} | pack {att['exam_id']} — {pack.get('title', '')}")
     print(f"MODE {att.get('mode')} | submitted {att.get('submitted_at')}")
+    if att.get('mode') == 'assisted':
+        sid = att.get('assisted_session_id')
+        if sid:
+            print(f"ASSISTED CHAT: an assistant was in the room — its transcript is the Hermes "
+                  f"session {sid}. For questions the student asked about, go read what you "
+                  f"told them there (via session search on that id); it is evidence about the "
+                  f"gap, but its answers are NOT independent evidence the student knew it.")
+        else:
+            print("ASSISTED CHAT: none linked (this attempt predates session linking, or the"
+                  " sitting was started outside the panel).")
+    review_ids = att.get('review_session_ids') or []
+    if review_ids:
+        print(f"REVIEW CHATS DISCUSSING THIS ATTEMPT: {len(review_ids)} (ids: {', '.join(review_ids)})")
     print(f"PACK provenance: {pack.get('provenance')}")
     print(f"PACK key_status: {pack.get('key_status', 'absent (official)')}")
     if r:

@@ -796,6 +796,12 @@ async function launchDiscussion(att, packTitle) {
     try {
       if (host.composer.submit?.(addr, discussPrompt(att, packTitle))) {
         try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
+        // Link the review chat to the attempt record, so the next review of this
+        // sitting can read past discussion instead of re-deriving it. Best effort:
+        // a failure here must never stop the chat from having been opened.
+        if (addr && addr !== 'new') {
+          try { await rest(`/attempts/${att.id}/link-session`, { method: 'POST', body: { session_id: addr } }) } catch { /* recorded next time */ }
+        }
         return true
       }
     } catch { /* composer not mounted yet */ }
@@ -842,7 +848,12 @@ async function primeAssistedChat(attemptId) {
 // creates the attempt, then either docks it in a side pane (assisted) or hands the
 // id back so the caller can show it full page. Returns null when a pane took it.
 async function startAttempt(pack, mode) {
-  const r = await rest('/attempts', { method: 'POST', body: { exam_id: pack.exam_id, mode } })
+  // The assisted sitting's chat IS the app's active session — pass it along with the
+  // request, so the attempt record can point at the tutor transcript later. For mock
+  // sittings there is no chat and the field stays empty. The user never sees this id
+  // and never types it.
+  const currentSession = mode === 'assisted' ? (host.state.activeSessionId.get() || null) : null
+  const r = await rest('/attempts', { method: 'POST', body: { exam_id: pack.exam_id, mode, assisted_session_id: currentSession } })
   await setActiveAttempt(r.attempt.id)
   const paned = mode === 'assisted' && openExamPane(r.attempt.id, () => showResult(r.attempt.id))
   if (paned) {

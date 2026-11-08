@@ -256,10 +256,18 @@ def attempt_lock(aid):
         yield
 
 
-def new_attempt(pack, mode):
+def new_attempt(pack, mode, assisted_session_id=None):
     now = time.time()
     a = {"id": f"a-{uuid.uuid4().hex[:10]}", "exam_id": pack["exam_id"],
          "pack_hash": pack_mod.pack_hash(pack), "pack_title": pack.get("title"),
+         # The chat the tutor sat in for an assisted sitting (a Hermes session id). Recorded
+         # at creation because the desk cannot find it later any other way; the review
+         # skill then reads its tutor answers when diagnosing missed questions.
+         "assisted_session_id": assisted_session_id,
+         # Every "Discuss in chat" review session opened for this attempt, in order.
+         # Sessions are the desk's evidence of its own conversations: the review reads
+         # past discussion instead of re-deriving it.
+         "review_session_ids": [],
          "mode": mode,
          "status": "in_progress", "started_at": now,
          "duration_seconds": pack["pattern"]["duration_minutes"] * 60,

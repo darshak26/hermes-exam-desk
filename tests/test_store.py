@@ -71,6 +71,15 @@ class StoreTests(unittest.TestCase):
         self.assertIsNotNone(saved["submitted_at"])
         self.assertEqual(saved["result"]["score"], 1)
 
+    def test_attempt_links_the_chats_it_grew_from(self):
+        """The record points at the chats it was made in: assisted sit-ins and reviews."""
+        pack = base_pack()
+        mock = store.new_attempt(pack, "exam")
+        self.assertIsNone(mock["assisted_session_id"])     # a mock has no chat
+        self.assertEqual(mock["review_session_ids"], [])
+        assisted = store.new_attempt(pack, "assisted", assisted_session_id="sess-123")
+        self.assertEqual(store.get_attempt(assisted["id"])["assisted_session_id"], "sess-123")
+
     def test_write_live_context_lifecycle(self):
         pack = base_pack()
         a = store.new_attempt(pack, "assisted")

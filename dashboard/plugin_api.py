@@ -82,6 +82,10 @@ class AnswerPatch(BaseModel):
 class StartBody(BaseModel):
     exam_id: str
     mode: str
+    # The chat session the user is sitting in (the app's active session) — recorded
+    # for assisted sittings so the review can find the tutor's answers later.
+    # Never shown as a name; the user never needs to type it.
+    assisted_session_id: Optional[str] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -162,10 +166,37 @@ def create_attempt(body: StartBody):
         raise HTTPException(404, "unknown exam_id")
     except ValueError as e:
         raise HTTPException(422, f"pack {body.exam_id!r} is invalid: {e}")
-    a = store_mod.new_attempt(pack, mode)
+    a = store_mod.new_attempt(pack, mode,
+                              assisted_session_id=body.assisted_session_id if mode == "assisted" else None)
     if body.mode == "assisted":
         store_mod.write_live_context(a, pack)
     return _view(a, pack)
+
+
+class LinkSessionBody(BaseModel):
+    session_id: str
+
+
+@router.post("/attempts/{aid}/link-session")
+def link_session(aid: str, body: LinkSessionBody):
+    """Append a Hermes session id that belongs to this attempt (a review/discuss
+    chat) to its record. Idempotent; refuses live attempts."""
+    with store_mod.attempt_lock(aid):
+        try:
+            a = store_mod.get_attempt(aid)
+        except KeyError:
+            raise HTTPException(404, "no such attempt")
+        if a.get("status") != "submitted":
+            raise HTTPException(409, "link a session to a submitted attempt — a live sitting has no review yet")
+        sid = str(body.session_id or "").strip()
+        if not sid:
+            raise HTTPException(422, "session_id required")
+        ids = list(a.get("review_session_ids") or [])
+        if sid not in ids:
+            ids.append(sid)
+            a["review_session_ids"] = ids
+            store_mod.save_attempt(a)
+        return {"attempt": a["id"], "review_session_ids": ids}
 
 
 @router.get("/attempts")

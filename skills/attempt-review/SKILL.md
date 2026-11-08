@@ -38,6 +38,20 @@ Don't use for: an attempt still running (`exam-desk:exam-assist` and the live fi
 
 4. **End with a study plan.** Prioritise the misconceptions by marks lost (awarded × occurrences), give each a concrete drill and rough dates in days from today, and keep it short — a plan someone would actually run, so two or three bullets per block and the block order justified in one line.
 
+## The assisted chat
+
+If the sitting was assisted, `load_attempt.py` prints an **ASSISTED CHAT** line: the id
+of the Hermes session where the tutor sat with the student. That transcript survives
+(submit clears only the plugin's scratch pointer, never the chat) — open it when a
+missed question has a recorded doubt, and read what you told them. It is the best
+evidence of the gap; what it is **not** is evidence the student knew it afterwards — a
+residual miss after being told is exactly the opinion you diagnose. Also treat the
+sitting's scoreline as weaker proof than a mock's, on the same reasoning.
+
+`load_attempt.py` also prints any **REVIEW CHATS** linked to this attempt. If one
+exists, open it before starting so this review continues the previous discussion
+instead of re-inventing it.
+
 ## Report shape
 
 Plain talk: one line per question under a heading per section, then the plan. The result page already shows the numbers — do not re-derive the scorecard; only total marks at the top and the plan. Cite ids as `A-07`, so the student can jump between the chat and the result page's review rows.
