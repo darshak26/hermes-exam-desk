@@ -778,15 +778,42 @@ function anotherPaperPrompt(label, years) {
 // session (a review is its own conversation, never a stray reply in yesterday's chat)
 // and sends the turn rather than staging a draft — a draft left in the composer was
 // the old defect. Same retry window as the sourcing button: the composer mounts late.
-function discussPrompt(att, packTitle) {
+function discussPrompt(att, packTitle, continuing = false) {
   const title = packTitle || att?.pack_title || att?.exam_id || 'exam'
-  return `Review my sitting of "${title}" (attempt id ${att.id}). `
+  // A review thread is per-sitting: after the first, later reviews are turns in
+  // that same conversation, so the opening line says "Continuing" — the agent
+  // sees the earlier discussion in its own transcript.
+  const lead = continuing
+    ? `Continuing my review of "${title}" (attempt id ${att.id}). `
+    : `Review my sitting of "${title}" (attempt id ${att.id}). `
+  return lead
     + 'Load the skill exam-desk:attempt-review and review my finished '
     + 'CBT attempt in detail: analyse every wrong, skipped and not-counted question, '
     + 'then build the study plan.'
 }
 
-async function launchDiscussion(att, packTitle) {
+// One review thread per sitting. The first click opens a fresh session and links it
+// to the attempt; later clicks reopen the LAST linked session and continue there —
+// the agent sees the whole earlier discussion in its own transcript, and nothing new
+// to keep is created each time. `fresh=true` is the escape hatch for a clean slate.
+async function launchDiscussion(att, packTitle, fresh = false) {
+  const prior = fresh ? [] : (att.review_session_ids || [])
+  if (prior.length) {
+    const sid = prior[prior.length - 1]
+    host.navigate('/' + encodeURIComponent(sid))
+    await new Promise(done => setTimeout(done, 600))   // let the session's composer mount
+    for (let i = 0; i < 30; i++) {
+      try {
+        if (host.composer.submit?.(sid, discussPrompt(att, packTitle, true))) {
+          try { await host.composer.setDraft?.(sid, '') } catch { /* nothing to clear */ }
+          return true
+        }
+      } catch { /* composer not mounted yet */ }
+      await new Promise(done => setTimeout(done, 250))
+    }
+    host.notify?.({ kind: 'error', message: 'Could not continue the review chat — the composer never mounted.' })
+    return false
+  }
   goToChat()
   await new Promise(done => setTimeout(done, 250))
   try { host.newChat?.() } catch { /* older desktop without newChat */ }
@@ -2229,13 +2256,15 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
     } catch (e) { setEvalError(e?.message || String(e)) }
     setEvalBusy(false)
   }
-  const discuss = () => {
+  const discuss = (fresh = false) => {
     const a = q.data?.attempt
     if (!a) return
-    // Detail is a chat's job: this opens a fresh review session with a turn that
-    // loads the attempt-review skill — it never stages a draft.
-    void launchDiscussion(a, q.data?.pack?.title)
+    // Detail is a chat's job: the first click on a sitting opens a fresh review
+    // session; any later click continues in that same thread, because the plan
+    // belongs to the sitting — `fresh` is the clean-slate escape hatch.
+    void launchDiscussion(a, q.data?.pack?.title, fresh)
   }
+  const hasReviewThread = (q.data?.attempt?.review_session_ids || []).length > 0
   // Drill these misses: the server files a pack holding every wrong/skipped/not-
   // counted question, and onDrill walks it into the normal instructions page.
   const drill = async () => {
@@ -2423,7 +2452,10 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
         jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'AI Overview' }),
         jsx(Badge, { variant: 'muted', size: 'xs', children: 'model output' }),
         jsx('span', { style: { flex: 1 } }),
-        jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
+        jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => discuss(), children: hasReviewThread ? 'Continue review' : 'Discuss in chat' }),
+        hasReviewThread
+          ? jsx(Button, { variant: 'text', size: 'sm', onClick: () => discuss(true), children: 'or a new discussion' })
+          : null,
         attempt.evaluation
           ? jsx(Button, { variant: 'outline', size: 'sm', onClick: () => setShowEval(v => !v),
               children: showEval ? 'Hide analysis' : 'Show analysis' })
