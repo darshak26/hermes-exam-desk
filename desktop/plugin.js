@@ -29,6 +29,17 @@ const CSS = `
 /* the page root is both .cbt and .cbt-page, so it cannot be a descendant selector */
 .cbt.cbt-page{display:block;padding:20px clamp(20px,4vw,56px);overflow:auto}
 .cbt.cbt-page > *{max-width:1040px}
+/* Home — the paper list sits on the same centred column as the result page, so the
+   two screens share one width and one left edge instead of hugging the left of a
+   wide window. Cards are the result page's cards: one radius, one padding, and the
+   gap between them owned by the column, not by a margin on each card. */
+.cbt.cbt-home{--home-col:1040px;max-width:var(--home-col);margin-inline:auto;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.cbt.cbt-home > *{max-width:100%}
+/* the page header closes with a hairline, so the first card is not read as part of it */
+.cbt.cbt-home .cbt-head-row{margin-bottom:0;padding-bottom:12px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt.cbt-home .cbt-card{border-radius:10px;padding:20px;margin-bottom:0}
+.cbt.cbt-home .cbt-card-title h3{font-size:15px}
+.cbt.cbt-home .cbt-card-body{margin-top:16px}
 .cbt .cbt-head-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .cbt .cbt-head-row h2{margin:0}
 .cbt .cbt-keys{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ui-text-secondary)}
@@ -74,13 +85,15 @@ const CSS = `
 .cbt .right{text-align:right}
 .cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
-/* attempt history — Mode | Status | Score | When | actions (530px content-sized to prevent 620px gap to actions) */
-.cbt .cbt-hist{table-layout:fixed;width:auto;min-width:530px}
-.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:84px}
-.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:118px}
-.cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:76px}
-.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:108px}
-.cbt .cbt-hist th:nth-child(5),.cbt .cbt-hist td:nth-child(5){width:144px;text-align:right}
+/* attempt history — Mode | Status | Score | When | actions. The table fills the card:
+   five percentage columns, so a wide window widens the columns instead of leaving a
+   dead right-hand half inside the box. */
+.cbt .cbt-hist{table-layout:fixed;width:100%;min-width:0}
+.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:14%}
+.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:20%}
+.cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:14%}
+.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:22%}
+.cbt .cbt-hist th:nth-child(5),.cbt .cbt-hist td:nth-child(5){width:30%;text-align:right}
 .cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
 /* instructions pattern — Section | Questions | To attempt | Marks */
 .cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:452px}
@@ -1080,7 +1093,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
-  return jsxs('div', { className: 'cbt cbt-page', children: [
+  return jsxs('div', { className: 'cbt cbt-page cbt-home', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx('h2', { children: 'Exam Desk' }),
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
@@ -1090,7 +1103,6 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx(Tip, { label: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', children:
         jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Source more papers' }) }),
     ] }),
-    jsx(Separator, { className: 'cbt-sep' }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
       : packs.isError
