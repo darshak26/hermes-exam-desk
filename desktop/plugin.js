@@ -1643,7 +1643,12 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     const t = e.target
     const tag = (t?.tagName || '').toLowerCase()
     if (tag === 'input' || tag === 'textarea' || t?.isContentEditable) {
-      if (e.key === 'Enter') { e.preventDefault(); void act('saveNext') }
+      // Enter = save & next belongs to the exam's OWN answer fields (NAT entry), so
+      // it fires only inside the paper. Everywhere else — above all the assisted
+      // chat composer, whose Enter sends the message — the key is the chat's, not
+      // the paper's: one keystroke, one action.
+      const inOwnField = t?.closest?.('.cbt-shell')
+      if (inOwnField && e.key === 'Enter') { e.preventDefault(); void act('saveNext') }
       return
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return
