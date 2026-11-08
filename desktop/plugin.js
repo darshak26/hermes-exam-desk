@@ -1159,6 +1159,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             jsx(Button, {
               className: 'cbt-flush',
               variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
+              style: { border: '1px solid var(--border, var(--ui-stroke-secondary, #c8c8c8))' },
               onClick: () => setOpen(!isOpen),
               children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
                 isOpen ? 'Hide history' : `History · ${ordered.length}`],
