@@ -713,22 +713,32 @@ function Countdown({ left, onExpire, compact = false }) {
 }
 
 // Stage text in whichever composer is live. `submit(null, …)` is a no-op on a
-// fresh chat, so a draft is the reliable path; submit is the fallback for an older
-// desktop without setDraft.
-async function stageInChat(text) {
-  const sid = host.state.activeSessionId.get() ?? null
-  let staged = false
-  try { staged = host.composer.setDraft ? await host.composer.setDraft(sid, text) : false } catch { staged = false }
-  if (!staged) { try { host.composer.submit?.(sid, text) } catch {} }
-  host.composer.focus(null)
-}
+// fresh chat, so a draft was the reliable path and submit the fallback for an older
+// desktop without setDraft. That inverted priority WAS the assisted-mode defect —
+// the intent is "create a turn", never "leave text for the user to send", so this
+// function is dead code; goToChatAndStage below submits directly instead.
 
 // Staging text is useless if the composer is not on screen — every caller that
 // wants the user to send something goes to the chat first, then stages.
+// The poll mirrors launchSourcing's: a fresh chat mounts its composer
+// asynchronously, and giving up early is what used to stage/look pasted.
+// Returns true when the turn was sent.
 async function goToChatAndStage(text) {
   goToChat()
   await new Promise(done => setTimeout(done, 300))     // let the chat mount its composer
-  await stageInChat(text)
+  for (let i = 0; i < 30; i++) {
+    const sid = host.state.activeSessionId.get() ?? null
+    try {
+      const addr = sid || 'new'
+      if (host.composer.submit?.(addr, text)) {
+        try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
+        return true
+      }
+    } catch { /* still mounting */ }
+    await new Promise(done => setTimeout(done, 250))
+  }
+  host.notify?.({ kind: 'error', message: 'Could not send that turn — the composer never mounted.' })
+  return false
 }
 
 // One click to add a paper. A plugin cannot push a skill into a live session, and
@@ -867,8 +877,24 @@ async function launchSourcing(prompt = ADD_PAPER_PROMPT) {
 }
 
 async function primeAssistedChat(attemptId) {
-  await goToChatAndStage('Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam (attempt '
+  const sent = await goToChatAndStage('Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam (attempt '
     + attemptId + '). Answer my doubts using the live question context file.')
+  if (!sent) return
+  // A sitting started from the home page had no active chat at creation, so its
+  // record has no assisted_session_id yet. Now the chat exists and is active —
+  // record it on the attempt, so the review can find the tutor transcript later.
+  // Best-effort: the turn matters, the link is bookkeeping.
+  try {
+    let sid = null
+    for (let i = 0; i < 30; i++) {
+      sid = host.state.activeSessionId.get() || null
+      if (sid) break
+      await new Promise(done => setTimeout(done, 250))
+    }
+    if (sid) {
+      await rest(`/attempts/${attemptId}/link-session`, { method: 'POST', body: { kind: 'assisted', session_id: sid } })
+    }
+  } catch { /* attempt stays unlinked; load_attempt reports that plainly */ }
 }
 
 // One door for "start a paper", shared by the instructions page and Retake: it

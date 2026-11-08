@@ -175,22 +175,32 @@ def create_attempt(body: StartBody):
 
 class LinkSessionBody(BaseModel):
     session_id: str
+    # 'review' (default): a "Discuss in chat" review session for a submitted attempt.
+    # 'assisted': the tutor chat of an assisted sitting — recorded post-creation when
+    # the panel had no active session at creation time and the chat only exists after
+    # the priming turn creates it.
+    kind: Optional[str] = None
 
 
 @router.post("/attempts/{aid}/link-session")
 def link_session(aid: str, body: LinkSessionBody):
-    """Append a Hermes session id that belongs to this attempt (a review/discuss
-    chat) to its record. Idempotent; refuses live attempts."""
+    """Append a Hermes session id that belongs to this attempt. Idempotent."""
     with store_mod.attempt_lock(aid):
         try:
             a = store_mod.get_attempt(aid)
         except KeyError:
             raise HTTPException(404, "no such attempt")
-        if a.get("status") != "submitted":
-            raise HTTPException(409, "link a session to a submitted attempt — a live sitting has no review yet")
         sid = str(body.session_id or "").strip()
         if not sid:
             raise HTTPException(422, "session_id required")
+        if body.kind == "assisted":
+            if a.get("assisted_session_id"):
+                return {"attempt": a["id"], "assisted_session_id": a["assisted_session_id"]}
+            a["assisted_session_id"] = sid
+            store_mod.save_attempt(a)
+            return {"attempt": a["id"], "assisted_session_id": sid}
+        if a.get("status") != "submitted":
+            raise HTTPException(409, "link a review session to a submitted attempt — a live sitting has no review yet")
         ids = list(a.get("review_session_ids") or [])
         if sid not in ids:
             ids.append(sid)

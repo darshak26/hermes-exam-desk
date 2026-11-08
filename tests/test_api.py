@@ -106,6 +106,17 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(client.post(f"/attempts/{aid}/link-session",
                                      json={"session_id": ""}).status_code, 422)
 
+    def test_link_assisted_chat_records_it_while_live(self):
+        """A live assisted sitting learns its chat id after the priming turn made it."""
+        aid = make_attempt()  # in_progress, assisted via assisted_session_id=None above
+        r = client.post(f"/attempts/{aid}/link-session",
+                        json={"session_id": "sess-xyz", "kind": "assisted"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["assisted_session_id"], "sess-xyz")
+        r = client.post(f"/attempts/{aid}/link-session",
+                        json={"session_id": "sess-other", "kind": "assisted"})
+        self.assertEqual(r.json()["assisted_session_id"], "sess-xyz")   # first writer wins
+
     def test_patch_answer_and_404s(self):
         aid = make_attempt()
         r = client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
