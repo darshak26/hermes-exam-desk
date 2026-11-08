@@ -535,6 +535,33 @@ class DrillTests(unittest.TestCase):
         self.assertEqual(client.post(f"/attempts/{aid}/drill").status_code, 409)
         self.assertEqual(client.post("/attempts/nope/drill").status_code, 404)
 
+    def test_pack_changed_detection(self):
+        aid = make_attempt()
+        r1 = client.get(f"/attempts/{aid}").json()
+        self.assertFalse(r1["pack_changed"])
+
+        client.post(f"/attempts/{aid}/submit")
+        r2 = client.get(f"/attempts/{aid}").json()
+        self.assertFalse(r2["pack_changed"])
+
+        # Modify the pack file on disk
+        p = base_pack()
+        p["title"] = "Modified Demo Title"
+        (DATA / "packs" / "gat-b-demo.json").write_text(json.dumps(p))
+        plugin_api.pack_mod.clear_cache()
+
+        r3 = client.get(f"/attempts/{aid}").json()
+        self.assertTrue(r3["pack_changed"])
+
+        # Legacy attempt without pack_hash
+        att_file = DATA / "attempts" / f"{aid}.json"
+        att_data = json.loads(att_file.read_text())
+        att_data.pop("pack_hash", None)
+        att_file.write_text(json.dumps(att_data))
+
+        r4 = client.get(f"/attempts/{aid}").json()
+        self.assertFalse(r4["pack_changed"])
+
     def test_topics_read_endpoint(self):
         self.assertEqual(client.get("/topics").json()["topics"], [])
         aid = make_attempt()

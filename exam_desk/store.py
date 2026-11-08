@@ -258,7 +258,9 @@ def attempt_lock(aid):
 
 def new_attempt(pack, mode):
     now = time.time()
-    a = {"id": f"a-{uuid.uuid4().hex[:10]}", "exam_id": pack["exam_id"], "mode": mode,
+    a = {"id": f"a-{uuid.uuid4().hex[:10]}", "exam_id": pack["exam_id"],
+         "pack_hash": pack_mod.pack_hash(pack), "pack_title": pack.get("title"),
+         "mode": mode,
          "status": "in_progress", "started_at": now,
          "duration_seconds": pack["pattern"]["duration_minutes"] * 60,
          "answers": {}, "answer_seq": [], "marked": [], "visited": [], "current": None,

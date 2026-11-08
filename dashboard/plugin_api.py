@@ -347,7 +347,8 @@ def drill_attempt(aid: str):
 @router.get("/topics")
 def get_topics(exam_id: str | None = None, limit: int = 20):
     """The ledger view: what the AI evaluations keep flagging, newest first."""
-    return {"topics": prompt_mod_topics.summarize(exam_id=exam_id, limit=max(1, min(limit, 100)))}
+    fam = pack_mod.family_of(exam_id) if exam_id is not None else None
+    return {"topics": prompt_mod_topics.summarize(exam_id=fam, limit=max(1, min(limit, 100)))}
 
 
 # Richest constraint first: a real json_schema, then json_object, then plain text.
@@ -492,8 +493,20 @@ def _reap(a, pack=None):
 
 def _view(a, pack):
     """The one envelope shape the panel understands."""
+    changed = False
+    a_hash = a.get("pack_hash")
+    if a_hash:
+        try:
+            curr_pack = pack
+            if curr_pack is None:
+                curr_pack = store_mod.get_pack(a["exam_id"])
+            curr_hash = pack_mod.pack_hash(curr_pack)
+            changed = bool(curr_hash != a_hash)
+        except Exception:
+            changed = False
+
     if a["status"] == "submitted":
-        out = {"attempt": a, "pack": pack, "remaining_seconds": 0.0}
+        out = {"attempt": a, "pack": pack, "remaining_seconds": 0.0, "pack_changed": changed}
         # The timeline view rides the same envelope: the result page computes its
         # statistics from it, and an attempt written before the stream existed
         # simply gets an empty one (per_question entries stay all-zero/absent).
@@ -504,4 +517,5 @@ def _view(a, pack):
         return out
     # in_progress and abandoned both hide the key; only a submitted attempt reveals it
     return {"attempt": a, "pack": store_mod.get_pack_view(a["exam_id"]),
-            "remaining_seconds": max(0.0, store_mod.remaining_seconds(a))}
+            "remaining_seconds": max(0.0, store_mod.remaining_seconds(a)),
+            "pack_changed": changed}

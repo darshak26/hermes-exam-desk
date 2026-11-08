@@ -104,8 +104,7 @@ Never re-ask what the opening turn already contained.
    where `<plugin-dir>` is the installed exam-desk plugin (`~/.hermes/plugins/exam-desk/`).
    Must print `PASS: <id> ...` (exit 0). Fix all `WARN:` lines too — placeholder
    topics, duplicate options, very short questions.
-5. **Install:** copy to the packs directory with the drafted name (see Prerequisites
-   in pyq-sourcing for how to compute it safely) as `<exam_id>.json`. Confirm the
+5. **Install:** run `python3 <plugin-dir>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper; ensure file stem equals `exam_id`). Never copy directly into `packs/`. Confirm the
    pack appears with the panel's own list (`GET /api/plugins/exam-desk/packs`) and
    carries the "AI-drafted" badge (that comes from the key status alone).
 6. **Report, concisely and honestly:** exam + pattern source, topics covered,

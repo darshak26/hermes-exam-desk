@@ -12,6 +12,7 @@ Two design rules this module exists to enforce:
    parses but blows up `grade_attempt` turns submit into a 500 that the attempt
    can never recover from.
 """
+import hashlib
 import json
 import math
 import re
@@ -29,6 +30,41 @@ DIFFICULTIES = ("easy", "medium", "hard")
 KEY_STATUSES = ("official", "unverified", "self-authored", "random")
 # Never serialised to the client while an attempt is in progress.
 HIDDEN_KEYS = ("answer", "explanation", "tolerance")
+
+YR = re.compile(r"-(?:19|20)\d{2}$")
+_SUPERSEDED = re.compile(r"-superseded-[0-9a-f]+$")
+_DRILL = re.compile(r"-drill(?:-\d+)?$")
+_SHIFT_AFTER_YEAR = re.compile(r"(?<=-(?:19|20)\d{2})-(?:shift|set|slot)\d+$")
+
+
+def family_of(exam_id):
+    """The exam family slug, stripping year, shift/set/slot and drill/superseded suffixes from right."""
+    slug = str(exam_id or "")
+    while True:
+        m = _SUPERSEDED.search(slug)
+        if m:
+            slug = slug[:m.start()]
+            continue
+        m = _DRILL.search(slug)
+        if m:
+            slug = slug[:m.start()]
+            continue
+        m = _SHIFT_AFTER_YEAR.search(slug)
+        if m:
+            slug = slug[:m.start()]
+            continue
+        m = YR.search(slug)
+        if m:
+            slug = slug[:m.start()]
+            continue
+        break
+    return slug
+
+
+def pack_hash(pack):
+    """12 hex chars of sha256 over the pack's canonical JSON."""
+    raw = json.dumps(pack, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
 MIN_OPTION_ALNUM = 2      # lint: an option with fewer letters/digits is OCR debris
 
@@ -163,6 +199,18 @@ def validate_pack(pack):
         errs.append(f"schema must be '{SCHEMA}'")
     if not SLUG.match(str(pack.get("exam_id", ""))):
         errs.append("exam_id must be a lowercase slug like 'gat-b-2024'")
+    if pack.get("set") is not None:
+        if not isinstance(pack["set"], str) or not SLUG.match(pack["set"]):
+            errs.append("set must be a lowercase slug")
+
+    slug_str = str(pack.get("exam_id", ""))
+    ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", slug_str)
+    if ym:
+        slug_year = ym.group(1)
+        if pack.get("year") is None:
+            errs.append(f"exam_id carries year '{slug_year}' but pack has no year")
+        elif str(pack["year"]) != slug_year:
+            errs.append(f"pack year '{pack['year']}' does not match exam_id year '{slug_year}'")
 
     pat = pack.get("pattern") or {}
     dur = pat.get("duration_minutes")
@@ -424,7 +472,8 @@ def key_status(pack):
 
 
 def summarize(pack, assets_dir=None):
-    return {"exam_id": pack["exam_id"], "title": pack.get("title", pack["exam_id"]),
+    return {"exam_id": pack["exam_id"], "family": family_of(pack["exam_id"]),
+            "title": pack.get("title", pack["exam_id"]),
             "year": pack.get("year"), "body": pack.get("body"),
             "duration_minutes": pack["pattern"]["duration_minutes"],
             "question_count": len(pack["questions"]),

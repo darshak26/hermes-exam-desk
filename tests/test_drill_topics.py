@@ -183,3 +183,46 @@ class TopicsTests(unittest.TestCase):
         topics.record("p2", "b", [{"topic": "B", "priority": "low"}], now=2)
         self.assertEqual([r["exam_id"] for r in topics.summarize()], ["p2", "p1"])
         self.assertEqual(len(topics.summarize(exam_id="p1")), 1)
+
+    def test_family_bucketing_and_papers_list(self):
+        topics.record("gat-b-2023", "a-01", [{"topic": "Genetics", "priority": "high"}], now=100)
+        topics.record("gat-b-2022", "a-02", [{"topic": "genetics", "priority": "medium"}], now=200)
+        rows = topics.summarize("gat-b")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["family"], "gat-b")
+        self.assertEqual(rows[0]["exam_id"], "gat-b")
+        self.assertEqual(rows[0]["papers"], ["gat-b-2022", "gat-b-2023"])
+        self.assertEqual(rows[0]["hits"], 2)
+        self.assertEqual(rows[0]["attempts"], ["a-01", "a-02"])
+        # Narrowing by one paper slug also resolves to family
+        self.assertEqual(len(topics.summarize("gat-b-2023")), 1)
+
+    def test_migration_on_read(self):
+        old_data = {
+            "schema": topics.SCHEMA,
+            "exams": {
+                "gat-b-2023": {
+                    "genetics": {"topic": "Genetics", "hits": 1, "attempts": ["a-01"],
+                                 "first_seen": 100.0, "last_seen": 100.0, "priority": "high"}
+                },
+                "gat-b-2022": {
+                    "genetics": {"topic": "Genetics", "hits": 1, "attempts": ["a-02"],
+                                 "first_seen": 50.0, "last_seen": 200.0, "priority": "medium"},
+                    "biochem": {"topic": "Biochemistry", "hits": 1, "attempts": ["a-02"],
+                                "first_seen": 50.0, "last_seen": 200.0, "priority": "low"}
+                }
+            }
+        }
+        topics.path().parent.mkdir(parents=True, exist_ok=True)
+        topics.path().write_text(json.dumps(old_data))
+
+        # _read should migrate into gat-b bucket
+        read_data = topics._read()
+        self.assertEqual(list(read_data["exams"].keys()), ["gat-b"])
+        gen = read_data["exams"]["gat-b"]["genetics"]
+        self.assertEqual(gen["papers"], ["gat-b-2022", "gat-b-2023"])
+        self.assertEqual(gen["attempts"], ["a-01", "a-02"])
+        self.assertEqual(gen["hits"], 2)
+        # Idempotent: reading again stays the same
+        second_read = topics._read()
+        self.assertEqual(second_read, read_data)

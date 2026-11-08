@@ -79,6 +79,7 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
         ),
         "pattern": {"duration_minutes": minutes, "sections": sections},
         "questions": questions,
+        **({"year": source["year"]} if "year" in source else {}),
         **({"key_status": key} if key and key != "official" else {}),
         "derived": True,                       # a fact about the file, not a validator field
         "derived_from": {"exam_id": source["exam_id"], "attempt_id": attempt.get("id"),

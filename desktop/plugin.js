@@ -198,6 +198,8 @@ const CSS = `
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
 /* home: a paper and its history */
+.cbt .cbt-family-band{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 0;padding:4px 0}
+.cbt .cbt-family-group{display:flex;flex-direction:column;gap:12px}
 .cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
 .cbt .cbt-card-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between}
 .cbt .cbt-card-title{min-width:0;display:flex;flex-direction:column;gap:4px}
@@ -732,6 +734,34 @@ const ADD_PAPER_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add 
   + 'to the official pattern. Say which route you took and why before you start, then '
   + 'validate the pack and file it.'
 
+// The exam family for a paper slug — mirror of exam_desk/pack.family_of.
+// The dashboard mounts the Python routes once at ITS boot, so a session can be served
+// by a module that predates `summarize()` returning `family`. Derive the key here as a
+// fallback so the grouping still works against a stale route table; the API value wins
+// whenever it is present.
+function familyOf(examId) {
+  let slug = String(examId || '')
+  const tails = [/-(?:19|20)\d{2}-(?:shift|set|slot)\d+$/, /-superseded-[0-9a-f]+$/,
+    /-drill(?:-\d+)?$/, /-(?:19|20)\d{2}$/]
+  for (let changed = true; changed;) {
+    changed = false
+    for (const re of tails) {
+      const m = slug.match(re)
+      if (m) { slug = slug.slice(0, m.index); changed = true; break }
+    }
+  }
+  return slug
+}
+
+function anotherPaperPrompt(label, years) {
+  const yearsText = years && years.length > 0 ? ` — I already have ${years.join(', ')}` : ''
+  return `Load the skill exam-desk:pyq-sourcing. I want another paper for ${label}${yearsText}. `
+    + 'Ask me which year, look for the official paper first. If there is no official paper for that exam '
+    + 'and year, or I tell you I want extra practice on specific topics instead, switch to '
+    + 'exam-desk:paper-gen and draft one to the official pattern. Say which route you took and why '
+    + 'before you start, then validate the pack and file it.'
+}
+
 // One click for the deep review. The result page keeps the AI's basic analysis; the
 // per-question walkthrough and the study plan live in a chat, so this opens a FRESH
 // session (a review is its own conversation, never a stray reply in yesterday's chat)
@@ -936,7 +966,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
   const scores = attempts.map(a => a.score).filter(v => typeof v === 'number')
   const best = scores.length ? Math.max(...scores) : null
   const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
-  const drift = (topics || []).filter(r => r.exam_id === pack.exam_id)
+  const drift = (topics || []).filter(r => r.exam_id === pack.exam_id || (pack.family && r.exam_id === pack.family))
 
   // A route this build asks for and the server does not serve means the dashboard is
   // still running the plugin it loaded at boot — its Python routes are mounted once, so a
@@ -1059,7 +1089,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
                   size: 'xs',
                   onClick: () => setModeFilter(m),
-                  children: `${label}${m ? ` ${filterCount(m)}` : ordered.length}`,
+                  children: `${label} ${m ? filterCount(m) : ordered.length}`,
                 })) })
               : null,
             jsx('span', { style: { flex: 1 } }),
@@ -1133,6 +1163,23 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
+
+  const groups = {}
+  for (const p of packList) {
+    const fam = p.family || familyOf(p.exam_id)
+    if (!groups[fam]) groups[fam] = []
+    groups[fam].push(p)
+  }
+  const familyKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b))
+  for (const k of familyKeys) {
+    groups[k].sort((a, b) => {
+      const yA = typeof a.year === 'number' ? a.year : -1
+      const yB = typeof b.year === 'number' ? b.year : -1
+      if (yA !== yB) return yB - yA
+      return (a.title || a.exam_id || '').localeCompare(b.title || b.exam_id || '')
+    })
+  }
+
   return jsxs('div', { className: 'cbt cbt-page cbt-home', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx('h2', { children: 'Exam Desk' }),
@@ -1150,17 +1197,52 @@ function CbtHome({ onStart, onResume, onViewResult }) {
         : (packList.length === 0
           ? jsxs('div', { children: [
               jsx(EmptyState, { title: 'No papers yet', description: 'Ask the agent to source a previous-year paper — it files itself here once validated.' }),
-              jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Source a paper' }),
+              jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add a paper' }),
             ] })
-          : packList.map(p => jsx(ExamCard, {
-              key: p.exam_id,
-              pack: p,
-              attempts: all.filter(a => a.exam_id === p.exam_id),
-              topics: topicsQ.data?.topics || [],
-              onStart: start,
-              onResume,
-              onViewResult,
-            }))),
+          : familyKeys.map(famKey => {
+              const famPacks = groups[famKey]
+              const bodies = [...new Set(famPacks.map(p => (p.body || '').trim()).filter(Boolean))]
+              // The band names the EXAM (family key), with the conducting body as a
+              // muted qualifier. The body alone reads like a category tag — "NTA / RCB
+              // (DBT)" says who runs it, not what you are about to sit.
+              const examLabel = (famKey || '').toUpperCase()
+              const bodyLabel = bodies.length === 1 && bodies[0].toLowerCase() !== examLabel.toLowerCase() ? bodies[0] : ''
+              const years = [...new Set(famPacks.map(p => p.year).filter(y => y != null && y !== ''))].sort((a, b) => b - a)
+              const anotherPrompt = anotherPaperPrompt(examLabel, years)
+              return jsxs('div', {
+                className: 'cbt-family-group',
+                children: [
+                  jsxs('div', {
+                    className: 'cbt-family-band',
+                    children: [
+                      jsxs('div', {
+                        className: 'cbt-row cbt-gap-sm',
+                        children: [
+                          jsx('h3', { style: { margin: 0 }, children: examLabel }),
+                          bodyLabel ? jsx('span', { className: 'cbt-sub', children: bodyLabel }) : null,
+                          jsx('span', { className: 'cbt-sub', children: `${famPacks.length} ${famPacks.length === 1 ? 'paper' : 'papers'}` }),
+                        ]
+                      }),
+                      jsx(Button, {
+                        variant: 'outline',
+                        size: 'xs',
+                        onClick: () => { void launchSourcing(anotherPrompt) },
+                        children: 'Another paper'
+                      }),
+                    ]
+                  }),
+                  ...famPacks.map(p => jsx(ExamCard, {
+                    key: p.exam_id,
+                    pack: p,
+                    attempts: all.filter(a => a.exam_id === p.exam_id),
+                    topics: topicsQ.data?.topics || [],
+                    onStart: start,
+                    onResume,
+                    onViewResult,
+                  }))
+                ]
+              }, famKey)
+            })),
     hist.isError ? jsx(ErrorBox, { what: 'Loading attempts', onRetry: () => hist.refetch() }) : null,
   ] })
 }
@@ -2239,6 +2321,9 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
     // answer "how did this sitting go", and two boxes for one subject read as two.
     jsxs('div', { className: 'cbt-card', children: [
       jsx('div', { className: 'cbt-section', style: { margin: '0 0 12px' }, children: 'Score' }),
+      q.data?.pack_changed
+        ? jsx('p', { className: 'cbt-sub', style: { margin: '0 0 12px' }, children: 'This paper was replaced after this attempt — the questions below are the current file, the score is the one you were graded against.' })
+        : null,
       jsxs('div', { className: 'cbt-score-row', children: [
         jsxs('div', { className: 'cbt-score-pair', children: [
           jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),

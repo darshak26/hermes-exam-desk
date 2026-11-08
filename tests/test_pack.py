@@ -2,7 +2,7 @@ import sys, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA
+from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, family_of, pack_hash, YR
 from tests.helpers import base_pack
 
 class PackTests(unittest.TestCase):
@@ -57,6 +57,59 @@ class PackTests(unittest.TestCase):
 
         p = base_pack(); p["key_status"] = "random"
         self.assertEqual(summarize(p)["key_status"], "random")
+
+    def test_family_of_rules_and_examples(self):
+        self.assertEqual(family_of("gat-b"), "gat-b")
+        self.assertEqual(family_of("gat-b-2023"), "gat-b")
+        self.assertEqual(family_of("gat-b-2023-shift1"), "gat-b")
+        self.assertEqual(family_of("gat-b-2023-drill"), "gat-b")
+        self.assertEqual(family_of("gat-b-2023-drill-2"), "gat-b")
+        self.assertEqual(family_of("gat-b-2023-superseded-4f2a9c1b0d3e"), "gat-b")
+        self.assertEqual(family_of("demo-basics"), "demo-basics")
+        self.assertEqual(family_of("csir-net-set-a"), "csir-net-set-a")
+        self.assertTrue(YR.search("-2023"))
+
+    def test_pack_hash(self):
+        p1 = base_pack()
+        p2 = {k: p1[k] for k in reversed(list(p1.keys()))}
+        h1 = pack_hash(p1)
+        h2 = pack_hash(p2)
+        self.assertEqual(len(h1), 12)
+        self.assertEqual(h1, h2)
+        p3 = base_pack()
+        p3["title"] = "Different Title"
+        self.assertNotEqual(pack_hash(p3), h1)
+
+    def test_summarize_has_family(self):
+        p = base_pack()
+        p["exam_id"] = "gat-b-2023"
+        p["year"] = 2023
+        sm = summarize(p)
+        self.assertEqual(sm["family"], "gat-b")
+
+    def test_validate_pack_set_and_year(self):
+        p = base_pack()
+        p["set"] = "set-a"
+        self.assertEqual(validate_pack(p), [])
+
+        p["set"] = "Set A!"
+        self.assertTrue(any("set" in e for e in validate_pack(p)))
+
+        p = base_pack()
+        p["exam_id"] = "gat-b-2023"
+        p["year"] = 2023
+        self.assertEqual(validate_pack(p), [])
+
+        p["year"] = 2024
+        self.assertTrue(any("year" in e for e in validate_pack(p)))
+
+        p.pop("year")
+        self.assertTrue(any("year" in e for e in validate_pack(p)))
+
+        p_no_yr = base_pack()
+        p_no_yr["exam_id"] = "demo-basics"
+        p_no_yr.pop("year", None)
+        self.assertEqual(validate_pack(p_no_yr), [])
 
 if __name__ == "__main__":
     unittest.main()

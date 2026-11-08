@@ -46,6 +46,8 @@ class StoreTests(unittest.TestCase):
         b = store.new_attempt(pack, "assisted")
         self.assertNotEqual(a["id"], b["id"])
         self.assertEqual(store.get_attempt(a["id"]), a)
+        self.assertTrue(a.get("pack_hash"))
+        self.assertEqual(a.get("pack_title"), pack.get("title"))
 
     def test_save_attempt_atomic_and_persists(self):
         a = store.new_attempt(base_pack(), "exam")

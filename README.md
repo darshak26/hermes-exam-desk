@@ -103,7 +103,13 @@ Schema and every rule the grader enforces: `skills/pyq-sourcing/references/pack-
 ```bash
 python3 skills/pyq-sourcing/scripts/validate_pack.py my-pack.json
 # PASS ... then WARN lines for OCR debris / placeholder topics that still grade
+python3 skills/pyq-sourcing/scripts/install_pack.py my-pack.json
+# PASS installed <slug>
 ```
+
+**Adding a second paper:** give it a slug that reflects the year or shift (e.g. `gat-b-2022` alongside `gat-b-2023`). The panel derives the exam family automatically (`family_of`) and groups papers under the same exam band, sharing the topics ledger.
+
+**Replacing an existing paper:** install with `--replace` (`python3 install_pack.py my-pack.json --replace`). Without `--replace`, the install is refused to prevent accidental overwrites. When replaced, the old pack is retired to `packs/superseded/<slug>.<hash>.json`. Existing attempts remember the hash of the paper they were sat against: if a paper is replaced under an attempt, the review page displays a clear notice that the questions reflect the new file while the score reflects the original graded attempt (`pack_changed: true`).
 
 ## API
 
