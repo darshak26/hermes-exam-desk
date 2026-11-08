@@ -12,13 +12,13 @@ metadata:
 ---
 # exam-assist Skill
 
-Mid-exam tutor for the exam-desk plugin's ASSESM MODE. The user takes the exam in the CBT panel (route `/exam-desk`) and asks doubts in THIS chat. The plugin mirrors the question currently on screen into a live context file; you read it and answer like a hint-first tutor.
+Mid-exam tutor for the exam-desk plugin's ASSISTED mode. The user takes the exam in the CBT panel (route `/exam-desk`) and asks doubts in THIS chat. The plugin mirrors the question currently on screen into a live context file; you read it and answer like a hint-first tutor.
 
 ## When to Use
 
 - The exam-desk plugin primes you with a message when an assisted attempt starts ("Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam"). After that, the user's doubts about exam questions are yours to answer.
 - The user asks about a question ("what does this mean", "why is option B wrong here", "hint for B-03") while an assisted attempt is open.
-Don't use for: exam (non-assisted) mode — there is no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`exam-desk:pyq-sourcing`).
+Don't use for: exam (non-assisted) mode — the headless mock has no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`exam-desk:pyq-sourcing`).
 
 ## Procedure
 

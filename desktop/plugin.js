@@ -633,7 +633,7 @@ function relTime(s) {
 
 const STATUS_LABEL = { in_progress: 'In progress', submitted: 'Submitted', abandoned: 'Discarded' }
 const STATUS_CLS = { in_progress: 'acc', submitted: 'ok', abandoned: 'mut' }
-const MODE_LABEL = { assisted: 'Assisted', exam: 'Exam' }
+const MODE_LABEL = { assisted: 'Assisted', exam: 'Mock' }   // vocab mirror — see exam_desk/vocab.py
 
 function fmtScore(v) {
   if (v === null || v === undefined) return '—'
@@ -725,6 +725,14 @@ const SOURCE_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a p
   + 'Ask me which exam and which year first — one question at a time — then find the '
   + 'official paper, validate it and file it.'
 
+// The other question source: the model drafts one from the exam's syllabus and
+// blueprint when no official paper is available (or a gap needs more practice).
+// Drafted papers self-declare: provenance carries the generation note and the
+// key is `self-authored`, so its scoreline is always read as practice.
+const DRAFT_PROMPT = 'Load the skill exam-desk:paper-gen and draft a practice paper for me. '
+  + 'Ask me which exam and which topics first — one question at a time — then write the '
+  + 'questions to the official pattern, validate the pack and file it.'
+
 // One click for the deep review. The result page keeps the AI's basic analysis; the
 // per-question walkthrough and the study plan live in a chat, so this opens a FRESH
 // session (a review is its own conversation, never a stray reply in yesterday's chat)
@@ -758,7 +766,7 @@ async function launchDiscussion(att) {
 // the prompt cannot end up sitting in the input box as well as being sent. The retry
 // window is long on purpose: a fresh chat mounts its composer asynchronously, and
 // giving up early is what used to fall back to pasting the text.
-async function launchSourcing() {
+async function launchSourcing(prompt = SOURCE_PROMPT) {
   goToChat()
   await new Promise(done => setTimeout(done, 250))
   const hadSession = !!host.state.activeSessionId.get()
@@ -769,7 +777,7 @@ async function launchSourcing() {
   for (let i = 0; i < 30; i++) {
     const addr = host.state.activeSessionId.get() || 'new'
     try {
-      if (host.composer.submit?.(addr, SOURCE_PROMPT)) {
+      if (host.composer.submit?.(addr, prompt)) {
         // belt and braces: a surface that echoed the text into its own draft would
         // otherwise leave a duplicate waiting for Enter
         try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
@@ -841,14 +849,14 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
     try {
       const id = await startAttempt(pack, mode)
       if (id) onBegin(id)              // exam mode, or a desktop without the pane API
-    } catch (e) { host.notifyError?.(`Could not start exam: ${e?.message || e}`); setStarting(false) }
+    } catch (e) { host.notifyError?.(`Could not start the paper: ${e?.message || e}`); setStarting(false) }
   }
   const marks = marksLabel(pack.pattern.sections[0] || {}, pack.pattern)
   const duration = `${hours ? hours + ' h ' : ''}${mins} min`
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
-      jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Mock' }),
       jsx('span', { style: { flex: 1 } }),
       jsx(SidebarButton, {}),
     ] }),
@@ -899,13 +907,17 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
 // One paper, its numbers, and its own attempt history. History is scoped to the
 // paper because a flat list of every attempt ever made stops being readable the
 // moment a second paper arrives.
-function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
+function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
   const qc = useQueryClient()
   const live = attempts.filter(a => a.status === 'in_progress')
   // attempts arrive after the first render, so "open when there is history" cannot be
   // an initial value — it would be computed against an empty list and stay closed.
   // null = follow the data; a click pins the user's choice.
   const [open, setOpen] = useState(null)
+  // History filter: null = every sitting; otherwise the mode word ('assisted'|'exam').
+  // A mock's trend reads right only next to other mocks — the modes are kept apart
+  // by the evaluation too (prompts builds HISTORY per mode).
+  const [modeFilter, setModeFilter] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
@@ -914,15 +926,18 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
 
   const isOpen = open === null ? attempts.length > 0 : open
   const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
+  const ranked = kept.filter(a => !modeFilter || a.mode === modeFilter)
   const rank = a => (a.status === 'in_progress' ? 0 : 1)
-  const ordered = [...kept].sort((x, y) =>
+  const ordered = [...ranked].sort((x, y) =>
     rank(x) - rank(y) || (y.submitted_at || y.started_at || 0) - (x.submitted_at || x.started_at || 0))
   const shown = showAll ? ordered : ordered.slice(0, 6)
   const hidden = ordered.length - shown.length
   const discarded = attempts.length - attempts.filter(a => a.status !== 'abandoned').length
+  const filterCount = m => attempts.filter(a => a.mode === m && (showDiscarded || a.status !== 'abandoned')).length
   const scores = attempts.map(a => a.score).filter(v => typeof v === 'number')
   const best = scores.length ? Math.max(...scores) : null
   const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
+  const drift = (topics || []).filter(r => r.exam_id === pack.exam_id)
 
   // A route this build asks for and the server does not serve means the dashboard is
   // still running the plugin it loaded at boot — its Python routes are mounted once, so a
@@ -968,6 +983,8 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
         jsxs('div', { className: 'cbt-row', children: [
           jsx('h3', { children: pack.title || pack.exam_id }),
           pack.invalid ? jsx(Badge, { variant: 'destructive', children: 'invalid' }) : null,
+          // An AI-drafted paper says so: its key was written by the model, never an exam key.
+          pack.key_status === 'self-authored' ? jsx(Badge, { variant: 'outline', size: 'xs', children: 'AI-drafted' }) : null,
           pack.warnings?.length
             ? jsx(Tip, { label: showWarn ? 'Hide the warnings' : 'Show what was flagged', children:
                 jsx(Button, {
@@ -996,6 +1013,16 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
               last ? `last ${relTime(last)}` : null,
             ].filter(Boolean).join(' · ') })
           : null,
+        // What the evaluations keep finding — the ledger (topics.json), newest first.
+        drift.length && !pack.invalid
+          ? jsxs('div', { className: 'cbt-sub', children: [
+              'The AI keeps flagging: ',
+              jsxs('span', { className: 'cbt-row', children: [
+                drift.slice(0, 4).map(t => jsx(Badge, { key: t.topic, variant: 'outline', size: 'xs', children:
+                  `${t.topic}${t.hits > 1 ? ` ×${t.hits}` : ''}` })),
+              ] }),
+            ] })
+          : null,
       ] }),
       jsx('div', { className: 'cbt-card-actions', children: pack.invalid ? null : jsxs('div', { className: 'cbt-row', children: [
         live.length
@@ -1006,10 +1033,10 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
             variant: live.length ? 'secondary' : 'default', size: 'sm',
             onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
           }) }),
-        jsx(Tip, { label: 'Full page, no chat, no hints', children:
+        jsx(Tip, { label: 'Full page, no chat, no hints — the score that counts', children:
           jsx(Button, {
             variant: 'secondary', size: 'sm',
-            onClick: () => onStart(pack, 'exam'), children: 'Start exam',
+            onClick: () => onStart(pack, 'mock'), children: 'Start mock',
           }) }),
       ] }) }),
     ] }),
@@ -1023,6 +1050,19 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
               children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
                 isOpen ? 'Hide history' : `History · ${ordered.length}`],
             }),
+            // Mode filter: puts every sitting on the shelf except the chosen word.
+            // A paper mixes assisted practice with mocks; the table should be able
+            // to show just the scorables.
+            attempts.length
+              ? jsx('nav', { className: 'cbt-row', style: { marginTop: 4 }, children: [
+                  ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
+                ].map(([label, m]) => jsx(Button, {
+                  key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
+                  size: 'xs',
+                  onClick: () => setModeFilter(m),
+                  children: `${label}${m ? ` ${filterCount(m)}` : ordered.length}`,
+                })) })
+              : null,
             jsx('span', { style: { flex: 1 } }),
             discarded
               ? jsx(Button, {
@@ -1081,6 +1121,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
 function CbtHome({ onStart, onResume, onViewResult }) {
   const packs = useQuery({ queryKey: ['cbt', 'packs'], queryFn: () => rest('/packs') })
   const hist = useQuery({ queryKey: ['cbt', 'attempts'], queryFn: () => rest('/attempts'), refetchInterval: 15000 })
+  const topicsQ = useQuery({ queryKey: ['cbt', 'topics'], queryFn: () => rest('/topics?limit=100') })
   const start = async (p, mode) => {
     try {
       const full = await rest(`/packs/${p.exam_id}`)
@@ -1090,6 +1131,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   // Sourcing is an agent job, not a form — but the turn it starts must not be a
   // template the user has to edit before sending.
   const source = () => { void launchSourcing() }
+  const draft = () => { void launchSourcing(DRAFT_PROMPT) }
   const packList = packs.data?.packs || []
   const all = hist.data?.attempts || []
   const liveCount = all.filter(a => a.status === 'in_progress').length
@@ -1099,9 +1141,11 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
       jsx(SidebarButton, {}),
-      jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
+      jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
       jsx(Tip, { label: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', children:
         jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Source more papers' }) }),
+      jsx(Tip, { label: 'No official paper anywhere (or a section needs more practice)? The agent drafts one to the exam\'s pattern — marked AI-drafted, key self-authored', children:
+        jsx(Button, { variant: 'ghost', size: 'sm', onClick: draft, children: 'Draft a paper' }) }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
@@ -1116,6 +1160,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               key: p.exam_id,
               pack: p,
               attempts: all.filter(a => a.exam_id === p.exam_id),
+              topics: topicsQ.data?.topics || [],
               onStart: start,
               onResume,
               onViewResult,
@@ -1467,7 +1512,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       inPane ? null : jsx(SidebarButton, {}),
       jsx(Tip, { label: pack.title || pack.exam_id, children:
         jsx('strong', { className: 'cbt-head-title', children: pack.title || pack.exam_id }) }),
-      isNarrow ? null : jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: attempt.mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      isNarrow ? null : jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: attempt.mode === 'assisted' ? 'Assisted' : 'Mock' }),
       jsx('span', { style: { flex: 1 } }),
       isNarrow
         ? jsx(Tip, { label: 'Question paper', children:
@@ -2009,9 +2054,10 @@ function AttemptsChart({ seq, selectedId, onSelect }) {
   ] })
 }
 
-function CbtResult({ attemptId, onHome, onRetake }) {
+function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
   // ── selected attempt state (local, not in view) ────────────────────────────
   const [selectedId, setSelectedId] = useState(attemptId)
+  const [drillBusy, setDrillBusy] = useState(false)
   const qc = useQueryClient()
 
   // ── load the entry attempt to derive exam_id ───────────────────────────────
@@ -2080,6 +2126,15 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     // loads the attempt-review skill — it never stages a draft.
     void launchDiscussion(a)
   }
+  // Drill these misses: the server files a pack holding every wrong/skipped/not-
+  // counted question, and onDrill walks it into the normal instructions page.
+  const drill = async () => {
+    if (drillBusy || !onDrill) return
+    setDrillBusy(true)
+    try { await onDrill(selectedId) }
+    catch (e) { host.notifyError?.(`Could not build a drill: ${e?.message || e}`) }
+    setDrillBusy(false)
+  }
 
   // ── arrow navigation helpers ───────────────────────────────────────────────
   const selSeqIdx = seq.findIndex(a => a.id === selectedId)
@@ -2115,7 +2170,11 @@ function CbtResult({ attemptId, onHome, onRetake }) {
       jsx(SidebarButton, {}),
       onRetake && entryAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[entryAttempt.mode] || entryAttempt.mode} attempt on this paper`, children:
         jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, entryAttempt.mode), children: 'Retake' }) }) : null,
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
+      onDrill && q.data?.attempt?.status === 'submitted' && q.data?.attempt?.result
+        ? jsx(Tip, { label: 'New paper holding this attempt\'s misses — wrong, skipped and not-counted, same key', children:
+            jsx(Button, { variant: 'secondary', size: 'sm', loading: drillBusy, onClick: drill, children: 'Drill misses' }) })
+        : null,
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All papers' }),
     ] }),
     // One attempt at a time: the arrows walk the papers' graded attempts in the order
     // they were submitted, and clamp at both ends rather than wrap.
@@ -2391,6 +2450,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
 }
 
 function CbtPage() {
+  const qc = useQueryClient()
   const [view, setView] = useState(() => {
     if (pendingResult) {
       const attemptId = pendingResult
@@ -2458,6 +2518,15 @@ function CbtPage() {
           const id = await startAttempt(pack, mode)
           if (id) setView({ name: 'exam', attemptId: id })
         } catch (e) { host.notifyError?.(`Could not start: ${e?.message || e}`) }
+      },
+      // one click from misses to their drill paper: file it, fetch it, walk the
+      // normal instructions page so the drill sits inside no special view
+      onDrill: async aid => {
+        const r = await rest(`/attempts/${aid}/drill`, { method: 'POST' })
+        const full = await rest(`/packs/${r.exam_id}`)
+        qc.invalidateQueries({ queryKey: ['cbt', 'packs'] })
+        qc.invalidateQueries({ queryKey: ['cbt', 'topics'] })
+        setView({ name: 'instructions', pack: full, mode: 'mock' })
       },
     }),
   ] })

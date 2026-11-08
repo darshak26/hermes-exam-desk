@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-VERSION = "0.7.0"
+VERSION = "0.9.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 ALLOWED_ASSET_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
@@ -35,10 +35,14 @@ pack_mod = importlib.import_module(_name + ".pack")
 store_mod = importlib.import_module(_name + ".store")
 prompt_mod = importlib.import_module(_name + ".prompts")
 timeline_mod = importlib.import_module(_name + ".timeline")
+prompt_mod_topics = importlib.import_module(_name + ".topics")
+drill_mod = importlib.import_module(_name + ".drill")
 
 router = APIRouter()
 BRIDGE = "exam_desk_ctx_bridge"         # set by the plugin's register(ctx)
-MODES = ("assisted", "exam")
+MODES = ("assisted", "exam")            # stored values; the panel displays vocab.MODE_LABELS
+# The panel says mock (the word the sitting deserves); older builds still send exam.
+MODE_ALIASES = {"mock": "exam"}
 HISTORY_LIMIT = 50
 
 
@@ -46,6 +50,25 @@ def _llm():
     """The gateway's LLM bridge, or None when the agent half isn't loaded."""
     ctx = getattr(sys.modules.get(BRIDGE), "ctx", None)
     return getattr(ctx, "llm", None)
+
+
+def mode_of(attempt):
+    """An attempt's normalised mode — an old attempt may predate the alias."""
+    m = attempt.get("mode")
+    return MODE_ALIASES.get(m, m if m in MODES else None)
+
+
+def history_rows(rows, attempt):
+    """The HISTORY feed for this attempt: same paper, same mode, submitted, ≤3.
+
+    Mode-cleaned on purpose. The mock's progress line must not read a sitting
+    where the tutor answered half the questions, and an assisted run must not
+    inherit the pressure (or numbers) of a clean sitting.
+    """
+    mine = mode_of(attempt)
+    return [p for p in rows
+            if p.get("exam_id") == attempt["exam_id"] and p.get("id") != attempt.get("id")
+            and p.get("mode") == mine and p.get("status") == "submitted"][:3]
 
 
 class AnswerPatch(BaseModel):
@@ -130,15 +153,16 @@ def get_pack(exam_id: str):
 # --------------------------------------------------------------------------- #
 @router.post("/attempts")
 def create_attempt(body: StartBody):
-    if body.mode not in MODES:
-        raise HTTPException(422, f"mode must be one of {MODES}")
+    mode = MODE_ALIASES.get(body.mode, body.mode)   # 'mock' is the panel's word for 'exam'
+    if mode not in MODES:
+        raise HTTPException(422, "mode must be one of assisted/mock/exam")
     try:
         pack = store_mod.get_pack(body.exam_id)
     except KeyError:
         raise HTTPException(404, "unknown exam_id")
     except ValueError as e:
         raise HTTPException(422, f"pack {body.exam_id!r} is invalid: {e}")
-    a = store_mod.new_attempt(pack, body.mode)
+    a = store_mod.new_attempt(pack, mode)
     if body.mode == "assisted":
         store_mod.write_live_context(a, pack)
     return _view(a, pack)
@@ -297,6 +321,35 @@ def prune_attempts(body: PruneBody = PruneBody()):
     return {"deleted": len(gone), "ids": gone}
 
 
+# --------------------------------------------------------------------------- #
+# drills (derived papers) + the topics ledger
+# --------------------------------------------------------------------------- #
+@router.post("/attempts/{aid}/drill")
+def drill_attempt(aid: str):
+    """Turn this submitted attempt's misses into a new pack, resumable like any paper.
+
+    Returns the summary of the derived pack; the panel fetches the answer-free
+    view and walks the normal instructions page — a drill is a paper, not a
+    special view. Idempotence is deliberate: one click always files a *new*
+    pack (`<exam_id>-drill(-2, -3…)`), so a second drill after more studying
+    holds only the misses that remain.
+    """
+    a, pack = _load(aid, touch=False)
+    if a["status"] != "submitted" or not a.get("result"):
+        raise HTTPException(409, "submit the attempt before drilling its misses")
+    try:
+        drill_id, _ = drill_mod.install_drill(pack, a)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"exam_id": drill_id, "summary": pack_mod.summarize(store_mod.get_pack(drill_id))}
+
+
+@router.get("/topics")
+def get_topics(exam_id: str | None = None, limit: int = 20):
+    """The ledger view: what the AI evaluations keep flagging, newest first."""
+    return {"topics": prompt_mod_topics.summarize(exam_id=exam_id, limit=max(1, min(limit, 100)))}
+
+
 # Richest constraint first: a real json_schema, then json_object, then plain text.
 # `_SHAPE_OK` remembers which one this process last got a usable answer from, because a
 # provider that refuses json_schema refuses it on EVERY call — re-asking costs a wasted
@@ -345,12 +398,12 @@ def evaluate(aid: str, force: bool = False):
         if llm is None:
             raise HTTPException(503, "AI unavailable: the exam-desk agent half is not loaded — "
                                      "enable the plugin in plugins.enabled and restart the gateway")
-        # Context for this run: the behaviour view + the student's own last runs on the
-        # same paper (submitted only, newest first, exclusive of this attempt).
+        # Context for this run: the behaviour view + the student's own last runs on
+        # this paper in this mode. Assisted runs are excluded from a mock's history
+        # (a tutor was beside the student — progress there is not progress alone)
+        # and vice versa; that filter is the point of keeping the modes apart.
         tl = timeline_mod.build(a, pack)
-        prior = [p for p in store_mod.list_attempts(30)
-                 if p.get("exam_id") == a["exam_id"] and p.get("id") != a["id"]
-                 and p.get("status") == "submitted"][:3]
+        prior = history_rows(store_mod.list_attempts(30), a)
         blob = prompt_mod.evaluation_input(pack, a, prior=prior, timeline_view=tl)
         data, model, provider, last_err = None, "", "", None
         # Degrade through the structured shapes providers actually support: a schema,
@@ -388,6 +441,12 @@ def evaluate(aid: str, force: bool = False):
                                    "generated_at": time.time()}
             fresh.pop("evaluation_error", None)
             store_mod.save_attempt(fresh, durable=True)
+            # The ledger is fed on success only, and must never break the evaluation
+            # reply on its own failure — the panel call above returns before it.
+            try:
+                prompt_mod_topics.record(a["exam_id"], aid, data.get("weak_topics"))
+            except Exception:
+                pass
             return fresh["evaluation"]
     finally:
         with _EVAL_LOCK:

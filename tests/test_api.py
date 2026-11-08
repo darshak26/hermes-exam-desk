@@ -485,3 +485,90 @@ class MediaTests(unittest.TestCase):
         (DATA / "packs" / "gat-b-demo.json").write_text(json.dumps(pack))
         warns = client.get("/packs").json()["packs"][0]["warnings"]
         self.assertTrue(any("missing" in w for w in warns), warns)
+
+
+class DrillTests(unittest.TestCase):
+    """Drills are resumable papers; the ledger fills only after a real evaluation."""
+
+    def setUp(self):
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        seed_pack()
+
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
+
+    def test_mock_alias_names_the_exam_mode(self):
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "mock"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["attempt"]["mode"], "exam")
+
+    def test_invalid_mode_still_names_the_words(self):
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "bogus"})
+        self.assertEqual(r.status_code, 422)
+        self.assertIn("assisted/mock/exam", r.json()["detail"])
+
+    def test_drill_files_a_pack_of_the_misses(self):
+        aid = make_attempt()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-02": 3}})  # wrong; A-01, rest skipped
+        client.post(f"/attempts/{aid}/submit")
+        r = client.post(f"/attempts/{aid}/drill")
+        self.assertEqual(r.status_code, 200, r.text)
+        drill_id = r.json()["exam_id"]
+        self.assertTrue(drill_id.startswith("gat-b-demo-drill"), drill_id)
+        view = client.get(f"/packs/{drill_id}").json()
+        ids = [q["id"] for q in view["questions"]]
+        self.assertEqual(ids, ["A-01", "A-02", "A-03", "B-01", "B-02", "B-03"])  # skip counts as a miss
+        self.assertEqual([s["attempt_limit"] for s in view["pattern"]["sections"]], [None, None])
+        # a resumable paper: a mock on the drill grades like any other paper
+        r2 = client.post("/attempts", json={"exam_id": drill_id, "mode": "mock"})
+        aid2 = r2.json()["attempt"]["id"]
+        client.patch(f"/attempts/{aid2}", json={"answers": {"A-02": 0}})   # correct this time
+        g = client.post(f"/attempts/{aid2}/submit").json()
+        self.assertEqual(g["attempt"]["status"], "submitted")
+        self.assertEqual(g["attempt"]["result"]["score"], 1)
+
+    def test_drill_refuses_live_and_used_attempts(self):
+        aid = make_attempt()
+        self.assertEqual(client.post(f"/attempts/{aid}/drill").status_code, 409)
+        self.assertEqual(client.post("/attempts/nope/drill").status_code, 404)
+
+    def test_topics_read_endpoint(self):
+        self.assertEqual(client.get("/topics").json()["topics"], [])
+        aid = make_attempt()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-02": 3}})
+        client.post(f"/attempts/{aid}/submit")
+        self.assertEqual(client.get("/topics").json()["topics"], [])   # an ungraded scoreline feeds nothing
+
+
+class EvalLedgerTests(LlmApiTests):
+    """The one class needing the bridge: evaluation → ledger recording."""
+
+    def test_successful_evaluation_records_weak_topics(self):
+        aid = self._answer(self._attempt(mode="exam"))
+        client.post(f"/attempts/{aid}/submit")
+        self.assertEqual(client.post(f"/attempts/{aid}/evaluate").status_code, 200)
+        rows = client.get("/topics").json()["topics"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["topic"], rows[0]["priority"], rows[0]["attempts"]),
+                         ("t", "high", [aid]))
+
+    def test_failed_evaluation_records_nothing(self):
+        FAKE_LLM.return_parsed_none = True
+        try:
+            aid = self._answer(self._attempt(mode="exam"))
+            client.post(f"/attempts/{aid}/submit")
+            self.assertEqual(client.post(f"/attempts/{aid}/evaluate").status_code, 502)
+            self.assertEqual(client.get("/topics").json()["topics"], [])
+        finally:
+            FAKE_LLM.return_parsed_none = False
+
+    def test_history_lines_carry_the_mode(self):
+        aid = self._answer(self._attempt(mode="exam"))
+        client.post(f"/attempts/{aid}/submit")
+        before = len(FAKE_LLM.calls)
+        client.post(f"/attempts/{aid}/evaluate")
+        text = FAKE_LLM.calls[before]["input"][0]["text"]
+        self.assertIn("MODE: exam", text)

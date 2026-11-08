@@ -24,7 +24,9 @@ QTYPES = ("mcq", "msq", "nat")
 DIFFICULTIES = ("easy", "medium", "hard")
 # How much the pack's `answer` fields can be trusted. Absent means "official"
 # (every hand-written pack, and the bundled demo), so this is opt-out only.
-KEY_STATUSES = ("official", "unverified", "random")
+# `self-authored` marks an AI-drafted paper: the model that wrote the questions
+# also wrote the key, so nothing of it is an exam fact.
+KEY_STATUSES = ("official", "unverified", "self-authored", "random")
 # Never serialised to the client while an attempt is in progress.
 HIDDEN_KEYS = ("answer", "explanation", "tolerance")
 

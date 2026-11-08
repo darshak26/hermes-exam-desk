@@ -1,8 +1,10 @@
 """Prompt builders for the post-exam evaluation (the only in-plugin LLM use)."""
 import json
 
+from .vocab import mode_label
+
 EVAL_INSTRUCTIONS = (
-    "You are analysing a submitted practice CBT attempt for a Biotechnology student. "
+    "You are analysing a submitted practice CBT attempt. "
     "You get the exam pattern, the score breakdown, and every wrong/skipped/not-counted "
     "question with its full text, the student's choice and the correct answer. "
     "Write an honest, specific evaluation: no praise padding. For every wrong or skipped "
@@ -63,11 +65,11 @@ def evaluation_input(pack, attempt, prior=None, timeline_view=None):
     for sid, st in r["sections"].items():
         lines.append(f"  {sid}: {st}")
     if prior:
-        lines.append("HISTORY: earlier attempts on this same paper, newest first")
+        lines.append("HISTORY: earlier attempts on this same paper in this same mode, newest first")
         for p in prior[:3]:
             rr = (p.get("result") or {}).get("totals") or {}
-            lines.append(f"  {p['id']}: score={rr.get('score')} correct={rr.get('correct')} "
-                         f"wrong={rr.get('wrong')} skipped={rr.get('skipped')}")
+            lines.append(f"  {p['id']} ({mode_label(p.get('mode'))}): score={rr.get('score')} "
+                         f"correct={rr.get('correct')} wrong={rr.get('wrong')} skipped={rr.get('skipped')}")
     tl = timeline_view or {}
     tl_lines = (timeline_mod_metric_lines(tl) if tl else [])
     if tl_lines:

@@ -1,6 +1,6 @@
 name: exam-desk
-version: 0.8.0
-description: Exam-agnostic CBT practice panel with PYQ sourcing skill and AI modes.
+version: 0.9.0
+description: Exam-agnostic CBT practice panel — PYQ sourcing, AI paper drafting, drills, AI evaluation.
 author: Swapnil Padmane (darshak26)
 license: MIT
 manifest_version: 1
