@@ -87,10 +87,25 @@ def main(argv=None):
         print(f"PASS replaced {exam_id}; previous kept as superseded/{retired_file}")
         return 0
 
+    if not pack.get("family"):
+        fam = pack_mod.pack_family(pack)
+        print(f"NOTE no family field; derived '{fam}' from exam_id — state it in the pack to pin it. "
+              "(To the installing agent: write family/kind in the pack you hand over.)")
+
+    fam = pack.get("family") or pack_mod.pack_family(pack)
+    kind = pack.get("kind")
+    scope = pack.get("scope")
+    parts = [f"family {fam}"]
+    if kind:
+        parts.append(str(kind))
+    if scope:
+        parts.append(f"scope {scope}")
+    meta = f" ({', '.join(parts)})"
+
     tmp_target = packs_dir / f"{exam_id}.{os.getpid()}.tmp"
     tmp_target.write_text(json.dumps(pack, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp_target, target)
-    print(f"PASS installed {exam_id}")
+    print(f"PASS installed {exam_id}{meta}")
     return 0
 
 

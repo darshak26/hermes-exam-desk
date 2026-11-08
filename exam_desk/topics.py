@@ -113,13 +113,13 @@ def _weakest(rows):
     return PRIORITIES[min(ranks)] if ranks else "low"
 
 
-def record(exam_id, attempt_id, weak_topics, now=None):
+def record(exam_id, attempt_id, weak_topics, now=None, family=None):
     """Fold one evaluation's `weak_topics` rows (list of dicts with topic /
     evidence / priority) into the ledger. Idempotent per topic+attempt."""
     if not isinstance(weak_topics, list) or not str(exam_id or "").strip():
         return 0
     eid = str(exam_id).strip()
-    fam = pack_mod.family_of(eid)
+    fam = str(family).strip() if family is not None and str(family).strip() else pack_mod.family_of(eid)
     folded, now_n = 0, float(now if now is not None else time.time())
     with _LOCK:
         data = _read()
@@ -182,12 +182,12 @@ def summarize(exam_id=None, limit=6):
     return rows[:max(0, limit)]
 
 
-def forget(exam_id):
+def forget(exam_id, family=None):
     """Drop one paper or family's rows — called when that paper's data is being removed."""
     if not str(exam_id or "").strip():
         return False
     eid = str(exam_id).strip()
-    fam = pack_mod.family_of(eid)
+    fam = str(family).strip() if family is not None and str(family).strip() else pack_mod.family_of(eid)
     with _LOCK:
         data = _read()
         book = data["exams"].pop(eid, None)

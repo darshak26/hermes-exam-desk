@@ -23,6 +23,7 @@ SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 QID = re.compile(r"^[A-Za-z0-9_-]+$")
 QTYPES = ("mcq", "msq", "nat")
 DIFFICULTIES = ("easy", "medium", "hard")
+KINDS = ("pyq", "practice", "drill")
 # How much the pack's `answer` fields can be trusted. Absent means "official"
 # (every hand-written pack, and the bundled demo), so this is opt-out only.
 # `self-authored` marks an AI-drafted paper: the model that wrote the questions
@@ -59,6 +60,28 @@ def family_of(exam_id):
             continue
         break
     return slug
+
+
+def pack_family(pack):
+    """The pack's exam family: stated family when present, else family_of(exam_id)."""
+    if isinstance(pack, dict):
+        fam = pack.get("family")
+        if fam:
+            return fam
+        return family_of(pack.get("exam_id"))
+    return family_of(pack)
+
+
+def derive_kind(exam_id):
+    """Best-effort display kind for old packs: drill, pyq, practice or None."""
+    slug = str(exam_id or "")
+    if "-drill" in slug:
+        return "drill"
+    if re.search(r"-(?:19|20)\d{2}(?:-|$)", slug):
+        return "pyq"
+    if re.search(r"(?:^|-)practice(?:-|$)", slug):
+        return "practice"
+    return None
 
 
 def pack_hash(pack):
@@ -203,7 +226,30 @@ def validate_pack(pack):
         if not isinstance(pack["set"], str) or not SLUG.match(pack["set"]):
             errs.append("set must be a lowercase slug")
 
+    if "kind" in pack:
+        if pack["kind"] not in KINDS:
+            errs.append(f"kind must be one of {KINDS}")
+
     slug_str = str(pack.get("exam_id", ""))
+    if "family" in pack:
+        if not isinstance(pack["family"], str) or not SLUG.match(pack["family"]):
+            errs.append("family must be a lowercase slug")
+        else:
+            # Stated family must own the slug: the id is the family itself or the
+            # family plus a suffix. This is the check the slug parser cannot do for
+            # generated papers (their ids keep the kind token, so family_of sees
+            # them unchanged) and it catches a wrong family on every pack shape.
+            if not (slug_str == pack["family"] or slug_str.startswith(pack["family"] + "-")):
+                errs.append(f"exam_id '{slug_str}' does not sit under stated family '{pack['family']}' "
+                            "— fix the family (or the exam_id)")
+
+    if pack.get("kind") == "pyq" and pack.get("year") is None:
+        errs.append("kind 'pyq' requires year")
+
+    if "scope" in pack:
+        if not isinstance(pack["scope"], str) or not pack["scope"].strip():
+            errs.append("scope must be a non-empty string")
+
     ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", slug_str)
     if ym:
         slug_year = ym.group(1)
@@ -472,7 +518,10 @@ def key_status(pack):
 
 
 def summarize(pack, assets_dir=None):
-    return {"exam_id": pack["exam_id"], "family": family_of(pack["exam_id"]),
+    return {"exam_id": pack["exam_id"],
+            "family": pack_family(pack),
+            "kind": pack.get("kind") or derive_kind(pack.get("exam_id")),
+            "scope": pack.get("scope"),
             "title": pack.get("title", pack["exam_id"]),
             "year": pack.get("year"), "body": pack.get("body"),
             "duration_minutes": pack["pattern"]["duration_minutes"],

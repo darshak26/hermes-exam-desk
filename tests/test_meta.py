@@ -62,6 +62,15 @@ class VocabParity(unittest.TestCase):
         panel = re.findall(r"(\w+)\s*:", m.group(1))
         self.assertEqual(sorted(panel), sorted(vocab.MODE_LABELS))
 
+    def test_panel_kind_labels_match_vocab(self):
+        import exam_desk.vocab as vocab
+        js = (ROOT / "desktop" / "plugin.js").read_text(encoding="utf-8")
+        m = re.search(r"const KIND_LABELS\s*=\s*\{([^}]*?)\}", js)
+        self.assertIsNotNone(m, "KIND_LABELS table vanished from the panel")
+        panel = dict(re.findall(r"(\w+)\s*:\s*'([^']*)'", m.group(1)))
+        self.assertEqual(panel, vocab.KIND_LABELS,
+                         "panel KIND_LABELS and exam_desk.vocab.KIND_LABELS drifted")
+
 
 class ManifestShape(unittest.TestCase):
     """Fields the catalog gate and the README both assume."""

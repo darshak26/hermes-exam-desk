@@ -48,6 +48,9 @@ class ApiTests(unittest.TestCase):
         packs = client.get("/packs").json()["packs"]
         self.assertEqual(len(packs), 1)
         self.assertEqual(packs[0]["sections"][1]["attempt_limit"], 2)
+        self.assertEqual(packs[0]["family"], "gat-b-demo")
+        self.assertIn("kind", packs[0])
+        self.assertIn("scope", packs[0])
         pack = client.get("/packs/gat-b-demo").json()
         for q in pack["questions"]:
             self.assertNotIn("answer", q)

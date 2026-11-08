@@ -14,8 +14,27 @@ keeps its own copy of the two short display labels because it cannot import here
              exam fact unless it is reconciled against an official source
 """
 MODE_LABELS = {"assisted": "assisted", "exam": "mock"}
+KIND_LABELS = {"pyq": "PYQ", "practice": "practice", "drill": "drill"}
+
+# Cosmetic shortforms for slugs and titles; never load-bearing — a pack_state that
+# spells the word out is always correct. Presence in this table is the ONLY licence
+# to abbreviate: anything not here (or ambiguous, like "gen") is spelled in full.
+ABBREVIATIONS = {
+    "bioinformatics": "bioinfo",
+    "biochemistry": "biochem",
+    "biotechnology": "biotech",
+    "immunology": "immuno",
+    "microbiology": "microbio",
+    "molecular-biology": "molbio",
+    "cell-biology": "cellbio",
+}
 
 
 def mode_label(mode):
     """Display word for an attempt mode ('' when the mode is unknown)."""
     return MODE_LABELS.get(mode, "")
+
+
+def kind_label(kind):
+    """Display word for a paper kind ('' when unknown)."""
+    return KIND_LABELS.get(kind, "")

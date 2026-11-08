@@ -96,6 +96,31 @@ class InstallPackScriptTests(unittest.TestCase):
             else:
                 store.os.environ.pop(store.ENV_DATA_DIR, None)
 
+    def test_installer_note_and_pass_fields(self):
+        # 1. Pack without family installs with derived family and prints NOTE
+        pack_no_fam = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        pack_no_fam["exam_id"] = "gat-b-legacy"
+        pack_no_fam.pop("family", None)
+        pack_file = self.data_dir / "gat-b-legacy.json"
+        pack_file.write_text(json.dumps(pack_no_fam), encoding="utf-8")
+        r = run_install(str(pack_file), "--data-dir", str(self.data_dir))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("NOTE no family field; derived 'gat-b-legacy' from exam_id — state it in the pack to pin it.", r.stdout)
+        self.assertIn("PASS installed gat-b-legacy (family gat-b-legacy)", r.stdout)
+
+        # 2. Pack with family, kind, scope echoes them on PASS line, no NOTE
+        pack_fields = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        pack_fields["exam_id"] = "gat-b-practice-bioinfo"
+        pack_fields["family"] = "gat-b"
+        pack_fields["kind"] = "practice"
+        pack_fields["scope"] = "Photosynthesis"
+        pack_fields_file = self.data_dir / "gat-b-practice-bioinfo.json"
+        pack_fields_file.write_text(json.dumps(pack_fields), encoding="utf-8")
+        r2 = run_install(str(pack_fields_file), "--data-dir", str(self.data_dir))
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertNotIn("NOTE no family field", r2.stdout)
+        self.assertIn("PASS installed gat-b-practice-bioinfo (family gat-b, practice, scope Photosynthesis)", r2.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

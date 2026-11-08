@@ -642,6 +642,7 @@ function relTime(s) {
 const STATUS_LABEL = { in_progress: 'In progress', submitted: 'Submitted', abandoned: 'Discarded' }
 const STATUS_CLS = { in_progress: 'acc', submitted: 'ok', abandoned: 'mut' }
 const MODE_LABEL = { assisted: 'Assisted', exam: 'Mock' }   // vocab mirror — see exam_desk/vocab.py
+const KIND_LABELS = { pyq: 'PYQ', practice: 'practice', drill: 'drill' }
 
 function fmtScore(v) {
   if (v === null || v === undefined) return '—'
@@ -773,12 +774,15 @@ function anotherPaperPrompt(label, years) {
 // session (a review is its own conversation, never a stray reply in yesterday's chat)
 // and sends the turn rather than staging a draft — a draft left in the composer was
 // the old defect. Same retry window as the sourcing button: the composer mounts late.
-const REVIEW_PROMPT_BASE = 'Load the skill exam-desk:attempt-review and review my finished '
-  + 'CBT attempt in detail: analyse every wrong, skipped and not-counted question, '
-  + 'then build the study plan. Attempt id: '
-function discussPrompt(att) { return REVIEW_PROMPT_BASE + att.id + '.' }
+function discussPrompt(att, packTitle) {
+  const title = packTitle || att?.pack_title || att?.exam_id || 'exam'
+  return `Review my sitting of "${title}" (attempt id ${att.id}). `
+    + 'Load the skill exam-desk:attempt-review and review my finished '
+    + 'CBT attempt in detail: analyse every wrong, skipped and not-counted question, '
+    + 'then build the study plan.'
+}
 
-async function launchDiscussion(att) {
+async function launchDiscussion(att, packTitle) {
   goToChat()
   await new Promise(done => setTimeout(done, 250))
   try { host.newChat?.() } catch { /* older desktop without newChat */ }
@@ -786,7 +790,7 @@ async function launchDiscussion(att) {
   for (let i = 0; i < 30; i++) {
     const addr = host.state.activeSessionId.get() || 'new'
     try {
-      if (host.composer.submit?.(addr, discussPrompt(att))) {
+      if (host.composer.submit?.(addr, discussPrompt(att, packTitle))) {
         try { await host.composer.setDraft?.(addr, '') } catch { /* nothing to clear */ }
         return true
       }
@@ -1012,11 +1016,15 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
     marks.length ? marks.join(' · ') : null,
   ].filter(Boolean).join(' · ')
 
+  const kindLabel = pack.kind && KIND_LABELS[pack.kind] ? KIND_LABELS[pack.kind] : null
+  const hasScope = pack.scope && !(pack.title || '').toLowerCase().includes(pack.scope.toLowerCase())
+
   return jsxs('section', { className: 'cbt-card', children: [
     jsxs('div', { className: 'cbt-card-head', children: [
       jsxs('div', { className: 'cbt-card-title', children: [
         jsxs('div', { className: 'cbt-row', children: [
           jsx('h3', { children: pack.title || pack.exam_id }),
+          kindLabel ? jsx(Badge, { variant: 'outline', size: 'xs', children: kindLabel }) : null,
           pack.invalid ? jsx(Badge, { variant: 'destructive', children: 'invalid' }) : null,
           // An AI-drafted paper says so: its key was written by the model, never an exam key.
           pack.key_status === 'self-authored' ? jsx(Badge, { variant: 'outline', size: 'xs', children: 'AI-drafted' }) : null,
@@ -1032,6 +1040,9 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
                 }) })
             : null,
         ] }),
+        hasScope && !pack.invalid
+          ? jsx('div', { className: 'cbt-sub', style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: pack.scope })
+          : null,
         jsx('div', { className: 'cbt-sub', children: pack.invalid
           ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
           : meta }),
@@ -2208,7 +2219,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
     if (!a) return
     // Detail is a chat's job: this opens a fresh review session with a turn that
     // loads the attempt-review skill — it never stages a draft.
-    void launchDiscussion(a)
+    void launchDiscussion(a, q.data?.pack?.title)
   }
   // Drill these misses: the server files a pack holding every wrong/skipped/not-
   // counted question, and onDrill walks it into the normal instructions page.

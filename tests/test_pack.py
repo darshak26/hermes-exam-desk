@@ -2,7 +2,7 @@ import sys, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, family_of, pack_hash, YR
+from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, family_of, pack_hash, YR, pack_family, derive_kind, KINDS
 from tests.helpers import base_pack
 
 class PackTests(unittest.TestCase):
@@ -110,6 +110,88 @@ class PackTests(unittest.TestCase):
         p_no_yr["exam_id"] = "demo-basics"
         p_no_yr.pop("year", None)
         self.assertEqual(validate_pack(p_no_yr), [])
+
+    def test_pack_family_stated_wins_and_legacy_fallback(self):
+        # Stated family wins
+        self.assertEqual(pack_family({"exam_id": "csir-net-set-a", "family": "csir-net"}), "csir-net")
+        self.assertEqual(pack_family({"exam_id": "gat-b-practice-bioinfo", "family": "gat-b"}), "gat-b")
+        # Legacy packs without family fall back to family_of
+        self.assertEqual(pack_family({"exam_id": "gat-b-2023"}), "gat-b")
+        self.assertEqual(pack_family({"exam_id": "csir-net-set-a"}), "csir-net-set-a")
+        self.assertEqual(pack_family({"exam_id": "demo-basics"}), "demo-basics")
+
+    def test_derive_kind_heuristics(self):
+        # -drill in slug -> drill
+        self.assertEqual(derive_kind("gat-b-2023-drill"), "drill")
+        self.assertEqual(derive_kind("gat-b-drill-2"), "drill")
+        # year token -> pyq
+        self.assertEqual(derive_kind("gat-b-2023"), "pyq")
+        self.assertEqual(derive_kind("gate-bt-2024-shift1"), "pyq")
+        # practice token -> practice
+        self.assertEqual(derive_kind("gat-b-practice-bioinfo"), "practice")
+        self.assertEqual(derive_kind("demo-practice"), "practice")
+        # else None
+        self.assertIsNone(derive_kind("demo-basics"))
+        self.assertIsNone(derive_kind("csir-net-set-a"))
+        self.assertIsNone(derive_kind(None))
+
+    def test_validate_pack_new_fields(self):
+        # Legacy pack without kind/family validates clean
+        legacy = base_pack()
+        self.assertEqual(validate_pack(legacy), [])
+
+        # kind enum enforcement
+        p = base_pack()
+        p["kind"] = "invalid_kind"
+        errs = validate_pack(p)
+        self.assertTrue(any("kind must be one of" in e for e in errs), errs)
+
+        p["kind"] = "practice"
+        p["family"] = "gat-b"
+        self.assertEqual(validate_pack(p), [])
+
+        # family/slug mismatch is an error
+        p_mismatch = base_pack()
+        p_mismatch["exam_id"] = "gat-b-2023"
+        p_mismatch["year"] = 2023
+        p_mismatch["family"] = "csir-net"
+        errs = validate_pack(p_mismatch)
+        self.assertTrue(any("does not sit under stated family" in e for e in errs), errs)
+
+        # pyq requires year
+        p_pyq = base_pack()
+        p_pyq["kind"] = "pyq"
+        p_pyq.pop("year", None)
+        errs = validate_pack(p_pyq)
+        self.assertTrue(any("kind 'pyq' requires year" in e for e in errs), errs)
+
+        # scope non-empty
+        p_scope = base_pack()
+        p_scope["scope"] = ""
+        errs = validate_pack(p_scope)
+        self.assertTrue(any("scope must be a non-empty string" in e for e in errs), errs)
+
+        p_scope["scope"] = "Photosynthesis"
+        self.assertEqual(validate_pack(p_scope), [])
+
+    def test_summarize_fields(self):
+        p = base_pack()
+        p["family"] = "gat-b"
+        p["kind"] = "practice"
+        p["scope"] = "Photosynthesis"
+        sm = summarize(p)
+        self.assertEqual(sm["family"], "gat-b")
+        self.assertEqual(sm["kind"], "practice")
+        self.assertEqual(sm["scope"], "Photosynthesis")
+
+        # Legacy pack derives kind and has None scope
+        p_leg = base_pack()
+        p_leg["exam_id"] = "gat-b-2023"
+        p_leg["year"] = 2023
+        sm_leg = summarize(p_leg)
+        self.assertEqual(sm_leg["family"], "gat-b")
+        self.assertEqual(sm_leg["kind"], "pyq")
+        self.assertIsNone(sm_leg["scope"])
 
 if __name__ == "__main__":
     unittest.main()

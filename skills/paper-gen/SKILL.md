@@ -80,9 +80,15 @@ Never re-ask what the opening turn already contained.
   <exam> pattern; questions and key are original, not exam items."`
   per-question `provenance` may say the topic basis. A pack of any other shape
   (claiming official keys) is a falsified pack — never write one.
-- `exam_id` is a lowercase slug distinct from the real papers' ids, e.g.
-  `gat-b-gen-molecular-techniques` (`-gen-` marks it drafted; second draft on the
-  same scope gets `-2` at the end).
+- **Pack identity fields:** set `family` (the exam slug, e.g. `gat-b`),
+  `kind: "practice"`, and `scope` (free text naming the syllabus area covered,
+  e.g. `Photosynthesis`). The `exam_id` slug is a cosmetic human label: it may
+  use a shortform token from `exam_desk/vocab.py` (`ABBREVIATIONS`) for tidiness
+  (e.g. `gat-b-practice-bioinfo`), else the full word. Deduplication now compares
+  fields — two slugs abbreviating the same scope differently are still two papers
+  for humans, so prefer consistency: pick the token from the table, else the full
+  word. When the installer refuses an existing slug, counter on the slug (append
+  `-2`, `-3`).
 
 ## Procedure
 

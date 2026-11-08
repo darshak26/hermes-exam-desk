@@ -445,7 +445,7 @@ def evaluate(aid: str, force: bool = False):
             # The ledger is fed on success only, and must never break the evaluation
             # reply on its own failure — the panel call above returns before it.
             try:
-                prompt_mod_topics.record(a["exam_id"], aid, data.get("weak_topics"))
+                prompt_mod_topics.record(a["exam_id"], aid, data.get("weak_topics"), family=pack_mod.pack_family(pack))
             except Exception:
                 pass
             return fresh["evaluation"]

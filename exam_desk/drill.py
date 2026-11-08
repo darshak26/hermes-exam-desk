@@ -69,6 +69,8 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
     return {
         "schema": pack_mod.SCHEMA,
         "exam_id": drill_id,
+        "family": pack_mod.pack_family(source),
+        "kind": "drill",
         "title": f"{source.get('title', source['exam_id'])} — drill ({n} misses)",
         "language": source.get("language"),
         "provenance": (
@@ -79,6 +81,7 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
         ),
         "pattern": {"duration_minutes": minutes, "sections": sections},
         "questions": questions,
+        **({"scope": source["scope"]} if source.get("scope") else {}),
         **({"year": source["year"]} if "year" in source else {}),
         **({"key_status": key} if key and key != "official" else {}),
         "derived": True,                       # a fact about the file, not a validator field

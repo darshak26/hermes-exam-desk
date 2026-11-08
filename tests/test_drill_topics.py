@@ -134,6 +134,19 @@ class DrillTests(unittest.TestCase):
         for p in (p1, p2):
             self.assertEqual(pack_mod.validate_pack(p), [])
 
+    def test_drill_pack_stamps_kind_family_scope(self):
+        source = dict(self.pack)
+        source["family"] = "gat-b"
+        source["kind"] = "practice"
+        source["scope"] = "Photosynthesis"
+        a = self._attempt({"A-01": 1}, pack=source)
+        drill_pack = drill.build_drill_pack(source, a, "gat-b-practice-drill")
+        self.assertEqual(drill_pack["kind"], "drill")
+        self.assertEqual(drill_pack["family"], "gat-b")
+        self.assertEqual(drill_pack["scope"], "Photosynthesis")
+        errs = pack_mod.validate_pack(drill_pack)
+        self.assertEqual(errs, [])
+
 
 class TopicsTests(unittest.TestCase):
     def setUp(self):
@@ -226,3 +239,20 @@ class TopicsTests(unittest.TestCase):
         # Idempotent: reading again stays the same
         second_read = topics._read()
         self.assertEqual(second_read, read_data)
+
+    def test_record_stated_family_and_legacy_call(self):
+        # record with family=... lands in the stated family bucket
+        topics.record("custom-slug-01", "a-01", [{"topic": "Bioinformatics", "priority": "high"}],
+                      now=100, family="gat-b")
+        rows = topics.summarize("gat-b")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["family"], "gat-b")
+        self.assertEqual(rows[0]["papers"], ["custom-slug-01"])
+
+        # Legacy keyword-only call still works (falls back to family_of(exam_id))
+        topics.record("gat-b-2024", "a-02", [{"topic": "Bioinformatics", "priority": "medium"}],
+                      now=200)
+        rows2 = topics.summarize("gat-b")
+        self.assertEqual(len(rows2), 1)
+        self.assertEqual(rows2[0]["papers"], ["custom-slug-01", "gat-b-2024"])
+        self.assertEqual(rows2[0]["hits"], 2)
