@@ -1155,7 +1155,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
     ] }),
     attempts.length
       ? jsxs('div', { className: 'cbt-card-body', children: [
-          jsxs('div', { className: 'cbt-row', style: { marginBottom: 8 }, children: [
+          jsxs('div', { className: 'cbt-row', style: { marginBottom: 8, alignItems: 'center' }, children: [
             jsx(Button, {
               className: 'cbt-flush',
               variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
@@ -1168,7 +1168,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             // A paper mixes assisted practice with mocks; the table should be able
             // to show just the scorables.
             attempts.length
-              ? jsx('nav', { className: 'cbt-row', style: { marginTop: 4, border: '1px solid var(--border, var(--ui-stroke-secondary, #c8c8c8))', borderRadius: 6, padding: 2, gap: 2, background: 'var(--card, var(--ui-surface-background, #f5f5f5))' }, children: [
+              ? jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--border, var(--ui-stroke-secondary, #c8c8c8))', borderRadius: 6, padding: 2, gap: 2, background: 'var(--card, var(--ui-surface-background, #f5f5f5))' }, children: [
                   ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
                 ].map(([label, m]) => jsx(Button, {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
