@@ -88,15 +88,16 @@ const CSS = `
 .cbt .right{text-align:right}
 .cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
-/* attempt history — Mode | Status | Score | When | actions. The table fills the card:
-   five percentage columns, so a wide window widens the columns instead of leaving a
+/* attempt history — Mode | Date | Status | Score | Result | Delete. The table fills the card:
+   six percentage columns, so a wide window widens the columns instead of leaving a
    dead right-hand half inside the box. */
 .cbt .cbt-hist{table-layout:fixed;width:100%;min-width:0}
-.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:14%}
-.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:20%}
+.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:12%}
+.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:16%}
 .cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:14%}
-.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:22%}
+.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:12%}
 .cbt .cbt-hist th:nth-child(5),.cbt .cbt-hist td:nth-child(5){width:30%;text-align:right}
+.cbt .cbt-hist th:nth-child(6),.cbt .cbt-hist td:nth-child(6){width:16%;text-align:right}
 .cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
 /* instructions pattern — Section | Questions | To attempt | Marks */
 .cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:452px}
@@ -1017,10 +1018,8 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
 function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
   const qc = useQueryClient()
   const live = attempts.filter(a => a.status === 'in_progress')
-  // attempts arrive after the first render, so "open when there is history" cannot be
-  // an initial value — it would be computed against an empty list and stay closed.
-  // null = follow the data; a click pins the user's choice.
-  const [open, setOpen] = useState(null)
+  // History is collapsed by default; clicking History toggle or any mode filter unfolds it.
+  const [open, setOpen] = useState(false)
   // History filter: null = every sitting; otherwise the mode word ('assisted'|'exam').
   // A mock's trend reads right only next to other mocks — the modes are kept apart
   // by the evaluation too (prompts builds HISTORY per mode).
@@ -1031,7 +1030,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
   const [busy, setBusy] = useState(false)
   const [showWarn, setShowWarn] = useState(false)
 
-  const isOpen = open === null ? attempts.length > 0 : open
+  const isOpen = open === true
   const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
   const ranked = kept.filter(a => !modeFilter || a.mode === modeFilter)
   const rank = a => (a.status === 'in_progress' ? 0 : 1)
@@ -1144,12 +1143,12 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
           : null,
         jsx(Tip, { label: 'Side pane beside the chat — ask doubts while you answer', children:
           jsx(Button, {
-            variant: live.length ? 'secondary' : 'default', size: 'sm',
+            variant: 'secondary', size: 'sm',
             onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
           }) }),
         jsx(Tip, { label: 'Full page, no chat, no hints — the score that counts', children:
           jsx(Button, {
-            variant: 'secondary', size: 'sm',
+            variant: 'default', size: 'sm',
             onClick: () => onStart(pack, 'mock'), children: 'Start mock',
           }) }),
       ] }) }),
@@ -1173,8 +1172,8 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
                 ].map(([label, m]) => jsx(Button, {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
                   size: 'xs',
-                  onClick: () => setModeFilter(m),
-                  children: `${label} ${m ? filterCount(m) : ordered.length}`,
+                  onClick: () => { setModeFilter(m); setOpen(true) },
+                  children: `${label} ${m ? filterCount(m) : (showDiscarded ? attempts.length : kept.length)}`,
                 })) })
               : null,
             jsx('span', { style: { flex: 1 } }),
@@ -1192,33 +1191,30 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
           ] }),
           isOpen ? jsxs('table', { className: 'cbt-table cbt-hist', children: [
             jsx('thead', { children: jsx('tr', { children: [
-              ['Mode', ''], ['Status', ''], ['Score', 'num'], ['When', 'num'], ['', 'right'],
-            ].map(([h, cls]) => jsx('th', { key: h || 'actions', className: cls || undefined, children: h })) }) }),
+              ['Mode', ''], ['Date', 'num'], ['Status', ''], ['Score', 'num'], ['Result', 'right'], ['Delete', 'right'],
+            ].map(([h, cls]) => jsx('th', { key: h, className: cls || undefined, children: h })) }) }),
             jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
               jsx('td', { children: jsx(Badge, { variant: 'outline', size: 'xs', children: MODE_LABEL[a.mode] || a.mode }) }),
+              jsx('td', { className: 'num muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
               jsx('td', { children: jsx(Badge, {
                 variant: a.status === 'in_progress' ? 'default' : a.status === 'submitted' ? 'muted' : 'outline',
                 size: 'xs',
                 children: STATUS_LABEL[a.status] || a.status,
               }) }),
               jsx('td', { className: a.score == null ? 'num muted' : 'num', children: fmtScore(a.score) }),
-              jsx('td', { className: 'num muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
+              jsx('td', { className: 'right', children: jsx(Button, {
+                variant: 'outline', size: 'xs',
+                onClick: a.status === 'in_progress' ? () => onResume(a.id, a.mode) : () => onViewResult(a.id),
+                children: 'Open',
+              }) }),
               jsx('td', { className: 'right', children: confirmDel === a.id
                 ? jsxs('div', { className: 'cbt-row', children: [
                     jsx('span', { className: 'cbt-sub', children: 'Delete this attempt?' }),
                     jsx(Button, { variant: 'destructive', size: 'xs', disabled: busy, onClick: () => void del(a.id), children: busy ? 'Deleting…' : 'Delete' }),
                     jsx(Button, { variant: 'ghost', size: 'xs', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
                   ] })
-                : jsxs('div', { className: 'cbt-row', children: [
-                    // One verb for the row: "Open" either resumes a live sitting or lands
-                    // on its result/pending view. Residue splits like Resume/Details/Result
-                    // made the user learn three words for one destination.
-                    jsx(Button, { variant: 'outline', size: 'xs',
-                      onClick: a.status === 'in_progress' ? () => onResume(a.id, a.mode)
-                        : () => onViewResult(a.id), children: 'Open' }),
-                    jsx(Tip, { label: 'Delete this attempt permanently', children:
-                      jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }),
-                  ] }) }),
+                : jsx(Tip, { label: 'Delete this attempt permanently', children:
+                    jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }) }),
             ] })) }),
             hidden > 0
               ? jsx('caption', { className: 'cbt-caption', children: jsx(Button, {
@@ -1270,10 +1266,9 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx('h2', { children: 'Exam Desk' }),
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
-      jsx(SidebarButton, {}),
       jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
       jsx(Tip, { label: 'Opens a chat: the agent asks which exam and year, then brings the official paper — or drafts one to the same pattern when none exists', children:
-        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Add a paper' }) }),
+        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Add exam' }) }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
@@ -1282,7 +1277,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
         : (packList.length === 0
           ? jsxs('div', { children: [
               jsx(EmptyState, { title: 'No papers yet', description: 'Ask the agent to source a previous-year paper — it files itself here once validated.' }),
-              jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add a paper' }),
+              jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }),
             ] })
           : familyKeys.map(famKey => {
               const famPacks = groups[famKey]
@@ -1312,7 +1307,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
                         variant: 'outline',
                         size: 'xs',
                         onClick: () => { void launchSourcing(anotherPrompt) },
-                        children: 'Another paper'
+                        children: 'Add paper'
                       }),
                     ]
                   }),
@@ -2344,7 +2339,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
         ? jsx(Tip, { label: 'New paper holding this attempt\'s misses — wrong, skipped and not-counted, same key', children:
             jsx(Button, { variant: 'secondary', size: 'sm', loading: drillBusy, onClick: drill, children: 'Drill misses' }) })
         : null,
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All papers' }),
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'Home' }),
     ] }),
     // One attempt at a time: the arrows walk the papers' graded attempts in the order
     // they were submitted, and clamp at both ends rather than wrap.
