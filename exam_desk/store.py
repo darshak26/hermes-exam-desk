@@ -139,6 +139,8 @@ def _read_attempt(path):
     a = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(a, dict) or not a.get("id") or not a.get("status"):
         raise ValueError("not an attempt record")
+    if not a.get("family"):
+        a["family"] = pack_mod.family_of(a.get("exam_id"))
     return a
 
 
@@ -259,6 +261,7 @@ def attempt_lock(aid):
 def new_attempt(pack, mode, assisted_session_id=None):
     now = time.time()
     a = {"id": f"a-{uuid.uuid4().hex[:10]}", "exam_id": pack["exam_id"],
+         "family": pack_mod.pack_family(pack),
          "pack_hash": pack_mod.pack_hash(pack), "pack_title": pack.get("title"),
          # The chat the tutor sat in for an assisted sitting (a Hermes session id). Recorded
          # at creation because the desk cannot find it later any other way; the review
@@ -300,11 +303,10 @@ def is_expired(a, now=None):
     return a.get("status") == "in_progress" and remaining_seconds(a, now) <= 0
 
 
-def iter_attempts(limit=None):
+def iter_attempts(limit=None, exam_id=None, family=None):
     """Yield ``(attempt, None)`` for readable files, ``(None, {'id','error'})`` for corrupt ones.
 
-    Newest first by file mtime, so `limit` only reads the newest files instead of
-    parsing every attempt ever taken.
+    Newest first by file mtime. Filters by ``exam_id`` and/or ``family`` before applying ``limit``.
     """
     d = attempts_dir()
     if not d.exists():
@@ -315,18 +317,28 @@ def iter_attempts(limit=None):
         except OSError:
             return 0.0
     paths = sorted(d.glob("*.json"), key=_mtime, reverse=True)
-    if limit:
+    if limit is not None and not exam_id and not family:
         paths = paths[:limit]
+    yielded = 0
     for p in paths:
         try:
-            yield _read_attempt(p), None
+            a = _read_attempt(p)
         except (OSError, ValueError) as e:
             yield None, {"id": p.stem, "error": str(e)}
+            continue
+        if exam_id is not None and a.get("exam_id") != exam_id:
+            continue
+        if family is not None and a.get("family") != family:
+            continue
+        yield a, None
+        yielded += 1
+        if limit is not None and yielded >= limit:
+            break
 
 
-def list_attempts(limit=None):
+def list_attempts(limit=None, exam_id=None, family=None):
     """Readable attempts only — a corrupt file never breaks the list."""
-    return [a for a, err in iter_attempts(limit) if a is not None]
+    return [a for a, err in iter_attempts(limit=limit, exam_id=exam_id, family=family) if a is not None]
 
 
 def submit_attempt(a, pack, now=None):
@@ -377,7 +389,7 @@ def delete_attempt(aid):
     return True
 
 
-def prune_attempts(statuses=("abandoned",), exam_id=None):
+def prune_attempts(statuses=("abandoned",), exam_id=None, family=None):
     """Delete finished attempts in bulk. Returns the ids removed.
 
     `statuses` is intersected with the deletable set — a live attempt is never
@@ -385,12 +397,10 @@ def prune_attempts(statuses=("abandoned",), exam_id=None):
     """
     wanted = {s for s in statuses if s != "in_progress"}
     removed = []
-    for a, err in iter_attempts():
+    for a, err in iter_attempts(exam_id=exam_id, family=family):
         if err is not None or a is None:
             continue
         if a.get("status") not in wanted:
-            continue
-        if exam_id and a.get("exam_id") != exam_id:
             continue
         try:
             with attempt_lock(a["id"]):

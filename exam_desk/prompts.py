@@ -1,5 +1,6 @@
 """Prompt builders for the post-exam evaluation (the only in-plugin LLM use)."""
 import json
+import re
 
 from .vocab import mode_label
 
@@ -20,7 +21,7 @@ EVAL_INSTRUCTIONS = (
     "coaching the student toward a wrong key. (3) The KEY line states how far the key can "
     "be trusted; when it is not official, name the items you could not verify. "
     "PROCESS lines record behaviour the panel logged live (time on screen, revisits, "
-    "answer changes, tutor doubts); HISTORY summarises earlier attempts of this paper. "
+    "answer changes, tutor doubts); HISTORY summarises earlier attempts in this exam family. "
     "Use PROCESS to separate a habit from a one-off and HISTORY to say whether something "
     "is improving — a study-plan step without a history delta stays a study-plan step. "
     "All strings in English."
@@ -64,12 +65,53 @@ def evaluation_input(pack, attempt, prior=None, timeline_view=None):
     lines += [f"SCORE: {r['score']}  TOTALS: {r['totals']}", "SECTIONS:"]
     for sid, st in r["sections"].items():
         lines.append(f"  {sid}: {st}")
+    valid_prior = []
     if prior:
-        lines.append("HISTORY: earlier attempts on this same paper in this same mode, newest first")
-        for p in prior[:3]:
+        for p in prior:
+            if p.get("kind") == "drill":
+                continue
+            eid = p.get("exam_id") or ""
+            if "-drill" in eid:
+                continue
+            valid_prior.append(p)
+            if len(valid_prior) >= 3:
+                break
+
+    if valid_prior:
+        lines.append("HISTORY: earlier attempts in this exam family in this same mode (drills excluded), newest first")
+        for p in valid_prior:
             rr = (p.get("result") or {}).get("totals") or {}
-            lines.append(f"  {p['id']} ({mode_label(p.get('mode'))}): score={rr.get('score')} "
-                         f"correct={rr.get('correct')} wrong={rr.get('wrong')} skipped={rr.get('skipped')}")
+            title = p.get("pack_title") or p.get("exam_id") or "Unknown Paper"
+            year = p.get("year")
+            if not year:
+                ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", str(p.get("exam_id", "")))
+                if ym:
+                    year = ym.group(1)
+            paper_desc = f"{title} ({year})" if (year and str(year) not in str(title)) else str(title)
+
+            p_result = p.get("result") or {}
+            qs = p_result.get("questions") or []
+            if qs:
+                tot_q = len(qs)
+                max_marks = round(sum(q.get("marks", [0])[0] for q in qs if q.get("counted", True)), 2)
+            else:
+                tot_q = (rr.get("correct", 0) + rr.get("wrong", 0) +
+                         rr.get("skipped", 0) + rr.get("not_counted", 0))
+                max_marks = p.get("total_marks")
+
+            if isinstance(max_marks, float) and max_marks.is_integer():
+                max_marks = int(max_marks)
+
+            meta_parts = []
+            if tot_q:
+                meta_parts.append(f"questions={tot_q}")
+            if max_marks is not None:
+                meta_parts.append(f"max_marks={max_marks}")
+            meta = f" [{', '.join(meta_parts)}]" if meta_parts else ""
+
+            lines.append(f"  {p['id']} [{paper_desc}] ({mode_label(p.get('mode'))}){meta}: "
+                         f"score={rr.get('score')} correct={rr.get('correct')} "
+                         f"wrong={rr.get('wrong')} skipped={rr.get('skipped')}")
     tl = timeline_view or {}
     tl_lines = (timeline_mod_metric_lines(tl) if tl else [])
     if tl_lines:

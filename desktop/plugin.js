@@ -1278,7 +1278,14 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }),
             ] })
           : familyKeys.map(famKey => {
-              const famPacks = groups[famKey]
+const famPacks = groups[famKey]
+                      const famAttempts = all.filter(a => (a.family || a.exam_id) === famKey || (a.family || '').toLowerCase() === famKey.toLowerCase())
+                      const famPapers = new Set(famAttempts.map(a => a.exam_id)).size
+                      const famBest = famAttempts.map(a => a.score).filter(v => typeof v === 'number')
+                      const famLast = famAttempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
+                      const famAgg = famAttempts.length
+                        ? `${famAttempts.length} attempt${famAttempts.length === 1 ? '' : 's'} across ${famPapers || famPacks.length} paper${(famPapers || famPacks.length) === 1 ? '' : 's'}${famLast ? ` · last ${relTime(famLast)}` : ''}`
+                        : null
               const bodies = [...new Set(famPacks.map(p => (p.body || '').trim()).filter(Boolean))]
               // The band names the EXAM (family key), with the conducting body as a
               // muted qualifier. The body alone reads like a category tag — "NTA / RCB
@@ -1299,6 +1306,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
                           jsx('h3', { style: { margin: 0 }, children: examLabel }),
                           bodyLabel ? jsx('span', { className: 'cbt-sub', children: bodyLabel }) : null,
                           jsx('span', { className: 'cbt-sub', children: `${famPacks.length} ${famPacks.length === 1 ? 'paper' : 'papers'}` }),
+                          famAgg ? jsx('span', { className: 'cbt-sub', children: famAgg }) : null,
                         ]
                       }),
                       jsx(Button, {
@@ -2116,10 +2124,13 @@ function EvaluationCard({ d, pack }) {
 // sideways rather than shrinking bars. Each value sits in one fixed row above the plot
 // (not on its own bar), so a negative bar or a bar on the max line cannot collide with it.
 function AttemptsChart({ seq, selectedId, onSelect }) {
+  // Drills have different ceilings and would distort the scale; show full papers only.
+  const fullSeq = seq.filter(a => !/-drill(?:-\\d+)?$/.test(a.exam_id || ''))
+  const chartSeq = fullSeq.length ? fullSeq : seq
   const BAR_W = 28, BAR_GAP = 12, SLOT = 40, PLOT_H = 160
   const VALUE_H = 20, BASELINE_H = 24, AXIS_W = 44
-  const n = seq.length
-  const scores = seq.map(a => a.score ?? 0)
+  const n = chartSeq.length
+  const scores = chartSeq.map(a => a.score ?? 0)
   // The scale spans zero, so this paper's negative marking draws below the zero line.
   const scaleMin = Math.min(0, ...scores)
   const scaleMax = Math.max(0, ...scores)
@@ -2143,14 +2154,14 @@ function AttemptsChart({ seq, selectedId, onSelect }) {
   const svgH = VALUE_H + PLOT_H + BASELINE_H
   const yOf = v => VALUE_H + PLOT_H - ((v - scaleMin) / range) * PLOT_H
   const zeroY = yOf(0)
-  const selIdx = seq.findIndex(a => a.id === selectedId)
+  const selIdx = chartSeq.findIndex(a => a.id === selectedId)
   const ticks = []
   for (const v of [scaleMax, 0, scaleMin]) {
     const label = fmtScore(v)
     if (!ticks.some(t => t.label === label)) ticks.push({ y: yOf(v), label })
   }
 
-  const bars = seq.map((a, i) => {
+  const bars = chartSeq.map((a, i) => {
     const v = a.score ?? 0
     const isSel = a.id === selectedId
     const base = v < 0 ? 'var(--ui-red)' : 'var(--ui-accent)'
@@ -2189,7 +2200,7 @@ function AttemptsChart({ seq, selectedId, onSelect }) {
   return jsxs('div', { className: 'cbt-card', children: [
     jsxs('div', { style: { marginBottom: 12 }, children: [
       jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Marks per attempt' }),
-      jsx('div', { className: 'cbt-sub', style: { marginTop: 2 }, children: `${n} submitted attempt${n === 1 ? '' : 's'} of this paper — click a bar to open it` }),
+      jsx('div', { className: 'cbt-sub', style: { marginTop: 2 }, children: `${n} submitted attempt${n === 1 ? '' : 's'}${fullSeq.length < seq.length ? ' (full papers)' : ''} — click a bar to open it` }),
     ] }),
     jsx('div', { className: 'cbt-chart-scroll', ref: wrapRef, children:
       jsxs('svg', { width: svgW, height: svgH, role: 'group', 'aria-label': 'Marks per attempt', style: { display: 'block' }, children: [
@@ -2221,22 +2232,28 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
   const [drillBusy, setDrillBusy] = useState(false)
   const qc = useQueryClient()
 
-  // ── load the entry attempt to derive exam_id ───────────────────────────────
+  // ── load the entry attempt to derive the exam family ──────────────────────
   const entryQ = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
-  const examId = entryQ.data?.attempt?.exam_id ?? null
+  const entryAttempt = entryQ.data?.attempt || null
+  const family = entryAttempt?.family || (entryAttempt?.exam_id ? null : null)
 
-  // ── load siblings for this exam ────────────────────────────────────────────
+  // ── load siblings for this exam family ────────────────────────────────────
   const siblingsQ = useQuery({
-    queryKey: ['cbt', 'attempts', examId],
-    queryFn: () => rest(`/attempts?exam_id=${encodeURIComponent(examId)}&limit=500`),
-    enabled: !!examId,
+    queryKey: ['cbt', 'attempts', 'family', family || entryAttempt?.exam_id],
+    queryFn: () => rest(`/attempts?family=${encodeURIComponent(family || entryAttempt?.exam_id)}&limit=500`),
+    enabled: !!entryAttempt,
   })
 
   // ── submitted sequence, oldest first (the chronological ordering) ──────────
   // Filtered here as well as on the server: a dashboard still running the previous
   // build ignores ?exam_id and answers with every paper's attempts, and this page
   // must not draw another exam's marks as this one's.
-  const allSiblings = (siblingsQ.data?.attempts || []).filter(a => !examId || a.exam_id === examId)
+  const allSiblings = (siblingsQ.data?.attempts || []).filter(a => {
+    if (!entryAttempt) return true
+    const f = family || entryAttempt.exam_id
+    const af = a.family || a.exam_id
+    return af === f || (typeof af === 'string' && typeof f === 'string' && af.toLowerCase() === f.toLowerCase())
+  })
   const seq = allSiblings
     .filter(a => a.status === 'submitted')
     .sort((a, b) => (a.submitted_at || 0) - (b.submitted_at || 0) || a.id.localeCompare(b.id))
@@ -2320,19 +2337,19 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
   // Title, arrows and chart come from the exam's own record, so they stay on screen
   // while a switch is in flight. Swapping the attempt body must never blank the page
   // the reader clicked on, and a chart that disappears on click teaches nothing.
-  const entryAttempt = entryQ.data?.attempt || null
-  const pack = entryQ.data?.pack || null
+  const pack = q.data?.pack || entryQ.data?.pack || null
+  const selAttempt = q.data?.attempt || entryAttempt
   if (!pack) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
 
   const selAtt = selSeqIdx >= 0 ? seq[selSeqIdx] : null
   const shell = body => jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
       jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx(Badge, { variant: entryAttempt?.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[entryAttempt?.mode] || entryAttempt?.mode || '' }),
+      jsx(Badge, { variant: selAttempt?.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[selAttempt?.mode] || selAttempt?.mode || '' }),
       jsx('span', { style: { flex: 1 } }),
       jsx(SidebarButton, {}),
-      onRetake && entryAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[entryAttempt.mode] || entryAttempt.mode} attempt on this paper`, children:
-        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, entryAttempt.mode), children: 'Retake' }) }) : null,
+      onRetake && selAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[selAttempt.mode] || selAttempt.mode} attempt on this paper`, children:
+        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, selAttempt.mode), children: 'Retake' }) }) : null,
       onDrill && q.data?.attempt?.status === 'submitted' && q.data?.attempt?.result
         ? jsx(Tip, { label: 'New paper holding this attempt\'s misses — wrong, skipped and not-counted, same key', children:
             jsx(Button, { variant: 'secondary', size: 'sm', loading: drillBusy, onClick: drill, children: 'Drill misses' }) })
@@ -2346,7 +2363,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
       // The pill names the ATTEMPT; the exam's name is the heading above it. Keeping
       // the title out of both places is what stops the page saying it twice.
       jsx('div', { className: 'cbt-attempt-pill', children: selAtt
-        ? `Attempt ${selSeqIdx + 1} of ${seq.length} · ${fmtWhen(selAtt.submitted_at)} · ${MODE_LABEL[selAtt.mode] || selAtt.mode}`
+        ? `Attempt ${selSeqIdx + 1} of ${seq.length} · ${selAtt.pack_title || selAtt.exam_id}${selAtt.year && !String(selAtt.pack_title || '').includes(String(selAtt.year)) ? ' ' + selAtt.year : ''} · ${fmtWhen(selAtt.submitted_at)} · ${MODE_LABEL[selAtt.mode] || selAtt.mode}`
         : 'not a graded attempt' }),
       jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: seq.length === 0 || selSeqIdx >= seq.length - 1, 'aria-label': 'Next attempt', onClick: goNext, children: icon('chevron-right', 'size-4') }),
     ] }),

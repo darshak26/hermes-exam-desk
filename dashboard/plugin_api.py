@@ -9,6 +9,9 @@ Concurrency: handlers that mutate an attempt run inside `store.attempt_lock`, so
 two tabs (or a tab racing the server-side auto-submit) cannot lose an answer.
 """
 import importlib.util
+import json
+import os
+import re
 import sys
 import threading
 import time
@@ -59,16 +62,21 @@ def mode_of(attempt):
 
 
 def history_rows(rows, attempt):
-    """The HISTORY feed for this attempt: same paper, same mode, submitted, ≤3.
+    """The HISTORY feed for this attempt: same exam family, same mode, submitted, no drills, ≤3.
 
     Mode-cleaned on purpose. The mock's progress line must not read a sitting
     where the tutor answered half the questions, and an assisted run must not
     inherit the pressure (or numbers) of a clean sitting.
     """
     mine = mode_of(attempt)
+    fam = attempt.get("family") or pack_mod.family_of(attempt.get("exam_id"))
     return [p for p in rows
-            if p.get("exam_id") == attempt["exam_id"] and p.get("id") != attempt.get("id")
-            and p.get("mode") == mine and p.get("status") == "submitted"][:3]
+            if (p.get("family") or pack_mod.family_of(p.get("exam_id"))) == fam
+            and p.get("id") != attempt.get("id")
+            and p.get("mode") == mine
+            and p.get("status") == "submitted"
+            and p.get("kind") != "drill"
+            and pack_mod.derive_kind(p.get("exam_id")) != "drill"][:3]
 
 
 class AnswerPatch(BaseModel):
@@ -210,32 +218,50 @@ def link_session(aid: str, body: LinkSessionBody):
 
 
 @router.get("/attempts")
-def list_attempts(limit: int = HISTORY_LIMIT, exam_id: str | None = None):
+def list_attempts(limit: int = HISTORY_LIMIT, exam_id: str | None = None, family: str | None = None):
     """History, newest first. Expired attempts are graded on the way out so the
     panel never offers "Resume" on an attempt whose clock has already run out.
 
-    ``exam_id`` narrows the list to one paper. It filters before the cap: an exam
-    whose last attempt is older than the newest ``limit`` attempts of other papers
-    must still answer with its own history, so a filtered call reads until it has
-    ``limit`` matches instead of truncating the newest files first.
+    ``exam_id`` narrows the list to one paper, ``family`` to an exam family.
+    They filter before the cap: an exam whose last attempt is older than the newest
+    ``limit`` attempts of other papers must still answer with its own history.
     """
+    if exam_id and family and pack_mod.family_of(exam_id) != family:
+        raise HTTPException(422, "family does not match exam_id")
     cap = max(1, min(limit, 500))
     rows, unreadable = [], []
-    for a, err in store_mod.iter_attempts(None if exam_id else cap):
+    pack_cache = {}
+    for a, err in store_mod.iter_attempts(limit=None if (exam_id or family) else cap, exam_id=exam_id, family=family):
         if err is not None:
             unreadable.append(err)
             continue
         if store_mod.is_expired(a):
             a = _reap(a)
-        if exam_id is not None and a["exam_id"] != exam_id:
-            continue
+        eid = a["exam_id"]
+        if eid not in pack_cache:
+            try:
+                pack_cache[eid] = store_mod.get_pack(eid)
+            except Exception:
+                pack_cache[eid] = None
+        p = pack_cache[eid]
+        pack_title = a.get("pack_title") or (p.get("title") if p else None) or eid
+        year = p.get("year") if p else None
+        if year is None:
+            ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", eid)
+            if ym:
+                year = int(ym.group(1))
+
         r = a.get("result") or {}
-        rows.append({"id": a["id"], "exam_id": a["exam_id"], "mode": a["mode"],
+        rows.append({"id": a["id"], "exam_id": a["exam_id"], "paper_id": a["exam_id"],
+                     "family": a.get("family") or pack_mod.family_of(a["exam_id"]),
+                     "pack_title": pack_title,
+                     "year": year,
+                     "mode": a["mode"],
                      "status": a["status"], "started_at": a["started_at"],
                      "submitted_at": a.get("submitted_at"),
                      "score": r.get("score"), "totals": r.get("totals"),
                      "has_evaluation": bool(a.get("evaluation"))})
-        if exam_id is not None and len(rows) >= cap:
+        if (exam_id is not None or family is not None) and len(rows) >= cap:
             break
     return {"attempts": rows, "unreadable": unreadable}
 
@@ -352,14 +378,40 @@ def delete_attempt(aid: str):
 
 class PruneBody(BaseModel):
     exam_id: Optional[str] = None
+    family: Optional[str] = None
     statuses: List[str] = Field(default_factory=lambda: ["abandoned"])
 
 
 @router.post("/attempts/prune")
 def prune_attempts(body: PruneBody = PruneBody()):
     """Bulk-delete finished attempts (abandoned by default). Live ones are safe."""
-    gone = store_mod.prune_attempts(statuses=body.statuses, exam_id=body.exam_id)
+    if body.exam_id and body.family and pack_mod.family_of(body.exam_id) != body.family:
+        raise HTTPException(422, "family does not match exam_id")
+    gone = store_mod.prune_attempts(statuses=body.statuses, exam_id=body.exam_id, family=body.family)
     return {"deleted": len(gone), "ids": gone}
+
+
+@router.post("/attempts/backfill-family")
+def backfill_family():
+    """One-shot rewrite of attempts lacking 'family', preserving os.utime."""
+    d = store_mod.attempts_dir()
+    if not d.exists():
+        return {"updated": 0}
+    count = 0
+    for p in d.glob("*.json"):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or not data.get("id"):
+                continue
+            if not data.get("family"):
+                data["family"] = pack_mod.family_of(data.get("exam_id"))
+                st = p.stat()
+                p.write_text(json.dumps(data, indent=1), encoding="utf-8")
+                os.utime(p, (st.st_atime, st.st_mtime))
+                count += 1
+        except Exception:
+            continue
+    return {"updated": count}
 
 
 # --------------------------------------------------------------------------- #
@@ -445,7 +497,7 @@ async def evaluate(aid: str, force: bool = False):
         # (a tutor was beside the student — progress there is not progress alone)
         # and vice versa; that filter is the point of keeping the modes apart.
         tl = timeline_mod.build(a, pack)
-        prior = history_rows(store_mod.list_attempts(30), a)
+        prior = history_rows(store_mod.list_attempts(30, family=a.get("family") or pack_mod.family_of(a["exam_id"])), a)
         blob = prompt_mod.evaluation_input(pack, a, prior=prior, timeline_view=tl)
         data, model, provider, last_err = None, "", "", None
         # Degrade through the structured shapes providers actually support: a schema,
