@@ -188,6 +188,8 @@ class FakeLlm:
                                  "weak_topics": [{"topic": "t", "evidence": "e", "priority": "high"}],
                                  "wrong_answer_notes": [{"question_id": "A-02", "note": "n"}],
                                  "study_plan": ["revise x"]})
+    async def acomplete_structured(self, **kw):          # the async lane the real PluginLlm exposes
+        return self.complete_structured(**kw)
 
 FAKE_LLM = FakeLlm()
 
@@ -352,6 +354,10 @@ class LlmApiTests(unittest.TestCase):
             self.assertEqual(client.post(f"/attempts/{first}/evaluate").status_code, 200)
             self.assertIn("json_schema", llm.calls[0], "the richest shape must be tried first")
             self.assertIn("json_mode", llm.calls[1], "then json_object")
+            self.assertEqual(llm.calls[0]["timeout"], 90,
+                             "the first shape runs on the short budget — a provider that can't "
+                             "answer in 90 s won't in 180, so fall through fast")
+            self.assertEqual(llm.calls[1]["timeout"], 180, "the warmed-up shapes keep the long budget")
 
             second = self._answer(self._attempt())
             client.post(f"/attempts/{second}/submit")

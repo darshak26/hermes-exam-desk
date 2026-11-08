@@ -377,7 +377,7 @@ def _shape_attempts():
 
 
 @router.post("/attempts/{aid}/evaluate")
-def evaluate(aid: str, force: bool = False):
+async def evaluate(aid: str, force: bool = False):
     a, pack = _load(aid, touch=True)
     if a["status"] != "submitted" or not a.get("result"):
         raise HTTPException(409, "submit the attempt before evaluating")
@@ -410,12 +410,20 @@ def evaluate(aid: str, force: bool = False):
         # Degrade through the structured shapes providers actually support: a schema,
         # then json_object, then plain text with the JSON dug out of the reply. Atlas /
         # opencode-go answers a json_schema request with 400 "not yet supported".
-        for shape, extra in _shape_attempts():
+        for i, (shape, extra) in enumerate(_shape_attempts()):
+            # First shape gets a short budget: a provider that cannot answer in 90 s
+            # under a 2,000-token cap will not answer in 180 — falling through to the
+            # next shape fast beats half a call's ceiling stuck on the wrong shape.
+            timeout = 90 if i == 0 else 180
             try:
-                r = llm.complete_structured(instructions=prompt_mod.EVAL_INSTRUCTIONS,
-                                            input=[{"type": "text", "text": blob}],
-                                            temperature=0.2, max_tokens=2000, timeout=180,
-                                            purpose="exam-desk.evaluate", **extra)
+                # await, not a thread call: the handler is async, so the wait runs on
+                # the event loop and no threadpool worker is parked for up to 3x180 s
+                # while evaluations on OTHER attempts are also in flight.
+                r = await llm.acomplete_structured(
+                    instructions=prompt_mod.EVAL_INSTRUCTIONS,
+                    input=[{"type": "text", "text": blob}],
+                    temperature=0.2, max_tokens=2000, timeout=timeout,
+                    purpose="exam-desk.evaluate", **extra)
             except Exception as e:                          # provider refused this shape
                 last_err = e
                 continue

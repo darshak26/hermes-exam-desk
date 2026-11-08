@@ -371,6 +371,8 @@ class Evaluation(Base):
                     "overall_comment": "ok", "sections": [{"section_id": "A", "comment": "c"}],
                     "weak_topics": [], "wrong_answer_notes": [], "study_plan": ["revise"]},
                     model="m", provider="p")
+            async def acomplete_structured(self, **kw):
+                return self.complete_structured(**kw)
 
         m = types.ModuleType("exam_desk_ctx_bridge")
         setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
@@ -396,6 +398,8 @@ class Evaluation(Base):
             def complete_structured(self, **kw):
                 calls.append(kw)
                 return behaviour(kw)
+            async def acomplete_structured(self, **kw):
+                return self.complete_structured(**kw)
 
         m = types.ModuleType("exam_desk_ctx_bridge")
         setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
@@ -465,6 +469,8 @@ class Audit070Regressions(Base):
             def complete_structured(self, **kw):
                 calls.append(kw)
                 return behaviour(kw)
+            async def acomplete_structured(self, **kw):
+                return self.complete_structured(**kw)
 
         m = types.ModuleType("exam_desk_ctx_bridge")
         setattr(m, "ctx", types.SimpleNamespace(llm=Fake()))
