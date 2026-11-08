@@ -126,8 +126,12 @@ const CSS = `
 .cbt .cbt-stat.wrong .v{color:var(--ui-red)}
 /* evaluation blocks reuse the how-it-works card: label row, hairline, body row.
    Prose caps at the same measure as the review body, so a long comment does not
-   run the full width of a 1440px window. */
-.cbt .cbt-eval{max-width:820px}
+   run the full width of a 1440px window. The blocks separate on the block
+   rhythm (16px), and their labels keep the pack's 8px label-to-content gap —
+   .cbt-section's own 24px top margin is tuned for page flow, not for a stack
+   of boxes inside one card. */
+.cbt .cbt-eval{display:flex;flex-direction:column;gap:16px;max-width:820px}
+.cbt .cbt-eval .cbt-section{margin:0 0 8px}
 .cbt .cbt-eval-title{font-size:12px;font-weight:600;color:var(--ui-text-secondary)}
 .cbt .cbt-eval-body{font-size:12.5px;line-height:1.55}
 .cbt .cbt-lead-row{justify-content:space-between;gap:16px}
@@ -2426,7 +2430,9 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
         ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children:
             `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
         : null,
-      showEval && jsxs('div', { children: [
+      // The open analysis needs its own step down from the title row — same 12px the
+      // closed-state note and the key-status line use, so the card has one rhythm.
+      showEval && jsxs('div', { style: { marginTop: 12 }, children: [
         evalBusy
           ? jsxs('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children: [
               jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
