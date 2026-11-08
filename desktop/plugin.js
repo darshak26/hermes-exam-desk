@@ -74,15 +74,17 @@ const CSS = `
 .cbt .right{text-align:right}
 .cbt .right .cbt-row{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .cbt .cbt-caption{caption-side:bottom;text-align:left;padding-top:8px}
-/* attempt history — Mode | Status | Score | When | actions (auto: holds the confirm row) */
-.cbt .cbt-hist{table-layout:fixed}
+/* attempt history — Mode | Status | Score | When | actions (530px content-sized to prevent 620px gap to actions) */
+.cbt .cbt-hist{table-layout:fixed;width:auto;min-width:530px}
 .cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:84px}
 .cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:118px}
 .cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:76px}
 .cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:108px}
+.cbt .cbt-hist th:nth-child(5),.cbt .cbt-hist td:nth-child(5){width:144px;text-align:right}
 .cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
 /* instructions pattern — Section | Questions | To attempt | Marks */
-.cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:520px}
+.cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:452px}
+.cbt .cbt-pattern th:nth-child(1),.cbt .cbt-pattern td:nth-child(1){width:140px}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
 /* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
 .cbt .cbt-sec{table-layout:fixed;width:auto;min-width:640px}
@@ -124,7 +126,7 @@ const CSS = `
 .cbt.cbt-result > *{max-width:1280px}
 .cbt .cbt-result-grid{display:grid;grid-template-columns:minmax(0,1fr) 640px;column-gap:32px;align-items:start}
 .cbt .cbt-result-grid > *{min-width:0}
-@media (max-width:1180px){.cbt .cbt-result-grid{display:block}}
+@media (max-width:1400px){.cbt .cbt-result-grid{display:block}}
 /* review pager: 20 rows a page keeps the page finite whatever the paper size */
 .cbt .cbt-pager{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
@@ -154,14 +156,14 @@ const CSS = `
   .cbt.cbt-page,.cbt .cbt-qbody,.cbt .cbt-pal-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--dt-scrollbar-thumb,var(--ui-text-secondary)) 30%,transparent) transparent}
 }
 /* result statistics: computed from the attempt record — nothing here is model output.
-   min-width 480: the table sits in the narrow 1fr column beside the 640px tables, and
-   a 160-question paper at the 1280px cap leaves that column ~496px — a 560px table
-   would reach across the gap into the topics table */
-.cbt .cbt-stats{table-layout:fixed;width:auto;min-width:480px}
+   In a 1440 window with the 260px app sidebar, the left 1fr column resolves to ~388px:
+   min-width: 0 and width: 100% let the table fill its column without overflow, and
+   td:nth-child(2) is proportional (~52%) so sentences wrap inside the column. */
+.cbt .cbt-stats{table-layout:fixed;width:100%;min-width:0}
 /* the measured column carries sentences, not single tokens — left-aligned so a
    three-line value does not hang off the right edge of its cell, and one notch
    more row padding than the numeric tables: the wrapped lines meet the hairline */
-.cbt .cbt-stats td:nth-child(2){width:260px;text-align:left;font-variant-numeric:tabular-nums}
+.cbt .cbt-stats td:nth-child(2){width:52%;text-align:left;font-variant-numeric:tabular-nums}
 .cbt .cbt-stats td{padding-top:10px;padding-bottom:10px}
 .cbt .cbt-topic{table-layout:fixed;width:auto;min-width:640px}
 .cbt .cbt-topic th:nth-child(2),.cbt .cbt-topic td:nth-child(2){width:64px}
@@ -180,6 +182,7 @@ const CSS = `
 .cbt .cbt-card-title h3{margin:0;font-size:14px}
 .cbt .cbt-card-actions{flex:0 0 auto}
 .cbt .cbt-card-body{margin-top:12px}
+.cbt .cbt-flush{margin-left:-8px}
 .cbt .cbt-stat-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin-top:4px}
 .cbt .cbt-warn-count{display:inline-flex;align-items:center;gap:4px;color:var(--ui-text-warn,var(--ui-text-secondary))}
 
@@ -199,7 +202,10 @@ const CSS = `
    the .cbt root sets) — so center it on the FIRST line: (24 − 13) / 2 = 5.5px.
    A wrapped option keeps the control on line 1 */
 .cbt .opt input{flex:0 0 auto;margin:5.5px 0 0}
-.cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap}
+.cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap;cursor:pointer}
+/* one verdict width for every row: "Skipped" and "Wrong (-0.5)" must not move the
+   type/topic text that follows, so the label lives in a reserved slot */
+.cbt .cbt-verdict{display:inline-flex;align-items:center;justify-content:flex-start;min-width:104px}
 .cbt .cbt-review-body{padding:8px 0 12px 20px;max-width:820px}
 .cbt .cbt-ans{display:flex;gap:8px;font-size:13px;margin-top:4px}
 .cbt .cbt-ans-k{color:var(--ui-text-secondary);min-width:110px}
@@ -219,12 +225,16 @@ const CSS = `
   --areas:"head head" "body pal" "act pal";}
 .cbt-shell.pal-collapsed{--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act"}
 .cbt-shell.pal-collapsed.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);--areas:"head" "body" "act"}
+/* Shell header, tabs and body share one text edge. The shell's grid area gives all
+   three the same box x, so only their own padding moves text: body 20px, head 20px
+   (its first control sits there), and tabs 18px because the app's SegmentedControl
+   adds 2px of inner padding to the first tab. Measured, not guessed. */
 .cbt-head{display:flex;align-items:center;gap:8px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .cbt .timer{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600}
 .cbt .timer.low{color:var(--ui-text-warn,var(--ui-accent))}
 .cbt .timer.crit{color:var(--ui-red)}
-.cbt .cbt-tabs{padding:0 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
+.cbt .cbt-tabs{padding:0 20px 0 18px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
 .cbt-qbody{max-width:820px;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
 .cbt .cbt-qbody p{max-width:none}
 
@@ -815,9 +825,10 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
   const duration = `${hours ? hours + ' h ' : ''}${mins} min`
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx(SidebarButton, {}),
       jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
       jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Exam' }),
+      jsx('span', { style: { flex: 1 } }),
+      jsx(SidebarButton, {}),
     ] }),
     jsx(Separator, { className: 'cbt-sep' }),
     jsxs('div', { className: 'cbt-meta', children: [
@@ -836,7 +847,6 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
         jsx('td', { className: 'num', children: marksLabel(s, pack.pattern) }),
       ] })) }),
     ] }),
-    jsx(Separator, { className: 'cbt-sep' }),
     jsx('div', { className: 'cbt-section', children: 'How the paper works' }),
     jsx('div', { className: 'cbt-how', children: [
       'Select an answer, then Save to stay or Save & Next to move on. Leaving a question without saving keeps the pick on screen but does not record it.',
@@ -957,12 +967,12 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
           ? jsx('ul', { className: 'cbt-list', children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) })
           : null,
         attempts.length
-          ? jsxs('div', { className: 'cbt-stat-row', children: [
-              jsx('span', { children: `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}` }),
-              discarded ? jsx('span', { children: `· ${discarded} discarded` }) : null,
-              best != null ? jsx('span', { children: `· best ${fmtScore(best)}` }) : null,
-              last ? jsx('span', { children: `· last ${relTime(last)}` }) : null,
-            ] })
+          ? jsx('div', { className: 'cbt-stat-row', children: [
+              `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}`,
+              discarded ? `${discarded} discarded` : null,
+              best != null ? `best ${fmtScore(best)}` : null,
+              last ? `last ${relTime(last)}` : null,
+            ].filter(Boolean).join(' · ') })
           : null,
       ] }),
       jsx('div', { className: 'cbt-card-actions', children: pack.invalid ? null : jsxs('div', { className: 'cbt-row', children: [
@@ -985,6 +995,7 @@ function ExamCard({ pack, attempts, onStart, onResume, onViewResult }) {
       ? jsxs('div', { className: 'cbt-card-body', children: [
           jsxs('div', { className: 'cbt-row', style: { marginBottom: 8 }, children: [
             jsx(Button, {
+              className: 'cbt-flush',
               variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
               onClick: () => setOpen(!isOpen),
               children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
@@ -1062,14 +1073,15 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   const liveCount = all.filter(a => a.status === 'in_progress').length
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx(SidebarButton, {}),
       jsx('h2', { children: 'Exam Desk' }),
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
+      jsx(SidebarButton, {}),
       jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch() }, children: 'Refresh' }),
       jsx(Tip, { label: 'Opens a chat prompt for the agent — fill in the exam and year, it fetches, checks and files the paper', children:
         jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Source more papers' }) }),
     ] }),
+    jsx(Separator, { className: 'cbt-sep' }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
       : packs.isError
@@ -1689,7 +1701,7 @@ function ResultMetrics({ attempt, pack, tl }) {
   }
   if (skipped)
     metrics.push(['Seen but skipped', `${seenBlank} question${seenBlank === 1 ? '' : 's'} opened and then left blank`])
-  metrics.push(['Never reached', `${neverSeen} question${neverSeen === 1 ? '' : 's'} of the paper were never visited`])
+  metrics.push(['Never reached', `${neverSeen} question${neverSeen === 1 ? '' : 's'} of the paper ${neverSeen === 1 ? 'was' : 'were'} never visited`])
   // With the behaviour stream, dwell is real: per-question time, mind changes, doubts.
   // Without it (an attempt recorded before the stream existed) the wall clock is the
   // only truth, and the row says exactly that. Sub-second median dwell (machine-speed
@@ -1725,7 +1737,7 @@ function ResultMetrics({ attempt, pack, tl }) {
 
 // Topic roll-up sorted by marks: the biggest losses to the top. A question lands
 // under the topic its pack gives it; blanks count as skips there, so a topic whose
-// rows are all blank shows an honest `skip`.
+// rows are all blank shows '—' like any unmeasured metric.
 function topicRoll(rows, questions) {
   const roll = new Map()
   for (const row of rows) {
@@ -1760,7 +1772,7 @@ function ResultTopics({ attempt, pack }) {
         jsx('td', { className: 'num', children: String(cur.correct) }),
         jsx('td', { className: 'num', children: String(cur.wrong) }),
         jsx('td', { className: `num${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
-        jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : 'skip' }),
+        jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : '—' }),
       ] })) }),
     ] }),
     topics.length > 6
@@ -1885,12 +1897,12 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const pct = total ? Math.round((1000 * (r.totals.correct || 0)) / total) / 10 : 0
   return jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx(SidebarButton, {}),
       jsx('h2', { children: pack.title || pack.exam_id }),
       jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[attempt.mode] || attempt.mode }),
       jsx(Tip, { label: fmtWhen(attempt.submitted_at), children:
         jsx('span', { className: 'cbt-sub', children: `submitted ${relTime(attempt.submitted_at)}` }) }),
       jsx('span', { style: { flex: 1 } }),
+      jsx(SidebarButton, {}),
       onRetake ? jsx(Tip, { label: `New ${MODE_LABEL[attempt.mode] || attempt.mode} attempt on this paper`, children:
         jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, attempt.mode), children: 'Retake' }) }) : null,
       jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
@@ -1906,7 +1918,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     jsxs('div', { className: 'cbt-result-grid', children: [
     jsxs('div', { className: 'cbt-rg', children: [
       jsxs('div', { className: 'cbt-score-strip', children: [
-        jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Score' }),
+        jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'Score' }),
         jsxs('div', { className: 'cbt-score-row', children: [
           jsxs('div', { className: 'cbt-score-pair', children: [
             jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
@@ -1933,7 +1945,7 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     jsxs('div', { className: 'cbt-rg', children: [
       pack.pattern.sections.length > 1
         ? jsxs('div', { children: [
-            jsx('div', { className: 'cbt-label', style: { marginTop: 0 }, children: 'Sections' }),
+            jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'Sections' }),
             jsxs('table', { className: 'cbt-table cbt-sec', children: [
               jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
                 ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
@@ -2048,13 +2060,16 @@ function CbtResult({ attemptId, onHome, onRetake }) {
           children: [
             jsx(Codicon, { name: expanded ? 'chevron-down' : 'chevron-right', size: 12 }),
             jsx('strong', { children: row.id }),
-            jsx(Badge, {
+            // Fixed-width verdict slot: the badge widths differ by up to 20px
+            // ("Skipped" vs "Wrong (-0.5)"), and a row whose verdict label changes
+            // must not shift the type/topic text of its neighbours.
+            jsx('span', { className: 'cbt-verdict', children: jsx(Badge, {
               size: 'xs',
               variant: row.verdict === 'correct' ? 'success' : row.verdict === 'wrong' ? 'destructive' : row.verdict === 'skipped' ? 'muted' : 'outline',
               children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}`,
-            }),
-            isMarked ? jsx(Badge, { size: 'xs', variant: 'muted', children: 'Marked' }) : null,
+            }) }),
             jsx('span', { className: 'cbt-sub', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
+            isMarked ? jsx(Badge, { size: 'xs', variant: 'muted', children: 'Marked' }) : null,
             jsx('span', { style: { flex: 1 } }),
           ],
         }),
