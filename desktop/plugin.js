@@ -118,19 +118,35 @@ const CSS = `
 .cbt .cbt-plan{margin:0;padding-left:20px}
 .cbt .cbt-plan li{margin:0 0 6px}
 .cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
-/* Result layout: two columns of content-sized blocks — score + metrics left,
-   sections + topics right. A three-row table stretched across the full cap reads
-   as a spreadsheet, so the tables keep their content size (min-width, never 100%)
-   and the columns end where their last table ends. Below the grid the analysis
-   (prose, capped 820px) and the review list use the full content width. */
-.cbt.cbt-result > *{max-width:1280px}
-.cbt .cbt-result-grid{display:grid;grid-template-columns:minmax(0,1fr) 640px;column-gap:32px;align-items:start}
-.cbt .cbt-result-grid > *{min-width:0}
-@media (max-width:1400px){.cbt .cbt-result-grid{display:block}}
-/* review pager: 20 rows a page keeps the page finite whatever the paper size */
-.cbt .cbt-pager{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--ui-stroke-secondary)}
+/* Result layout: centred column of rounded cards. Every block shares the measured
+   column, and inside each card content sits 20px in on the same left edge. */
+.cbt.cbt-result{--rg-col:820px;max-width:var(--rg-col);margin-inline:auto;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.cbt.cbt-result > *{max-width:100%;box-sizing:border-box}
+.cbt.cbt-result .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:20px;margin-bottom:0;box-sizing:border-box}
+.cbt.cbt-result .cbt-card .cbt-more{padding:12px 0 0;margin-top:12px}
+.cbt.cbt-result .cbt-sec{width:100%;min-width:0}
+.cbt .cbt-attempt-nav{display:flex;justify-content:center;align-items:center;gap:8px;margin:0}
+.cbt .cbt-attempt-pill{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cbt .cbt-chart-scroll{overflow-x:auto}
+.cbt .cbt-chart-scroll svg rect:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
+.cbt .cbt-tile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cbt .cbt-tile{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:12px;display:flex;flex-direction:column;min-width:0;box-sizing:border-box}
+.cbt .cbt-tile-k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ui-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbt .cbt-tile-v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;margin:4px 0 2px}
+.cbt .cbt-tile-d{font-size:12px;color:var(--ui-text-secondary);line-height:1.35}
+.cbt .cbt-topic-list{display:flex;flex-direction:column;gap:12px}
+.cbt .cbt-topic-item{display:flex;flex-direction:column;gap:6px}
+.cbt .cbt-topic-row{display:flex;align-items:center;gap:12px;font-size:13px}
+.cbt .cbt-topic-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbt .cbt-topic-stat{font-variant-numeric:tabular-nums;text-align:right}
+.cbt .cbt-topic-ca{width:80px;flex:0 0 80px}
+.cbt .cbt-topic-acc{width:60px;flex:0 0 60px}
+.cbt .cbt-topic-marks{width:72px;flex:0 0 72px}
+.cbt .cbt-topic-track{height:4px;background:var(--ui-stroke-secondary);border-radius:2px;overflow:hidden}
+.cbt .cbt-topic-fill{height:100%;background:var(--ui-accent);border-radius:2px}
+/* review pager: centred [‹] Page 1 of 2 [›] */
+.cbt .cbt-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;padding-top:12px;border-top:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
-.cbt .cbt-pager .cbt-pager-sp{flex:1}
 /* evaluation notes: the first few, the rest behind a count — a 160-question attempt
    can carry ~94 notes, which is a screenful of prose on its own */
 .cbt .cbt-more{padding:9px 12px;font-size:12px;color:var(--ui-text-secondary);border-top:1px solid var(--ui-stroke-secondary);display:flex;align-items:center;gap:8px}
@@ -165,13 +181,6 @@ const CSS = `
    more row padding than the numeric tables: the wrapped lines meet the hairline */
 .cbt .cbt-stats td:nth-child(2){width:52%;text-align:left;font-variant-numeric:tabular-nums}
 .cbt .cbt-stats td{padding-top:10px;padding-bottom:10px}
-.cbt .cbt-topic{table-layout:fixed;width:auto;min-width:640px}
-.cbt .cbt-topic th:nth-child(2),.cbt .cbt-topic td:nth-child(2){width:64px}
-.cbt .cbt-topic th:nth-child(3),.cbt .cbt-topic td:nth-child(3){width:104px}
-.cbt .cbt-topic th:nth-child(4),.cbt .cbt-topic td:nth-child(4){width:80px}
-.cbt .cbt-topic th:nth-child(5),.cbt .cbt-topic td:nth-child(5){width:80px}
-.cbt .cbt-topic th:nth-child(6),.cbt .cbt-topic td:nth-child(6){width:88px}
-.cbt .cbt-topic th:nth-child(7),.cbt .cbt-topic td:nth-child(7){width:110px}
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
@@ -1683,56 +1692,112 @@ function ResultMetrics({ attempt, pack, tl }) {
   const per = answered ? (wall / answered / 60).toFixed(1) : null
   const penalty = pack.pattern.sections.some(s => (s.marks_wrong ?? 0) < 0)
 
-  const metrics = [
-    ['Answered', `${answered} of ${total} — ${fmtPct(answered, total)} of the paper`],
-    ['Accuracy', correct ? `${fmtPct(correct, attempted)} — ${correct} right of the ${attempted} attempted`
-      : 'no right answer recorded'],
+  const tiles = [
+    { label: 'Answered', value: `${answered}/${total}`, detail: `${fmtPct(answered, total)} of the paper` },
   ]
-  if (penalty && wrong)
-    metrics.push(['Penalty paid', `${fmtScore(lost)} lost across ${wrong} wrong answer${wrong === 1 ? '' : 's'}`])
-  for (const s of pack.pattern.sections) {
-    if (!s.attempt_limit) continue
-    const counted = rows.filter(row => row.section === s.id && row.verdict !== 'not_counted').length
-    const wasted = rows.filter(row => row.section === s.id && row.verdict === 'not_counted').length
-    if (wasted)
-      metrics.push([`Over the limit (${s.id})`, `${wasted} answer${wasted === 1 ? '' : 's'} beyond the first ${s.attempt_limit} are graded 0 — that is their whole cost`])
-    else if (counted < s.attempt_limit)
-      metrics.push([`Under the limit (${s.id})`, `${counted} of the ${s.attempt_limit} allowed answers spent — ${s.attempt_limit - counted} unused`])
+  if (attempted > 0) {
+    tiles.push({
+      label: 'Accuracy',
+      value: fmtPct(correct, attempted),
+      detail: correct ? `${correct} right of ${attempted} attempted` : 'no right answer recorded',
+    })
   }
-  if (skipped)
-    metrics.push(['Seen but skipped', `${seenBlank} question${seenBlank === 1 ? '' : 's'} opened and then left blank`])
-  metrics.push(['Never reached', `${neverSeen} question${neverSeen === 1 ? '' : 's'} of the paper ${neverSeen === 1 ? 'was' : 'were'} never visited`])
+  if (penalty && wrong > 0) {
+    tiles.push({
+      label: 'Penalty paid',
+      value: fmtScore(lost),
+      detail: `${wrong} wrong answer${wrong === 1 ? '' : 's'}`,
+    })
+  }
+
   // With the behaviour stream, dwell is real: per-question time, mind changes, doubts.
   // Without it (an attempt recorded before the stream existed) the wall clock is the
   // only truth, and the row says exactly that. Sub-second median dwell (machine-speed
   // retries, a corrupted stream) hides the row: a "median 0s" line would be noise.
   const t = (tl && tl.totals) || null
   if (t && t.events) {
-    if (t.changed)
-      metrics.push(['Mind changes', `${t.changed} answer${t.changed === 1 ? '' : 's'} changed after a first save`])
-    if (t.doubts)
-      metrics.push(['Asked the tutor', `${t.doubts} doubt${t.doubts === 1 ? '' : 's'} during the sitting`])
-    if (t.median_spent != null && t.median_spent > 0)
-      metrics.push(['Time on question', `median ${fmtFor(t.median_spent)}, longest ${fmtFor(t.longest_spent)} over the ${t.covered} touched`])
-    for (const [sid, sec] of Object.entries(tl.sections || {})) {
-      if (sec.dwell) metrics.push([`Time in section ${sid}`, `${fmtFor(sec.dwell)} across ${sec.questions} questions`])
+    if (t.median_spent != null && t.median_spent > 0) {
+      tiles.push({
+        label: 'Time on question',
+        value: fmtFor(t.median_spent),
+        detail: `median; longest ${fmtFor(t.longest_spent)} over ${t.covered} touched`,
+      })
     }
-    if (!metrics.some(([label]) => label === 'Time on question' || label.startsWith('Time in section')))
-      metrics.push(['Time on question', 'the stream is too thin for a real median — opened and saved in the same instant'])
-  } else {
-    metrics.push(['Pace', `${fmtFor(wall)} wall clock for ${answered} recorded answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each, averaged` : ''} (per-question times are not recorded)`])
+    for (const [sid, sec] of Object.entries(tl.sections || {})) {
+      if (sec.dwell) {
+        tiles.push({
+          label: `Time in section ${sid}`,
+          value: fmtFor(sec.dwell),
+          detail: `across ${sec.questions} questions`,
+        })
+      }
+    }
+    if (t.changed) {
+      tiles.push({
+        label: 'Mind changes',
+        value: String(t.changed),
+        detail: 'answers changed after a first save',
+      })
+    }
+    if (t.doubts) {
+      tiles.push({
+        label: 'Asked the tutor',
+        value: String(t.doubts),
+        detail: `asked during the sitting`,
+      })
+    }
+  } else if (wall != null && isFinite(wall)) {
+    tiles.push({
+      label: 'Pace',
+      value: fmtFor(wall),
+      detail: `wall clock for ${answered} answer${answered === 1 ? '' : 's'}${per ? ` — ${per} min each` : ''} (per-question times are not recorded)`,
+    })
   }
 
-  return jsxs('table', { className: 'cbt-table cbt-stats', children: [
-    jsx('thead', { children: jsx('tr', { children: [
-      jsx('th', { children: 'Statistic' }),
-      jsx('th', { children: 'Measured' }),
-    ] }) }),
-    jsx('tbody', { children: metrics.map(([label, value]) => jsxs('tr', { key: label, children: [
-      jsx('td', { children: label }),
-      jsx('td', { className: 'num', children: value }),
-    ] })) }),
-  ] })
+  if (skipped) {
+    tiles.push({
+      label: 'Seen but skipped',
+      value: String(seenBlank),
+      detail: `opened and then left blank`,
+    })
+  }
+  tiles.push({
+    label: 'Never reached',
+    value: String(neverSeen),
+    detail: 'questions never visited',
+  })
+
+  for (const s of pack.pattern.sections) {
+    if (!s.attempt_limit) continue
+    const counted = rows.filter(row => row.section === s.id && row.verdict !== 'not_counted').length
+    const wasted = rows.filter(row => row.section === s.id && row.verdict === 'not_counted').length
+    if (wasted) {
+      tiles.push({
+        label: `Over the limit (${s.id})`,
+        value: String(wasted),
+        detail: `beyond the first ${s.attempt_limit} — graded 0`,
+      })
+    } else if (counted < s.attempt_limit) {
+      tiles.push({
+        label: `Under the limit (${s.id})`,
+        value: `${counted}/${s.attempt_limit}`,
+        detail: `${s.attempt_limit - counted} allowed answers unused`,
+      })
+    }
+  }
+
+  return jsx('div', {
+    className: 'cbt-tile-grid',
+    children: tiles.map(tile => jsxs('div', {
+      className: 'cbt-tile',
+      key: tile.label,
+      children: [
+        jsx('div', { className: 'cbt-tile-k', children: tile.label }),
+        jsx('div', { className: 'cbt-tile-v', children: tile.value }),
+        tile.detail ? jsx('div', { className: 'cbt-tile-d', children: tile.detail }) : null,
+      ],
+    })),
+  })
 }
 
 // Topic roll-up sorted by marks: the biggest losses to the top. A question lands
@@ -1758,23 +1823,25 @@ function ResultTopics({ attempt, pack }) {
   const [allTopics, setAllTopics] = useState(false)
   const topics = topicRoll((attempt.result || {}).questions || [], pack.questions || [])
   if (topics.length <= 1) return null                       // one topic across the paper is no roll-up
+  const maxAwardedInRoll = Math.max(0, ...topics.map(t => Number(t.awarded) || 0))
   const showTopics = allTopics ? topics : topics.slice(0, 6)
-  return jsxs('div', { children: [
-    jsx('div', { className: 'cbt-section', style: { marginTop: 16 }, children: 'Topics' }),
-    jsxs('table', { className: 'cbt-table cbt-topic', children: [
-      jsx('thead', { children: jsx('tr', { children:
-        ['Topic', 'Q', 'Attempted', 'Correct', 'Wrong', 'Marks', 'Accuracy']
-          .map((htitle, i) => jsx('th', { key: htitle, className: i ? 'num' : undefined, children: htitle })) }) }),
-      jsx('tbody', { children: showTopics.map(cur => jsxs('tr', { key: cur.topic, children: [
-        jsx('td', { children: cur.topic }),
-        jsx('td', { className: 'num', children: String(cur.q) }),
-        jsx('td', { className: 'num', children: String(cur.attempted) }),
-        jsx('td', { className: 'num', children: String(cur.correct) }),
-        jsx('td', { className: 'num', children: String(cur.wrong) }),
-        jsx('td', { className: `num${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
-        jsx('td', { className: 'num', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : '—' }),
-      ] })) }),
-    ] }),
+  return jsxs('div', { className: 'cbt-card', children: [
+    jsx('div', { className: 'cbt-section', style: { margin: '0 0 12px' }, children: 'Topics' }),
+    jsx('div', { className: 'cbt-topic-list', children: showTopics.map(cur => {
+      const fillPct = maxAwardedInRoll > 0 && cur.awarded > 0
+        ? Math.min(100, Math.max(0, (cur.awarded / maxAwardedInRoll) * 100))
+        : 0
+      return jsxs('div', { key: cur.topic, className: 'cbt-topic-item', children: [
+        jsxs('div', { className: 'cbt-topic-row', children: [
+          jsx('span', { className: 'cbt-topic-name', title: cur.topic, children: cur.topic }),
+          jsx('span', { className: 'cbt-topic-stat cbt-topic-ca', children: `${cur.correct}/${cur.attempted}` }),
+          jsx('span', { className: 'cbt-topic-stat cbt-topic-acc', children: cur.attempted ? fmtPct(cur.correct, cur.attempted) : '—' }),
+          jsx('span', { className: `cbt-topic-stat cbt-topic-marks${cur.awarded > 0 ? ' hit' : cur.awarded < 0 ? ' miss' : ''}`, children: fmtScore(cur.awarded) }),
+        ] }),
+        jsx('div', { className: 'cbt-topic-track', children:
+          fillPct > 0 ? jsx('div', { className: 'cbt-topic-fill', style: { width: `${fillPct}%` } }) : null }),
+      ] })
+    }) }),
     topics.length > 6
       ? jsx('div', { className: 'cbt-more', children:
           jsx('button', {
@@ -1824,13 +1891,143 @@ function EvaluationCard({ d, pack }) {
   ] })
 }
 
+// ── Bar chart: marks per attempt ─────────────────────────────────────────────
+// Geometry is declared, not eyeballed: one slot per attempt, never narrower than SLOT px,
+// and the slot widens with the band so a handful of attempts fills the row instead of
+// huddling at the left edge. Past the point where SLOT no longer fits, the chart scrolls
+// sideways rather than shrinking bars. Each value sits in one fixed row above the plot
+// (not on its own bar), so a negative bar or a bar on the max line cannot collide with it.
+function AttemptsChart({ seq, selectedId, onSelect }) {
+  const BAR_W = 28, BAR_GAP = 12, SLOT = 40, PLOT_H = 160
+  const VALUE_H = 20, BASELINE_H = 24, AXIS_W = 44
+  const n = seq.length
+  const scores = seq.map(a => a.score ?? 0)
+  // The scale spans zero, so this paper's negative marking draws below the zero line.
+  const scaleMin = Math.min(0, ...scores)
+  const scaleMax = Math.max(0, ...scores)
+  const range = scaleMax - scaleMin || 1
+  // The band's own width, measured — bars spread over it instead of stacking left.
+  const wrapRef = useRef(null)
+  const [avail, setAvail] = useState(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => setAvail(el.clientWidth || 0)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const plotW = Math.max(avail > AXIS_W ? avail - AXIS_W : 0, n * SLOT)
+  const slotW = plotW / Math.max(1, n)
+  const svgW = AXIS_W + plotW
+  const svgH = VALUE_H + PLOT_H + BASELINE_H
+  const yOf = v => VALUE_H + PLOT_H - ((v - scaleMin) / range) * PLOT_H
+  const zeroY = yOf(0)
+  const selIdx = seq.findIndex(a => a.id === selectedId)
+  const ticks = []
+  for (const v of [scaleMax, 0, scaleMin]) {
+    const label = fmtScore(v)
+    if (!ticks.some(t => t.label === label)) ticks.push({ y: yOf(v), label })
+  }
+
+  const bars = seq.map((a, i) => {
+    const v = a.score ?? 0
+    const isSel = a.id === selectedId
+    const base = v < 0 ? 'var(--ui-red)' : 'var(--ui-accent)'
+    const fill = isSel ? base : `color-mix(in srgb, ${base} 35%, transparent)`
+    // A zero-scoring attempt still gets a 2px mark, or it would not be clickable.
+    const h = v === 0 ? 2 : Math.abs(yOf(v) - zeroY)
+    const y = v === 0 ? zeroY - 1 : Math.min(yOf(v), zeroY)
+    const cx = AXIS_W + i * slotW + slotW / 2          // the slot's centre
+    const x = cx - BAR_W / 2
+    return jsxs('g', { key: a.id, children: [
+      jsx('text', {
+        // Just above the bar's own top edge: above zero for a negative bar, which is
+        // where that bar starts. Never below the plot, so the label row cannot collide
+        // with the attempt numbers underneath.
+        x: cx, y: Math.max(12, (v >= 0 ? yOf(v) : zeroY) - 6), textAnchor: 'middle',
+        style: { fontSize: '11px', fill: 'var(--ui-text-secondary)', fontVariantNumeric: 'tabular-nums', fontWeight: isSel ? 600 : 400 },
+        children: fmtScore(v),
+      }),
+      jsx('rect', {
+        x, y, width: BAR_W, height: h, rx: 2,
+        style: { fill, cursor: 'pointer', stroke: isSel ? base : 'none', strokeWidth: 1 },
+        role: 'button', tabIndex: 0,
+        'aria-label': `Attempt ${i + 1}, ${fmtScore(v)} marks`,
+        'aria-current': isSel ? 'true' : undefined,
+        onClick: () => onSelect(a.id),
+        onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(a.id) } },
+      }),
+      jsx('text', {
+        x: cx, y: VALUE_H + PLOT_H + 16, textAnchor: 'middle',
+        style: { fontSize: '11px', fill: 'var(--ui-text-secondary)', fontVariantNumeric: 'tabular-nums' },
+        children: String(i + 1),
+      }),
+    ] })
+  })
+
+  return jsxs('div', { className: 'cbt-card', children: [
+    jsxs('div', { style: { marginBottom: 12 }, children: [
+      jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Marks per attempt' }),
+      jsx('div', { className: 'cbt-sub', style: { marginTop: 2 }, children: `${n} submitted attempt${n === 1 ? '' : 's'} of this paper — click a bar to open it` }),
+    ] }),
+    jsx('div', { className: 'cbt-chart-scroll', ref: wrapRef, children:
+      jsxs('svg', { width: svgW, height: svgH, role: 'group', 'aria-label': 'Marks per attempt', style: { display: 'block' }, children: [
+        ...ticks.map(t =>
+          jsxs('g', { key: `tick-${t.label}`, children: [
+            jsx('line', {
+              x1: AXIS_W, y1: t.y, x2: svgW, y2: t.y,
+              style: { stroke: 'var(--ui-stroke-secondary)', strokeWidth: 1 },
+            }),
+            jsx('text', {
+              x: AXIS_W - 6, y: t.y + 4, textAnchor: 'end',
+              style: { fontSize: '11px', fill: 'var(--ui-text-secondary)', fontVariantNumeric: 'tabular-nums' },
+              children: t.label,
+            }),
+          ] })),
+        ...bars,
+      ] }) }),
+    selIdx >= 0
+      ? jsx('div', { className: 'cbt-sub', style: { marginTop: 8, fontVariantNumeric: 'tabular-nums' },
+          children: `Attempt ${selIdx + 1}: ${fmtScore(seq[selIdx].score ?? 0)} marks — the bars are every graded attempt, oldest first.` })
+      : jsx('div', { className: 'cbt-sub', style: { marginTop: 8 },
+          children: 'This attempt was never graded — click a bar to open a graded one.' }),
+  ] })
+}
+
 function CbtResult({ attemptId, onHome, onRetake }) {
-  const q = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
+  // ── selected attempt state (local, not in view) ────────────────────────────
+  const [selectedId, setSelectedId] = useState(attemptId)
   const qc = useQueryClient()
+
+  // ── load the entry attempt to derive exam_id ───────────────────────────────
+  const entryQ = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
+  const examId = entryQ.data?.attempt?.exam_id ?? null
+
+  // ── load siblings for this exam ────────────────────────────────────────────
+  const siblingsQ = useQuery({
+    queryKey: ['cbt', 'attempts', examId],
+    queryFn: () => rest(`/attempts?exam_id=${encodeURIComponent(examId)}&limit=500`),
+    enabled: !!examId,
+  })
+
+  // ── submitted sequence, oldest first (the chronological ordering) ──────────
+  // Filtered here as well as on the server: a dashboard still running the previous
+  // build ignores ?exam_id and answers with every paper's attempts, and this page
+  // must not draw another exam's marks as this one's.
+  const allSiblings = (siblingsQ.data?.attempts || []).filter(a => !examId || a.exam_id === examId)
+  const seq = allSiblings
+    .filter(a => a.status === 'submitted')
+    .sort((a, b) => (a.submitted_at || 0) - (b.submitted_at || 0) || a.id.localeCompare(b.id))
+
+  // ── load the selected attempt's full data ──────────────────────────────────
+  const q = useQuery({ queryKey: ['cbt', 'attempt', selectedId], queryFn: () => rest(`/attempts/${selectedId}`) })
+
+  // ── review list state — reset on attempt switch ────────────────────────────
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(null)
-  // A real paper is 160 questions: rendering every review row at once made the page
-  // 6,000 px tall. Twenty a page keeps it finite and keeps the pager on screen.
   const [page, setPage] = useState(0)
   const [evalBusy, setEvalBusy] = useState(false)
   const [evalError, setEvalError] = useState(null)
@@ -1838,15 +2035,27 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   // Analysis is a section the reader opens: default closed so the numbers tell the
   // story first and the model call happens only once someone asks for it.
   const [showEval, setShowEval] = useState(false)
+  // Switching attempts resets the review list and the analysis panel: page 3 of one
+  // attempt's wrong answers is not page 3 of another's, and an open analysis belongs
+  // to the attempt it was run on.
+  const prevSelRef = useRef(selectedId)
+  useEffect(() => {
+    if (prevSelRef.current !== selectedId) {
+      setFilter('all'); setPage(0); setOpen(null)
+      setShowEval(false); setEvalError(null)
+      prevSelRef.current = selectedId
+    }
+  }, [selectedId])
+
   // `force` re-runs the LLM; without it the server returns the stored evaluation and
   // the call is free, so opening a result twice never costs a second model call.
   const runEval = async force => {
     if (evalBusy) return
     setEvalBusy(true); setEvalError(null)
     try {
-      const ev = await rest(`/attempts/${attemptId}/evaluate${force ? '?force=true' : ''}`, { method: 'POST' })
+      const ev = await rest(`/attempts/${selectedId}/evaluate${force ? '?force=true' : ''}`, { method: 'POST' })
       const d = q.data
-      qc.setQueryData(['cbt', 'attempt', attemptId], { ...d, attempt: { ...d.attempt, evaluation: ev } })
+      qc.setQueryData(['cbt', 'attempt', selectedId], { ...d, attempt: { ...d.attempt, evaluation: ev } })
       setEvalTried(true)
       qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
     } catch (e) { setEvalError(e?.message || String(e)) }
@@ -1859,19 +2068,82 @@ function CbtResult({ attemptId, onHome, onRetake }) {
     // loads the attempt-review skill — it never stages a draft.
     void launchDiscussion(a)
   }
-  if (q.isLoading) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
-  if (q.isError || !q.data) return jsx('div', { className: 'cbt cbt-page', children: jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() }) })
-  const { attempt, pack } = q.data
+
+  // ── arrow navigation helpers ───────────────────────────────────────────────
+  const selSeqIdx = seq.findIndex(a => a.id === selectedId)
+  const goPrev = () => { if (selSeqIdx > 0) setSelectedId(seq[selSeqIdx - 1].id) }
+  const goNext = () => { if (selSeqIdx < seq.length - 1) setSelectedId(seq[selSeqIdx + 1].id) }
+
+  // Keyboard: ArrowLeft/ArrowRight switch when not in an input/textarea/select/contenteditable
+  useEffect(() => {
+    const handler = e => {
+      const tag = (e.target?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev() }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); goNext() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [seq, selectedId])
+
+  // ── shell: the part that belongs to the EXAM, not to one attempt ────────────
+  // Title, arrows and chart come from the exam's own record, so they stay on screen
+  // while a switch is in flight. Swapping the attempt body must never blank the page
+  // the reader clicked on, and a chart that disappears on click teaches nothing.
+  const entryAttempt = entryQ.data?.attempt || null
+  const pack = entryQ.data?.pack || null
+  if (!pack) return jsx('div', { className: 'cbt cbt-page', children: jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading…'] }) })
+
+  const selAtt = selSeqIdx >= 0 ? seq[selSeqIdx] : null
+  const shell = body => jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
+    jsxs('div', { className: 'cbt-head-row', children: [
+      jsx('h2', { children: pack.title || pack.exam_id }),
+      jsx(Badge, { variant: entryAttempt?.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[entryAttempt?.mode] || entryAttempt?.mode || '' }),
+      jsx('span', { style: { flex: 1 } }),
+      jsx(SidebarButton, {}),
+      onRetake && entryAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[entryAttempt.mode] || entryAttempt.mode} attempt on this paper`, children:
+        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, entryAttempt.mode), children: 'Retake' }) }) : null,
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
+    ] }),
+    // One attempt at a time: the arrows walk the papers' graded attempts in the order
+    // they were submitted, and clamp at both ends rather than wrap.
+    jsxs('div', { className: 'cbt-attempt-nav', children: [
+      jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: selSeqIdx <= 0, 'aria-label': 'Previous attempt', onClick: goPrev, children: icon('chevron-left', 'size-4') }),
+      // The pill names the ATTEMPT; the exam's name is the heading above it. Keeping
+      // the title out of both places is what stops the page saying it twice.
+      jsx('div', { className: 'cbt-attempt-pill', children: selAtt
+        ? `Attempt ${selSeqIdx + 1} of ${seq.length} · ${fmtWhen(selAtt.submitted_at)} · ${MODE_LABEL[selAtt.mode] || selAtt.mode}`
+        : 'not a graded attempt' }),
+      jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: seq.length === 0 || selSeqIdx >= seq.length - 1, 'aria-label': 'Next attempt', onClick: goNext, children: icon('chevron-right', 'size-4') }),
+    ] }),
+    seq.length > 0 ? jsx(AttemptsChart, { seq, selectedId, onSelect: id => setSelectedId(id) }) : null,
+    ...body,
+  ] })
+
+  // The attempt body itself: pending, failed, ungraded, or the full result.
+  if (!q.data) {
+    return shell([
+      jsx('div', { className: 'cbt-card', children: q.isError
+        ? jsx(ErrorBox, { what: 'Loading result', onRetry: () => q.refetch() })
+        : jsxs('div', { className: 'cbt-row cbt-sub', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading this attempt…'] })
+      }),
+    ])
+  }
+  const attempt = q.data.attempt
+
+  // ── not-submitted stub (abandoned / in-progress) with arrows + chart ───────
   if (attempt.status !== 'submitted' || !attempt.result) {
     const why = attempt.status === 'abandoned'
       ? 'This attempt was discarded — it was never graded and its answer key is not shown.'
       : 'This attempt is still in progress — resume it to finish.'
-    return jsxs('div', { className: 'cbt cbt-page', children: [
-      jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx('p', { className: 'cbt-sub', children: why }),
-      jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onHome(), children: 'Back to home' }),
-    ] })
+    return shell([
+      jsx('div', { className: 'cbt-card', children: [
+        jsx('p', { className: 'cbt-sub', style: { margin: '0 0 12px' }, children: why }),
+        jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onHome(), children: 'Back to home' }),
+      ] }),
+    ])
   }
+
   const r = attempt.result
   // A failure survives the reload now (the server stores it on the attempt), so the
   // panel shows the same reason next time instead of a bare "No evaluation yet."
@@ -1895,223 +2167,215 @@ function CbtResult({ attemptId, onHome, onRetake }) {
   const pageRows = rows.slice(shownFrom, shownTo)
   const total = (r.totals.correct || 0) + (r.totals.wrong || 0) + (r.totals.skipped || 0) + (r.totals.not_counted || 0)
   const pct = total ? Math.round((1000 * (r.totals.correct || 0)) / total) / 10 : 0
-  return jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
-    jsxs('div', { className: 'cbt-head-row', children: [
-      jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[attempt.mode] || attempt.mode }),
-      jsx(Tip, { label: fmtWhen(attempt.submitted_at), children:
-        jsx('span', { className: 'cbt-sub', children: `submitted ${relTime(attempt.submitted_at)}` }) }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx(SidebarButton, {}),
-      onRetake ? jsx(Tip, { label: `New ${MODE_LABEL[attempt.mode] || attempt.mode} attempt on this paper`, children:
-        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, attempt.mode), children: 'Retake' }) }) : null,
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'All exams' }),
-    ] }),
-    jsx(Separator, { className: 'cbt-sep' }),
-    // One band: score on the left, sections on the right. A 160-question paper's table
-    // is three rows tall, so stacking it under the score cost a screen of height for
-    // nothing.
-    // Two columns of content-sized blocks: score and the metric table left, the
-    // per-section and per-topic tables right. A three-row table stretched across the
-    // full cap reads as a spreadsheet (the native rule: small tables size to their
-    // content); below this grid the analysis and the review take the full width.
-    jsxs('div', { className: 'cbt-result-grid', children: [
-    jsxs('div', { className: 'cbt-rg', children: [
-      jsxs('div', { className: 'cbt-score-strip', children: [
-        jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'Score' }),
-        jsxs('div', { className: 'cbt-score-row', children: [
-          jsxs('div', { className: 'cbt-score-pair', children: [
-            jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
-            maxTotal ? jsx('span', { className: 'cbt-score-max', children: `/ ${maxTotal}` }) : null,
-          ] }),
-          jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
-            jsxs('div', { className: `cbt-stat ${k}`, children: [
-              jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
-              jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
-            ] }, k)) }),
+  return shell([
+    // Card 3 — Score, then the statistics measured from the record. One card: both
+    // answer "how did this sitting go", and two boxes for one subject read as two.
+    jsxs('div', { className: 'cbt-card', children: [
+      jsx('div', { className: 'cbt-section', style: { margin: '0 0 12px' }, children: 'Score' }),
+      jsxs('div', { className: 'cbt-score-row', children: [
+        jsxs('div', { className: 'cbt-score-pair', children: [
+          jsx('div', { className: `cbt-score${r.score > 0 ? ' pos' : r.score < 0 ? ' neg' : ''}`, children: fmtScore(r.score) }),
+          maxTotal ? jsx('span', { className: 'cbt-score-max', children: `/ ${maxTotal}` }) : null,
         ] }),
-        jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: [
-          `${r.totals.correct} of ${total} questions correct · ${pct}%`,
-          penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
-          penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
-        ] }),
+        jsx('div', { className: 'cbt-stat-grid', children: ['correct', 'wrong', 'skipped', 'not_counted'].map(k =>
+          jsxs('div', { className: `cbt-stat ${k}`, children: [
+            jsx('span', { className: 'k', children: VERDICT_LABEL[k] }),
+            jsx('span', { className: 'v', children: String(r.totals[k] ?? 0) }),
+          ] }, k)) }),
       ] }),
-      jsxs('div', { className: 'cbt-row', style: { marginTop: 16 }, children: [
+      jsx('div', { className: 'cbt-sub', style: { marginTop: 12 }, children: [
+        `${r.totals.correct} of ${total} questions correct · ${pct}%`,
+        penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
+        penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
+      ] }),
+      jsx(Separator, { className: 'cbt-sep' }),
+      jsxs('div', { style: { marginBottom: 12 }, children: [
         jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Statistics' }),
-        jsx('span', { className: 'cbt-sub', children: 'computed from the attempt record — no model involved' }),
+        jsx('div', { className: 'cbt-sub', style: { marginTop: 2 }, children: 'computed from the attempt record — no model involved' }),
       ] }),
       jsx(ResultMetrics, { attempt, pack, tl: q.data?.stats }),
     ] }),
-    jsxs('div', { className: 'cbt-rg', children: [
-      pack.pattern.sections.length > 1
-        ? jsxs('div', { children: [
-            jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'Sections' }),
-            jsxs('table', { className: 'cbt-table cbt-sec', children: [
-              jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
-                ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
-                : h })) }) }),
-              jsx('tbody', { children: pack.pattern.sections.map(s => {
-                const st = r.sections[s.id] || {}
-                return jsxs('tr', { key: s.id, children: [
-                  jsxs('td', { children: [
-                    jsx(Badge, { variant: 'outline', size: 'xs', children: s.id }),
-                    ' ',
-                    s.title,
-                  ] }),
-                  jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: st.score == null ? '—' : fmtScore(st.score) }),
-                  jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
-                  jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
-                  jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
-                  jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
-                  jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
-                ] })
-              }) }),
-              jsx('tfoot', { children: jsxs('tr', { children: [
-                jsx('td', { children: 'Total' }),
-                jsx('td', { className: 'num', children: fmtScore(r.score) }),
-                jsx('td', { className: 'num', children: String(maxTotal || '—') }),
-                jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
-                jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
-                jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
-                jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
-              ] }) }),
-            ] }),
-          ] })
-        : null,
-        jsx(ResultTopics, { attempt, pack }),
-    ] }),
-    ] }),
-    jsx(Separator, { className: 'cbt-sep' }),
-    jsxs('div', { className: 'cbt-row', children: [
-      jsx('div', { className: 'cbt-section', style: { marginTop: 0 }, children: 'AI analysis' }),
-      jsx(Badge, { variant: 'muted', size: 'xs', children: 'model output' }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
-      attempt.evaluation
-        ? jsx(Button, { variant: 'outline', size: 'sm', onClick: () => setShowEval(v => !v),
-            children: showEval ? 'Hide analysis' : 'Show analysis' })
-        : jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy,
-            onClick: () => { setShowEval(true); void runEval(false) }, children: 'Analyse this attempt' }),
-    ] }),
-    pack.key_status && pack.key_status !== 'official'
-      ? jsx('div', { className: 'cbt-row cbt-sub', style: { margin: '12px 0' }, children:
-          `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
-      : null,
-    showEval && jsxs('div', { children: [
-      evalBusy
-        ? jsxs('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children: [
-            jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
-            'Analysing your attempt — this calls the model once and takes a few seconds.',
-          ] })
-        : evalFailure
-          ? jsxs('div', { children: [
-              jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
-                jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
-                attempt.evaluation_error && !evalError
-                  ? jsx('span', { className: 'cbt-sub', children: `recorded ${relTime(attempt.evaluation_error.at)}` })
-                  : null,
-                jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
-              ] }),
-              jsxs('details', { style: { marginTop: 8 }, children: [
-                jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
-                jsx('pre', { className: 'cbt-pre', children: evalFailure }),
-              ] }),
-            ] })
-          : attempt.evaluation
-            ? jsxs('div', { children: [
-                jsx(EvaluationCard, { d: attempt.evaluation.data, pack }),
-                jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
-                  jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
-                  jsx('span', { style: { flex: 1 } }),
-                  jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
+    // Card 4 — Sections
+    pack.pattern.sections.length > 1
+      ? jsxs('div', { className: 'cbt-card', children: [
+          jsx('div', { className: 'cbt-section', style: { margin: '0 0 12px' }, children: 'Sections' }),
+          jsxs('table', { className: 'cbt-table cbt-sec', children: [
+            jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
+              ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
+              : h })) }) }),
+            jsx('tbody', { children: pack.pattern.sections.map(s => {
+              const st = r.sections[s.id] || {}
+              return jsxs('tr', { key: s.id, children: [
+                jsxs('td', { children: [
+                  jsx(Badge, { variant: 'outline', size: 'xs', children: s.id }),
+                  ' ',
+                  s.title,
                 ] }),
+                jsx('td', { className: `num${st.score > 0 ? ' hit' : st.score < 0 ? ' miss' : ''}`, children: st.score == null ? '—' : fmtScore(st.score) }),
+                jsx('td', { className: 'num muted', children: String(maxBySection[s.id] ?? '—') }),
+                jsx('td', { className: 'num', children: String(st.correct ?? 0) }),
+                jsx('td', { className: 'num', children: String(st.wrong ?? 0) }),
+                jsx('td', { className: 'num', children: String(st.skipped ?? 0) }),
+                jsx('td', { className: 'num', children: String(st.not_counted ?? 0) }),
               ] })
-            : null,
-    ] }),
-    jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
-    jsxs('div', { className: 'cbt-row', children: [
-      jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Review' }),
-      jsx('span', { className: 'cbt-sub', children: rows.length
-        ? `${shownFrom + 1}–${shownTo} of ${rows.length}`
-        : 'nothing here' }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx(SegmentedControl, {
-        value: filter,
-        onChange: f => { setFilter(f); setPage(0); setOpen(null) },
-        sizing: 'content',
-        options: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) => ({
-          id: f,
-          label: f === 'all' ? `${label} ${r.questions.length}` : `${label} ${r.totals[f] ?? 0}`,
-        })),
-      }),
-    ] }),
-    jsx('div', { style: { marginTop: 8 }, children: pageRows.map(row => {
-      const qq = qmap[row.id]
-      const expanded = open === row.id
-      const isMarked = (attempt.marked || []).includes(row.id)
-      const skipped = row.verdict === 'skipped'
-      return jsxs('div', { key: row.id, className: 'review-row', children: [
-        jsx('div', {
-          className: 'cbt-row cbt-review-head', role: 'button', tabIndex: 0, 'aria-expanded': expanded,
-          onClick: () => setOpen(expanded ? null : row.id),
-          onKeyDown: e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(expanded ? null : row.id) }
-          },
-          children: [
-            jsx(Codicon, { name: expanded ? 'chevron-down' : 'chevron-right', size: 12 }),
-            jsx('strong', { children: row.id }),
-            // Fixed-width verdict slot: the badge widths differ by up to 20px
-            // ("Skipped" vs "Wrong (-0.5)"), and a row whose verdict label changes
-            // must not shift the type/topic text of its neighbours.
-            jsx('span', { className: 'cbt-verdict', children: jsx(Badge, {
-              size: 'xs',
-              variant: row.verdict === 'correct' ? 'success' : row.verdict === 'wrong' ? 'destructive' : row.verdict === 'skipped' ? 'muted' : 'outline',
-              children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}`,
             }) }),
-            jsx('span', { className: 'cbt-sub', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
-            isMarked ? jsx(Badge, { size: 'xs', variant: 'muted', children: 'Marked' }) : null,
-            jsx('span', { style: { flex: 1 } }),
-          ],
-        }),
-        expanded && jsxs('div', { className: 'cbt-review-body', children: [
-          jsx('p', { children: qq.text }),
-          mediaNode(qq.media, pack.exam_id, `rev-${row.id}`),
-          (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'cbt-sub', children: [
-            `${String.fromCharCode(65 + i)}) ${o}`,
-            qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.exam_id, `rev-${row.id}-o${i}`) : null,
-          ] })),
-          jsxs('div', { className: 'cbt-ans', children: [
-            jsx('span', { className: 'cbt-ans-k', children: 'Your answer' }),
-            jsx('span', {
-              className: skipped ? 'muted' : row.verdict === 'correct' ? 'hit' : 'miss',
-              children: skipped ? 'not answered' : fmtAns(qq, attempt.answers[row.id]),
-            }),
+            jsx('tfoot', { children: jsxs('tr', { children: [
+              jsx('td', { children: 'Total' }),
+              jsx('td', { className: 'num', children: fmtScore(r.score) }),
+              jsx('td', { className: 'num', children: String(maxTotal || '—') }),
+              jsx('td', { className: 'num', children: String(r.totals.correct ?? 0) }),
+              jsx('td', { className: 'num', children: String(r.totals.wrong ?? 0) }),
+              jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
+              jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
+            ] }) }),
           ] }),
-          jsxs('div', { className: 'cbt-ans', children: [
-            jsx('span', { className: 'cbt-ans-k', children: 'Correct answer' }),
-            jsx('span', { className: 'hit', children: fmtAns(qq, qq.answer) }),
-          ] }),
-          qq.explanation ? jsx('p', { className: 'cbt-sub', children: qq.explanation }) : null,
-        ] }),
-      ] })
-    }) }),
-    pageCount > 1
-      ? jsxs('div', { className: 'cbt-pager', children: [
-          jsx(Button, {
-            variant: 'outline', size: 'sm', disabled: safePage === 0,
-            onClick: () => { setPage(Math.max(0, safePage - 1)); setOpen(null) },
-            children: 'Previous',
-          }),
-          jsx('span', { className: 'cbt-pager-n', children: `Page ${safePage + 1} of ${pageCount}` }),
-          jsx('span', { className: 'cbt-pager-sp' }),
-          jsx(Button, {
-            variant: 'outline', size: 'sm', disabled: safePage >= pageCount - 1,
-            onClick: () => { setPage(Math.min(pageCount - 1, safePage + 1)); setOpen(null) },
-            children: 'Next',
-          }),
         ] })
       : null,
-  ] })
+    // Card 6 — Topics
+    jsx(ResultTopics, { attempt, pack }),
+    // Card 7 — AI Overview
+    jsxs('div', { className: 'cbt-card', children: [
+      jsxs('div', { className: 'cbt-row', children: [
+        jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'AI Overview' }),
+        jsx(Badge, { variant: 'muted', size: 'xs', children: 'model output' }),
+        jsx('span', { style: { flex: 1 } }),
+        jsx(Button, { variant: 'ghost', size: 'sm', onClick: discuss, children: 'Discuss in chat' }),
+        attempt.evaluation
+          ? jsx(Button, { variant: 'outline', size: 'sm', onClick: () => setShowEval(v => !v),
+              children: showEval ? 'Hide analysis' : 'Show analysis' })
+          : jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy,
+              onClick: () => { setShowEval(true); void runEval(false) }, children: 'Analyse this attempt' }),
+      ] }),
+      // A closed card still has to say what it would open, and whether opening it is
+      // free: a stored analysis is served from the attempt, a new one costs a model call.
+      !showEval
+        ? jsx('div', { className: 'cbt-sub', style: { marginTop: 12 }, children: attempt.evaluation
+            ? `Saved analysis from ${fmtWhen(attempt.evaluation.generated_at)} — open it for the per-section notes and the weak topics.`
+            : 'The analysis runs once, on demand — nothing on this page depends on it.' })
+        : null,
+      pack.key_status && pack.key_status !== 'official'
+        ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children:
+            `This run was graded against a ${pack.key_status} answer key — read the marks and notes as indicative, not as a measure of your preparation.` })
+        : null,
+      showEval && jsxs('div', { children: [
+        evalBusy
+          ? jsxs('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children: [
+              jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
+              'Analysing your attempt — this calls the model once and takes a few seconds.',
+            ] })
+          : evalFailure
+            ? jsxs('div', { children: [
+                jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
+                  jsx(Badge, { variant: 'destructive', size: 'xs', children: 'AI evaluation failed' }),
+                  attempt.evaluation_error && !evalError
+                    ? jsx('span', { className: 'cbt-sub', children: `recorded ${relTime(attempt.evaluation_error.at)}` })
+                    : null,
+                  jsx(Button, { variant: 'outline', size: 'sm', onClick: () => void runEval(false), children: 'Retry' }),
+                ] }),
+                jsxs('details', { style: { marginTop: 8 }, children: [
+                  jsx('summary', { className: 'cbt-sub cbt-clickable', children: 'What the model said' }),
+                  jsx('pre', { className: 'cbt-pre', children: evalFailure }),
+                ] }),
+              ] })
+            : attempt.evaluation
+              ? jsxs('div', { children: [
+                  jsx(EvaluationCard, { d: attempt.evaluation.data, pack }),
+                  jsxs('div', { className: 'cbt-row', style: { marginTop: 12 }, children: [
+                    jsx('span', { className: 'cbt-sub', children: `via ${attempt.evaluation.provider || '?'}/${attempt.evaluation.model || '?'} · ${fmtWhen(attempt.evaluation.generated_at)}` }),
+                    jsx('span', { style: { flex: 1 } }),
+                    jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy, onClick: () => void runEval(true), children: 'Re-analyse' }),
+                  ] }),
+                ] })
+              : null,
+      ] }),
+    ] }),
+    // Card 8 — Questions
+    jsxs('div', { className: 'cbt-card', children: [
+      jsxs('div', { className: 'cbt-row', children: [
+        jsx('div', { className: 'cbt-section', style: { margin: 0 }, children: 'Questions' }),
+        jsx('span', { style: { flex: 1 } }),
+        jsx('span', { className: 'cbt-sub', style: { fontVariantNumeric: 'tabular-nums' }, children: rows.length
+          ? `${shownFrom + 1}–${shownTo} of ${rows.length}`
+          : 'nothing here' }),
+        jsx(SegmentedControl, {
+          value: filter,
+          onChange: f => { setFilter(f); setPage(0); setOpen(null) },
+          sizing: 'content',
+          options: [['all', 'All'], ['wrong', 'Wrong'], ['skipped', 'Skipped'], ['not_counted', 'Not counted']].map(([f, label]) => ({
+            id: f,
+            label: f === 'all' ? `${label} ${r.questions.length}` : `${label} ${r.totals[f] ?? 0}`,
+          })),
+        }),
+      ] }),
+      jsx('div', { style: { marginTop: 12 }, children: pageRows.map(row => {
+        const qq = qmap[row.id]
+        const expanded = open === row.id
+        const isMarked = (attempt.marked || []).includes(row.id)
+        const skipped = row.verdict === 'skipped'
+        return jsxs('div', { key: row.id, className: 'review-row', children: [
+          jsx('div', {
+            className: 'cbt-row cbt-review-head', role: 'button', tabIndex: 0, 'aria-expanded': expanded,
+            onClick: () => setOpen(expanded ? null : row.id),
+            onKeyDown: e => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(expanded ? null : row.id) }
+            },
+            children: [
+              jsx(Codicon, { name: expanded ? 'chevron-down' : 'chevron-right', size: 12 }),
+              jsx('strong', { children: row.id }),
+              // Fixed-width verdict slot: the badge widths differ by up to 20px
+              // ("Skipped" vs "Wrong (-0.5)"), and a row whose verdict label changes
+              // must not shift the type/topic text of its neighbours.
+              jsx('span', { className: 'cbt-verdict', children: jsx(Badge, {
+                size: 'xs',
+                variant: row.verdict === 'correct' ? 'success' : row.verdict === 'wrong' ? 'destructive' : row.verdict === 'skipped' ? 'muted' : 'outline',
+                children: `${VERDICT_LABEL[row.verdict]}${row.awarded ? ` (${row.awarded})` : ''}`,
+              }) }),
+              jsx('span', { className: 'cbt-sub', children: `${row.type.toUpperCase()} · ${row.topic || ''}` }),
+              isMarked ? jsx(Badge, { size: 'xs', variant: 'muted', children: 'Marked' }) : null,
+              jsx('span', { style: { flex: 1 } }),
+            ],
+          }),
+          expanded && jsxs('div', { className: 'cbt-review-body', children: [
+            jsx('p', { children: qq.text }),
+            mediaNode(qq.media, pack.exam_id, `rev-${row.id}`),
+            (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'cbt-sub', children: [
+              `${String.fromCharCode(65 + i)}) ${o}`,
+              qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.exam_id, `rev-${row.id}-o${i}`) : null,
+            ] })),
+            jsxs('div', { className: 'cbt-ans', children: [
+              jsx('span', { className: 'cbt-ans-k', children: 'Your answer' }),
+              jsx('span', {
+                className: skipped ? 'muted' : row.verdict === 'correct' ? 'hit' : 'miss',
+                children: skipped ? 'not answered' : fmtAns(qq, attempt.answers[row.id]),
+              }),
+            ] }),
+            jsxs('div', { className: 'cbt-ans', children: [
+              jsx('span', { className: 'cbt-ans-k', children: 'Correct answer' }),
+              jsx('span', { className: 'hit', children: fmtAns(qq, qq.answer) }),
+            ] }),
+            qq.explanation ? jsx('p', { className: 'cbt-sub', children: qq.explanation }) : null,
+          ] }),
+        ] })
+      }) }),
+      pageCount > 1
+        ? jsxs('div', { className: 'cbt-pager', children: [
+            jsx(Button, {
+              type: 'button', variant: 'ghost', size: 'sm', disabled: safePage === 0,
+              'aria-label': 'Previous page',
+              onClick: () => { setPage(Math.max(0, safePage - 1)); setOpen(null) },
+              children: icon('chevron-left', 'size-4'),
+            }),
+            jsx('span', { className: 'cbt-pager-n', children: `Page ${safePage + 1} of ${pageCount}` }),
+            jsx(Button, {
+              type: 'button', variant: 'ghost', size: 'sm', disabled: safePage >= pageCount - 1,
+              'aria-label': 'Next page',
+              onClick: () => { setPage(Math.min(pageCount - 1, safePage + 1)); setOpen(null) },
+              children: icon('chevron-right', 'size-4'),
+            }),
+          ] })
+        : null,
+    ] }),
+  ])
 }
 
 function CbtPage() {

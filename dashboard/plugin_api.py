@@ -145,22 +145,33 @@ def create_attempt(body: StartBody):
 
 
 @router.get("/attempts")
-def list_attempts(limit: int = HISTORY_LIMIT):
+def list_attempts(limit: int = HISTORY_LIMIT, exam_id: str | None = None):
     """History, newest first. Expired attempts are graded on the way out so the
-    panel never offers "Resume" on an attempt whose clock has already run out."""
+    panel never offers "Resume" on an attempt whose clock has already run out.
+
+    ``exam_id`` narrows the list to one paper. It filters before the cap: an exam
+    whose last attempt is older than the newest ``limit`` attempts of other papers
+    must still answer with its own history, so a filtered call reads until it has
+    ``limit`` matches instead of truncating the newest files first.
+    """
+    cap = max(1, min(limit, 500))
     rows, unreadable = [], []
-    for a, err in store_mod.iter_attempts(max(1, min(limit, 500))):
+    for a, err in store_mod.iter_attempts(None if exam_id else cap):
         if err is not None:
             unreadable.append(err)
             continue
         if store_mod.is_expired(a):
             a = _reap(a)
+        if exam_id is not None and a["exam_id"] != exam_id:
+            continue
         r = a.get("result") or {}
         rows.append({"id": a["id"], "exam_id": a["exam_id"], "mode": a["mode"],
                      "status": a["status"], "started_at": a["started_at"],
                      "submitted_at": a.get("submitted_at"),
                      "score": r.get("score"), "totals": r.get("totals"),
                      "has_evaluation": bool(a.get("evaluation"))})
+        if exam_id is not None and len(rows) >= cap:
+            break
     return {"attempts": rows, "unreadable": unreadable}
 
 

@@ -140,6 +140,35 @@ class ApiTests(unittest.TestCase):
         # result view carries the full pack (answers included)
         self.assertIn("answer", r.json()["pack"]["questions"][0])
 
+    def test_list_attempts_exam_id_filter(self):
+        """?exam_id= returns only that pack's attempts; omitting it returns all."""
+        import json as _json
+        alt = base_pack()
+        alt["exam_id"] = "alt-demo"
+        alt["title"] = "Alt Demo"
+        (DATA / "packs" / "alt-demo.json").write_text(_json.dumps(alt))
+        # create and submit one attempt on each pack
+        a1 = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam"}).json()["attempt"]["id"]
+        a2 = client.post("/attempts", json={"exam_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
+        client.post(f"/attempts/{a1}/submit")
+        client.post(f"/attempts/{a2}/submit")
+        # filtered
+        filtered = client.get("/attempts", params={"exam_id": "gat-b-demo"}).json()["attempts"]
+        self.assertTrue(all(a["exam_id"] == "gat-b-demo" for a in filtered))
+        self.assertTrue(any(a["id"] == a1 for a in filtered))
+        self.assertFalse(any(a["id"] == a2 for a in filtered))
+        # unfiltered returns both
+        all_attempts = client.get("/attempts").json()["attempts"]
+        ids = {a["id"] for a in all_attempts}
+        self.assertIn(a1, ids)
+        self.assertIn(a2, ids)
+        # the filter applies before the cap: newer attempts of another paper must not
+        # crowd an older paper's history out of a narrow page
+        a3 = client.post("/attempts", json={"exam_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
+        client.post(f"/attempts/{a3}/submit")
+        narrow = client.get("/attempts", params={"exam_id": "gat-b-demo", "limit": 1}).json()["attempts"]
+        self.assertEqual([a["id"] for a in narrow], [a1])
+
 class FakeResult:
     def __init__(self, text="", parsed=None, model="fake-model", provider="fake"):
         self.text, self.parsed, self.model, self.provider = text, parsed, model, provider
