@@ -1167,7 +1167,7 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
             // A paper mixes assisted practice with mocks; the table should be able
             // to show just the scorables.
             attempts.length
-              ? jsx('nav', { className: 'cbt-row', style: { marginTop: 4 }, children: [
+              ? jsx('nav', { className: 'cbt-row', style: { marginTop: 4, border: '1px solid var(--border)', borderRadius: 6, padding: 2, gap: 2, background: 'var(--card)' }, children: [
                   ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
                 ].map(([label, m]) => jsx(Button, {
                   key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
@@ -1266,9 +1266,9 @@ function CbtHome({ onStart, onResume, onViewResult }) {
       jsx('h2', { children: 'Exam Desk' }),
       jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
       jsx('span', { style: { flex: 1 } }),
-      jsx(Button, { variant: 'secondary', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
+      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
       jsx(Tip, { label: 'Opens a chat: the agent asks which exam and year, then brings the official paper — or drafts one to the same pattern when none exists', children:
-        jsx(Button, { variant: 'outline', size: 'sm', onClick: source, children: 'Add exam' }) }),
+        jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }) }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
