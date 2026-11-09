@@ -1,7 +1,7 @@
 {
   "name": "exam-desk",
   "label": "Exam Desk",
-  "version": "0.7.0",
+  "version": "0.10.0",
   "description": "Question-bank + exam/grading backend for the CBT desktop panel.",
   "tab": { "hidden": true },
   "entry": "index.js",

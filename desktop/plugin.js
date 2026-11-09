@@ -11,7 +11,8 @@ const CSS = `
 /* Tokens only. Chrome (buttons, badges, dialogs, tips, kbd, segmented controls)
    comes from the app's primitives; this sheet owns layout and this plugin's own
    surfaces, and never re-specifies a primitive's padding, radius or colour. */
-.cbt{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary);font:13px/1.5 var(--font-sans,system-ui)}
+.cbt{--cbt-col:1040px;--cbt-col-read:820px;--cbt-gutter:clamp(20px,4vw,56px);--cbt-gap:16px;
+  height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text-primary);font:13px/1.5 var(--font-sans,system-ui)}
 .cbt *{box-sizing:border-box}
 .cbt .muted,.cbt .cbt-sub{color:var(--ui-text-secondary)}
 .cbt .cbt-sub{font-size:12px}
@@ -30,31 +31,41 @@ const CSS = `
    The ROOT must span the pane: it is the scroller (overflow:auto), and a max-width on
    it drags the scrollbar into the middle of the window. Width is capped on the
    CHILDREN instead, centred — same reading column, bar at the pane's right edge. */
-.cbt.cbt-page{display:block;padding:20px clamp(20px,4vw,56px);overflow:auto}
-.cbt.cbt-page > *{max-width:1040px;margin-inline:auto}
+.cbt.cbt-page{display:block;padding:20px var(--cbt-gutter);overflow:auto}
+/* THE COLUMN — declared once, here; nothing else in this sheet caps a page.
+   axis: the pane's centre · --cbt-col 1040 for data · --cbt-col-read 820 for prose.
+   The ROOT spans the pane because it is the scroller: a max-width on it drags the
+   bar into the middle of the window, so the width is capped on the children. */
+.cbt.cbt-page > *{max-width:var(--cbt-col);width:100%;margin-inline:auto}
+.cbt.cbt-page.cbt-result > *{max-width:var(--cbt-col-read)}
 /* Home — the paper list sits on the same centred column as the result page, so the
    two screens share one width and one left edge instead of hugging the left of a
    wide window. Cards are the result page's cards: one radius, one padding, and the
    gap between them owned by the column, not by a margin on each card. */
-.cbt.cbt-home{--home-col:1040px;width:100%;max-width:none;margin:0;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
-.cbt.cbt-home > *{max-width:var(--home-col);width:100%;margin-inline:auto}
+.cbt.cbt-home{display:flex;flex-direction:column;gap:var(--cbt-gap);box-sizing:border-box}
 /* the page header closes with a hairline, so the first card is not read as part of it */
-.cbt.cbt-home .cbt-head-row{margin-bottom:0;padding-bottom:12px;border-bottom:1px solid var(--ui-stroke-secondary)}
-.cbt.cbt-home .cbt-card{border-radius:10px;padding:20px;margin-bottom:0}
-.cbt.cbt-home .cbt-card-title h3{font-size:15px}
-.cbt.cbt-home .cbt-card-body{margin-top:16px}
+.cbt.cbt-home .cbt-head-row{margin-bottom:0;padding-bottom:12px;border-bottom:1px solid var(--ui-stroke-secondary);
+  display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.cbt.cbt-home .cbt-head-row h2{margin:0;font-size:20px;font-weight:600;line-height:1.2;letter-spacing:-.015em}
+.cbt.cbt-home .cbt-head-row .cbt-sub{font-size:12.5px}
+.cbt .cbt-head-left{display:flex;align-items:baseline;gap:12px;min-width:0}
+.cbt .cbt-head-stack{flex-direction:column;align-items:flex-start;gap:2px}
+.cbt .cbt-eyebrow{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ui-text-secondary)}
+.cbt .cbt-facts{font-size:12.5px;color:var(--ui-text-secondary);margin-top:2px;line-height:1.5}
+.cbt .cbt-head-right{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+
 .cbt .cbt-head-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.cbt .cbt-head-row h2{margin:0}
-.cbt .cbt-keys{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ui-text-secondary)}
+.cbt .cbt-head-row h2{margin:0;font-size:20px;font-weight:600;line-height:1.25;letter-spacing:-.015em}
+.cbt .cbt-keys{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--ui-text-secondary)}
 .cbt .cbt-loading{display:flex;align-items:center;gap:6px;color:var(--ui-text-secondary)}
 .cbt .cbt-error{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:8px 0}
 /* instructions page: meta chips, section labels, hairline-divided guidance rows */
 .cbt .cbt-sep{margin:16px 0}
 .cbt .cbt-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
 .cbt .cbt-section{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);margin:24px 0 8px}
-.cbt .cbt-how{border:1px solid var(--ui-stroke-secondary);border-radius:8px;overflow:hidden}
-.cbt .cbt-how-row{padding:9px 12px;font-size:12.5px;line-height:1.55;color:var(--ui-text-primary)}
-.cbt .cbt-how-row+.cbt-how-row{border-top:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-how{display:flex;flex-direction:column}
+.cbt .cbt-how-row{padding:10px 0;font-size:12.5px;line-height:1.55;color:var(--ui-text-primary);
+  border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-keys{margin-top:16px}
 
 /* Dialogs are portalled to the document body, so they are NOT inside .cbt and every
@@ -92,16 +103,33 @@ const CSS = `
    six percentage columns, so a wide window widens the columns instead of leaving a
    dead right-hand half inside the box. */
 .cbt .cbt-hist{table-layout:fixed;width:100%;min-width:0}
-.cbt .cbt-hist th:nth-child(1),.cbt .cbt-hist td:nth-child(1){width:12%}
-.cbt .cbt-hist th:nth-child(2),.cbt .cbt-hist td:nth-child(2){width:16%}
-.cbt .cbt-hist th:nth-child(3),.cbt .cbt-hist td:nth-child(3){width:14%}
-.cbt .cbt-hist th:nth-child(4),.cbt .cbt-hist td:nth-child(4){width:12%}
-.cbt .cbt-hist th:nth-child(5),.cbt .cbt-hist td:nth-child(5){width:30%;text-align:right}
-.cbt .cbt-hist th:nth-child(6),.cbt .cbt-hist td:nth-child(6){width:16%;text-align:right}
+/* cells get room to breathe: 11px above and below, header pinned to the top */
+.cbt .cbt-hist th,.cbt .cbt-hist td{padding:11px 16px 11px 0}
+.cbt .cbt-hist th{padding-top:0}
+.cbt .cbt-hist tbody td{line-height:1.45}
+.cbt .cbt-hist td:nth-child(1) .cbt-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Column widths are sized to their content, not to a share of the table: a label
+   right-aligned over a column twice as wide as its values floats away from the column
+   it names and crowds the next one. Only the paper title can use slack, so it gets
+   the remainder — everything else is fixed. */
+.cbt .cbt-hist.has-paper{table-layout:fixed;width:100%}
+.cbt .cbt-hist.has-paper th:nth-child(1),.cbt .cbt-hist.has-paper td:nth-child(1){width:auto}
+.cbt .cbt-hist.has-paper th:nth-child(2),.cbt .cbt-hist.has-paper td:nth-child(2){width:96px}
+.cbt .cbt-hist.has-paper th:nth-child(3),.cbt .cbt-hist.has-paper td:nth-child(3){width:104px}
+.cbt .cbt-hist.has-paper th:nth-child(4),.cbt .cbt-hist.has-paper td:nth-child(4){width:112px}
+.cbt .cbt-hist.has-paper th:nth-child(5),.cbt .cbt-hist.has-paper td:nth-child(5){width:64px}
+.cbt .cbt-hist.has-paper th:nth-child(6),.cbt .cbt-hist.has-paper td:nth-child(6){width:72px}
+.cbt .cbt-hist.has-paper th:nth-child(7),.cbt .cbt-hist.has-paper td:nth-child(7){width:40px;text-align:right}
+/* the row ends at the card's edge, not 16px inside it */
+.cbt .cbt-hist th:last-child,.cbt .cbt-hist td:last-child{padding-right:0}
+/* One edge per column: the header and every cell start at the column's left edge, so
+   the header row and the rows under it share a single grid. Numbers keep tabular
+   figures, so digits still sit on a grid even though they read from the left. */
+.cbt .cbt-hist th,.cbt .cbt-hist td{text-align:left}
 .cbt .cbt-hist tbody tr:hover{background:var(--chrome-action-hover)}
 /* instructions pattern — Section | Questions | To attempt | Marks */
-.cbt .cbt-pattern{table-layout:fixed;width:auto;min-width:452px}
-.cbt .cbt-pattern th:nth-child(1),.cbt .cbt-pattern td:nth-child(1){width:140px}
+.cbt .cbt-pattern{table-layout:fixed;width:100%;min-width:0}
+.cbt .cbt-pattern th:nth-child(1),.cbt .cbt-pattern td:nth-child(1){width:auto}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
 /* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
 .cbt .cbt-sec{table-layout:fixed;width:auto;min-width:640px}
@@ -131,7 +159,7 @@ const CSS = `
    rhythm (16px), and their labels keep the pack's 8px label-to-content gap —
    .cbt-section's own 24px top margin is tuned for page flow, not for a stack
    of boxes inside one card. */
-.cbt .cbt-eval{display:flex;flex-direction:column;gap:16px;max-width:820px}
+.cbt .cbt-eval{display:flex;flex-direction:column;gap:16px;max-width:var(--cbt-col-read)}
 .cbt .cbt-eval .cbt-section{margin:0 0 8px}
 .cbt .cbt-eval-title{font-size:12px;font-weight:600;color:var(--ui-text-secondary)}
 .cbt .cbt-eval-body{font-size:12.5px;line-height:1.55}
@@ -141,13 +169,13 @@ const CSS = `
 .cbt tfoot td{font-weight:600;border-top:1px solid var(--ui-stroke-secondary);border-bottom:0;padding-top:8px}
 /* Result layout: centred column of rounded cards. Every block shares the measured
    column, and inside each card content sits 20px in on the same left edge. */
-.cbt.cbt-result{--rg-col:820px;width:100%;max-width:none;margin:0;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.cbt.cbt-result{display:flex;flex-direction:column;gap:var(--cbt-gap);box-sizing:border-box}
 .cbt.cbt-result > *{max-width:var(--rg-col);width:100%;margin-inline:auto;box-sizing:border-box}
 .cbt.cbt-result .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:20px;margin-bottom:0;box-sizing:border-box}
 .cbt.cbt-result .cbt-card .cbt-more{padding:12px 0 0;margin-top:12px}
 .cbt.cbt-result .cbt-sec{width:100%;min-width:0}
 .cbt .cbt-attempt-nav{display:flex;justify-content:center;align-items:center;gap:8px}
-.cbt .cbt-attempt-pill{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cbt .cbt-attempt-pill{font-size:12.5px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .cbt .cbt-chart-scroll{overflow-x:auto}
 .cbt .cbt-chart-scroll svg rect:focus-visible{outline:2px solid var(--ui-accent);outline-offset:1px}
 .cbt .cbt-tile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
@@ -166,7 +194,10 @@ const CSS = `
 .cbt .cbt-topic-track{height:4px;background:var(--ui-stroke-secondary);border-radius:2px;overflow:hidden}
 .cbt .cbt-topic-fill{height:100%;background:var(--ui-accent);border-radius:2px}
 /* review pager: centred [‹] Page 1 of 2 [›] */
-.cbt .cbt-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;padding-top:12px;border-top:1px solid var(--ui-stroke-secondary)}
+/* The row above already ends on a hairline; a second border here drew two lines with
+   nothing between them. The pager carries spacing only — and the same 16px the card
+   pads its bottom with, so the strip reads as centred between its two lines. */
+.cbt .cbt-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;margin-bottom:0}
 .cbt .cbt-pager .cbt-pager-n{font-size:12px;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
 /* evaluation notes: the first few, the rest behind a count — a 160-question attempt
    can carry ~94 notes, which is a screenful of prose on its own */
@@ -205,9 +236,48 @@ const CSS = `
 /* the dialog's counts table is portalled out of the .cbt tree — its grid lives on
    .cbt-dlg (see the dialog block below), so only the page-scoped tables are here */
 
-/* home: a paper and its history */
-.cbt .cbt-family-band{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 0;padding:4px 0}
-.cbt .cbt-family-group{display:flex;flex-direction:column;gap:12px}
+/* HOME — one shelf per exam.
+   Type ladder, declared once: 20/600 page · 16/600 caps exam · 14/500 paper ·
+   12.5/400 facts · 11.5/600 table header. Spacing: 4/6 inside a line, 12 between
+   blocks, 16 after the page header, 32 between exams. Nothing else caps a width. */
+/* One exam = one card: the same border, radius and padding the result page's cards
+   use, so an exam reads as a block and the page reads as a list of exams. */
+.cbt .cbt-shelf{display:flex;flex-direction:column;gap:12px;min-width:0;
+  border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:16px 20px;box-sizing:border-box}
+.cbt .cbt-exam-band{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding-bottom:16px;border-bottom:1px solid var(--ui-stroke-secondary)}
+.cbt .cbt-exam-band h3{margin:0;font-size:16px;font-weight:600;line-height:1.2;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ui-text-primary)}
+.cbt .cbt-exam-band .cbt-sub{font-size:12.5px}
+/* a paper is a row: title, one line of facts, the ways to sit it on the right */
+.cbt .cbt-papers{display:flex;flex-direction:column;gap:0;min-width:0}
+.cbt .cbt-paper{display:flex;align-items:center;flex-wrap:wrap;gap:10px 24px;padding:16px 0;
+  border-bottom:1px solid var(--ui-stroke-secondary);min-width:0}
+/* The shelf's 12px column gap already sits above the first paper row. Its own padding
+   added to that and put 28px over the title against 16px under the meta line; the
+   first row tops up by 4 so both sides read 16. */
+.cbt .cbt-papers > .cbt-paper:first-child{padding-top:3px}
+.cbt .cbt-paper-main{display:flex;flex-direction:column;gap:6px;flex:1 1 320px;min-width:0}
+.cbt .cbt-paper-head{display:flex;align-items:center;gap:8px;min-width:0}
+.cbt .cbt-paper-title{font-size:14px;font-weight:500;line-height:1.4;margin:0;min-width:0;
+  color:var(--ui-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbt .cbt-paper-meta{display:flex;align-items:baseline;gap:10px;font-size:12.5px;min-width:0}
+.cbt .cbt-dash{color:var(--ui-text-secondary);opacity:.5;flex:0 0 auto}
+.cbt .cbt-nowrap{white-space:nowrap}
+.cbt-dlg .cbt-warn-list{font-size:12.5px;margin:0 0 16px;padding-left:20px;max-height:min(50vh,320px);overflow:auto}
+.cbt-dlg .cbt-warn-list li{margin:0 0 8px}
+.cbt .cbt-paper-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;margin-left:auto}
+.cbt .cbt-warn-slot{display:flex;align-items:center;justify-content:flex-end;width:56px;flex:0 0 56px}
+.cbt .cbt-btn-fixed{min-width:112px}
+.cbt .cbt-warn-chip{color:var(--ui-text-warn, var(--ui-accent));border-color:var(--ui-text-warn, var(--ui-accent));
+  background:color-mix(in srgb, var(--ui-text-warn, var(--ui-accent)) 14%, transparent)}
+/* exam history: disclosure + mode words on the left, bulk actions on the right */
+.cbt .cbt-shelf-hist{display:flex;flex-direction:column;gap:12px;min-width:0;padding-top:4px}
+.cbt .cbt-hist-row{display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:wrap}
+.cbt .cbt-hist-row .cbt-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.cbt .cbt-filter{color:var(--ui-text-secondary)}
+.cbt .cbt-filter.on{color:var(--ui-text-primary);text-decoration:underline;text-underline-offset:3px}
+.cbt .cbt-ellipsis{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cbt .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:16px;margin-bottom:16px}
 .cbt .cbt-card-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between}
 .cbt .cbt-card-title{min-width:0;display:flex;flex-direction:column;gap:4px}
@@ -215,6 +285,13 @@ const CSS = `
 .cbt .cbt-card-actions{flex:0 0 auto}
 .cbt .cbt-card-body{margin-top:12px}
 .cbt .cbt-flush{margin-left:-8px}
+.cbt .cbt-head-nav{margin-right:8px}
+.cbt .cbt-icon-btn{border:0;background:transparent;color:var(--ui-text-secondary);padding:4px}
+.cbt .cbt-icon-btn:hover{color:var(--ui-text-primary)}
+.cbt .cbt-row-end{margin-left:4px}
+/* The disclosure holds a fixed slot: switching between "History · n" and "Hide history"
+   must not shove the filters or the discarded link sideways. */
+.cbt .cbt-hist-toggle{flex:0 0 118px;width:118px;justify-content:flex-start;text-align:left}
 .cbt .cbt-stat-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin-top:4px}
 .cbt .cbt-warn-count{display:inline-flex;align-items:center;gap:4px;color:var(--ui-text-warn,var(--ui-text-secondary))}
 
@@ -238,7 +315,7 @@ const CSS = `
 /* one verdict width for every row: "Skipped" and "Wrong (-0.5)" must not move the
    type/topic text that follows, so the label lives in a reserved slot */
 .cbt .cbt-verdict{display:inline-flex;align-items:center;justify-content:flex-start;min-width:104px}
-.cbt .cbt-review-body{padding:8px 0 12px 20px;max-width:820px}
+.cbt .cbt-review-body{padding:8px 0 12px 20px;max-width:var(--cbt-col-read)}
 .cbt .cbt-ans{display:flex;gap:8px;font-size:13px;margin-top:4px}
 .cbt .cbt-ans-k{color:var(--ui-text-secondary);min-width:110px}
 .cbt .hit{color:var(--ui-success)}
@@ -271,7 +348,7 @@ const CSS = `
    cell: a max-width here parks the bar in the middle of the pane on a wide window.
    The reading measure lives on the content instead. */
 .cbt-qbody{width:100%;max-width:none;margin:0;padding:20px 20px 40px;font-size:15px;line-height:1.6;overflow:auto}
-.cbt .cbt-qbody > *{max-width:820px}
+.cbt .cbt-qbody > *{max-width:var(--cbt-col-read);margin-inline:auto}
 
 /* palette */
 .cbt-pal-wrap{position:relative;display:flex;flex-direction:column;min-height:0;height:100%;border-left:1px solid var(--ui-stroke-secondary)}
@@ -348,11 +425,37 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){
   .cbt *{transition:none!important;animation:none!important}
 }
+/* Narrow screens. A table keeps its column widths and scrolls sideways: seven columns
+   squeezed into a phone's width is not a table, it is a ladder of 3px columns. */
+.cbt .cbt-tablewrap{overflow-x:auto;overflow-y:hidden;max-width:100%}
+.cbt .cbt-hist{min-width:632px}
+.cbt .cbt-pattern{min-width:420px}
+.cbt .cbt-stats{min-width:440px}
+.cbt .cbt-sec{min-width:560px}
+@media (max-width: 640px){
+  /* a row of controls stops pinning itself past the edge and takes its own line */
+  .cbt .cbt-paper-actions{flex:1 1 100%;margin-left:0;flex-wrap:wrap}
+  .cbt .cbt-exam-band{flex-wrap:wrap}
+  .cbt .cbt-attempt-pill{white-space:normal}
+}
 `;
+
+// 0.9.0 spelling, read-only. The dashboard and the gateway each mount these routes
+// when THEY boot, so a panel can meet a backend that has not picked up the rename
+// yet and answer it with `exam_id`/`family`. Fold them here, once, so every
+// component reads one name. Delete with the backend's `_legacy()` echo.
+function foldNames(obj) {
+  const one = o => (o && typeof o === 'object' ? { ...o, paper_id: o.paper_id ?? o.exam_id, exam: o.exam ?? o.family } : o)
+  if (!obj || typeof obj !== 'object') return obj
+  if (Array.isArray(obj.packs)) return { ...obj, packs: obj.packs.map(one) }
+  if (Array.isArray(obj.attempts)) return { ...obj, attempts: obj.attempts.map(one) }
+  if (!obj.attempt && !obj.pack) return obj
+  return { ...obj, attempt: one(obj.attempt), pack: one(obj.pack) }
+}
 
 async function rest(path, opts) {
   const r = await ctxRest(path, opts)
-  return r
+  return foldNames(r)
 }
 let ctxRest = () => { throw new Error('register not called') }
 let ctxStorage = null
@@ -501,11 +604,11 @@ function icon(name, className) {
 // A figure's src is either an http(s) URL or a path inside the pack's asset dir.
 // Relative ones come back through the plugin's own route, so the browser fetches
 // them from the same origin — an <img> cannot read the gateway's filesystem.
-function mediaSrc(examId, src) {
+function mediaSrc(paperId, src) {
   const clean = String(src || '')
   if (/^https?:\/\//i.test(clean)) return clean
   const path = clean.split('/').filter(Boolean).map(encodeURIComponent).join('/')
-  return `/api/plugins/exam-desk/packs/${encodeURIComponent(examId)}/assets/${path}`
+  return `/api/plugins/exam-desk/packs/${encodeURIComponent(paperId)}/assets/${path}`
 }
 
 // A figure that 404s (or is unreadable) otherwise collapses to a broken-image
@@ -566,7 +669,7 @@ function ScrollToTop({ dep, targetRef }) {
 // Question bodies carry more than text: a diagram, a data table, or a note that
 // only makes sense with the figure. Each block renders as its own element so a
 // long paper reads like a paper.
-function mediaNode(blocks, examId, keyPrefix = 'media') {
+function mediaNode(blocks, paperId, keyPrefix = 'media') {
   if (!Array.isArray(blocks) || !blocks.length) return null
   return blocks.map((b, i) => {
     const key = `${keyPrefix}-${i}`
@@ -583,7 +686,7 @@ function mediaNode(blocks, examId, keyPrefix = 'media') {
     if (b && b.type === 'text') {
       return jsx('p', { key, className: 'media-note', children: b.text })
     }
-    return jsx(MediaFigure, { key, src: mediaSrc(examId, b?.src), alt: b?.alt || '', caption: b?.caption })
+    return jsx(MediaFigure, { key, src: mediaSrc(paperId, b?.src), alt: b?.alt || '', caption: b?.caption })
   })
 }
 
@@ -646,7 +749,17 @@ function relTime(s) {
 
 const STATUS_LABEL = { in_progress: 'In progress', submitted: 'Submitted', abandoned: 'Discarded' }
 const STATUS_CLS = { in_progress: 'acc', submitted: 'ok', abandoned: 'mut' }
-const MODE_LABEL = { assisted: 'Assisted', exam: 'Mock' }   // vocab mirror — see exam_desk/vocab.py
+const MODE_LABEL = { assisted: 'Assisted', mock: 'Mock' }   // vocab mirror — see exam_desk/vocab.py
+// A route this build asks for and the server does not serve means the dashboard is
+// still running the plugin it loaded at boot — its Python routes are mounted once, so a
+// plugin updated on disk keeps answering with the old route table. The bare "Not Found"
+// that comes back is a restart instruction, not a bug report.
+const ROUTE_GONE = 'the dashboard is running an older build of this plugin — restart the dashboard, then retry'
+const apiFailed = (what, e) => {
+  const msg = String(e?.message ?? e)
+  return /(^|[^0-9])404([^0-9]|$)|not found/i.test(msg) ? `${what} failed: ${ROUTE_GONE}` : `${what} failed: ${msg}`
+}
+
 const KIND_LABELS = { pyq: 'PYQ', practice: 'practice', drill: 'drill' }
 
 function fmtScore(v) {
@@ -756,13 +869,13 @@ const ADD_PAPER_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add 
   + 'to the official pattern. Say which route you took and why before you start, then '
   + 'validate the pack and file it.'
 
-// The exam family for a paper slug — mirror of exam_desk/pack.family_of.
+// The exam for a paper slug — mirror of exam_desk/pack.exam_of.
 // The dashboard mounts the Python routes once at ITS boot, so a session can be served
-// by a module that predates `summarize()` returning `family`. Derive the key here as a
+// by a module that predates `summarize()` returning `exam`. Derive the key here as a
 // fallback so the grouping still works against a stale route table; the API value wins
 // whenever it is present.
-function familyOf(examId) {
-  let slug = String(examId || '')
+function examOf(paperId) {
+  let slug = String(paperId || '')
   const tails = [/-(?:19|20)\d{2}-(?:shift|set|slot)\d+$/, /-superseded-[0-9a-f]+$/,
     /-drill(?:-\d+)?$/, /-(?:19|20)\d{2}$/]
   for (let changed = true; changed;) {
@@ -790,7 +903,7 @@ function anotherPaperPrompt(label, years) {
 // and sends the turn rather than staging a draft — a draft left in the composer was
 // the old defect. Same retry window as the sourcing button: the composer mounts late.
 function discussPrompt(att, packTitle, continuing = false) {
-  const title = packTitle || att?.pack_title || att?.exam_id || 'exam'
+  const title = packTitle || att?.paper_title || att?.paper_id || 'paper'
   // A review thread is per-sitting: after the first, later reviews are turns in
   // that same conversation, so the opening line says "Continuing" — the agent
   // sees the earlier discussion in its own transcript.
@@ -907,7 +1020,7 @@ async function startAttempt(pack, mode) {
   // sittings there is no chat and the field stays empty. The user never sees this id
   // and never types it.
   const currentSession = mode === 'assisted' ? (host.state.activeSessionId.get() || null) : null
-  const r = await rest('/attempts', { method: 'POST', body: { exam_id: pack.exam_id, mode, assisted_session_id: currentSession } })
+  const r = await rest('/attempts', { method: 'POST', body: { paper_id: pack.paper_id, mode, assisted_session_id: currentSession } })
   await setActiveAttempt(r.attempt.id)
   const paned = mode === 'assisted' && openExamPane(r.attempt.id, () => showResult(r.attempt.id))
   if (paned) {
@@ -959,45 +1072,57 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
       if (id) onBegin(id)              // exam mode, or a desktop without the pane API
     } catch (e) { host.notifyError?.(`Could not start the paper: ${e?.message || e}`); setStarting(false) }
   }
-  const marks = marksLabel(pack.pattern.sections[0] || {}, pack.pattern)
+  // The marking chip used to read `sections[0]` and present it as the paper's scheme —
+  // on a paper with two sections at different marks it printed one of them as if it
+  // were the whole. The pattern table is the only place marks are stated, and it states
+  // them per section, which is the truth.
   const duration = `${hours ? hours + ' h ' : ''}${mins} min`
+  const sections = pack.pattern.sections || []
+  const showAttemptLimit = sections.some(s => s.attempt_limit)
+  const facts = [
+    `${pack.questions.length} questions`,
+    duration,
+    types.map(t => QTYPE_LABEL[t] || t).join(', '),
+    sections.length > 1 ? `${sections.length} sections` : null,
+  ].filter(Boolean).join(' · ')
   return jsxs('div', { className: 'cbt cbt-page', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx('h2', { children: `Instructions — ${pack.title || pack.exam_id}` }),
-      jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Mock' }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx(SidebarButton, {}),
+      jsxs('div', { className: 'cbt-head-left cbt-head-stack', children: [
+        jsx('div', { className: 'cbt-eyebrow', children: 'Instructions' }),
+        jsxs('div', { className: 'cbt-row cbt-gap-sm', children: [
+          jsx('h2', { children: pack.title || pack.paper_id }),
+          jsx(Badge, { variant: mode === 'assisted' ? 'outline' : 'muted', children: mode === 'assisted' ? 'Assisted' : 'Mock' }),
+        ] }),
+        jsx('div', { className: 'cbt-facts', children: facts }),
+      ] }),
     ] }),
     jsx(Separator, { className: 'cbt-sep' }),
-    jsxs('div', { className: 'cbt-meta', children: [
-      jsx(Badge, { variant: 'outline', children: duration }),
-      jsx(Badge, { variant: 'outline', children: `${pack.questions.length} questions` }),
-      types.map(t => jsx(Badge, { variant: 'outline', key: t, children: QTYPE_LABEL[t] || t })),
-      marks ? jsx(Badge, { variant: 'outline', children: marks }) : null,
-    ] }),
     jsx('div', { className: 'cbt-section', children: 'Pattern' }),
-    jsxs('table', { className: 'cbt-table cbt-pattern', children: [
-      jsx('thead', { children: jsx('tr', { children: ['Section', 'Questions', 'To attempt', 'Marks'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
-      jsx('tbody', { children: pack.pattern.sections.map(s => jsxs('tr', { key: s.id, children: [
+    jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-pattern', children: [
+      jsx('thead', { children: jsx('tr', { children: [
+        ...['Section', 'Questions'], ...(showAttemptLimit ? ['To attempt'] : []), 'Marks',
+      ].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h })) }) }),
+      jsx('tbody', { children: sections.map(s => jsxs('tr', { key: s.id, children: [
         jsx('td', { children: s.title }),
         jsx('td', { className: 'num', children: String(s.question_count) }),
-        jsx('td', { className: 'num', children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' }),
+        ...(showAttemptLimit ? [jsx('td', { className: 'num', children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' })] : []),
         jsx('td', { className: 'num', children: marksLabel(s, pack.pattern) }),
       ] })) }),
-    ] }),
+    ] }) }),
     jsx('div', { className: 'cbt-section', children: 'How the paper works' }),
+    // Rules, not five bordered boxes: hairlines between statements read as one list.
     jsx('div', { className: 'cbt-how', children: [
-      'Select an answer, then Save to stay or Save & Next to move on. Leaving a question without saving keeps the pick on screen but does not record it.',
+      'Select an answer, then Save to stay or Save & next to move on. An unsaved pick stays on screen but is not recorded.',
       'Only answers are evaluated — marking a question for review without answering it does not score.',
       'The question map shows each question’s state; click a number to jump there.',
-      `The timer starts when you begin and runs ${duration}. At zero the paper submits itself.`,
+      `The clock starts when you begin and runs ${duration}. At zero the paper submits itself.`,
       mode === 'assisted'
         ? 'The paper opens in a pane beside your chat, so you can ask doubts while you work.'
         : 'Full page, nothing else competing for the screen. Start an assisted attempt instead if you want the chat beside the paper.',
     ].map((t, i) => jsx('div', { className: 'cbt-how-row', key: i, children: t })) }),
     jsxs('div', { className: 'cbt-row', style: { marginTop: 24 }, children: [
-      jsx(Button, { variant: 'default', size: 'default', loading: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
       jsx(Button, { variant: 'ghost', size: 'default', disabled: starting, onClick: onBack, children: 'Back' }),
+      jsx(Button, { variant: 'default', size: 'default', loading: starting, onClick: begin, children: starting ? 'Starting…' : 'I am ready to begin' }),
     ] }),
     jsx(Separator, { className: 'cbt-sep', style: { marginTop: 24 } }),
     jsxs('div', { className: 'cbt-keys', children: [
@@ -1012,48 +1137,159 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
   ] })
 }
 
-// One paper, its numbers, and its own attempt history. History is scoped to the
-// paper because a flat list of every attempt ever made stops being readable the
-// moment a second paper arrives.
-function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
+// ── Home: one shelf per exam ────────────────────────────────────────────────
+// The exam owns the numbers a reader compares (best score, last sitting, what the
+// AI keeps flagging) and it is the scope the history is filtered by — so those
+// controls live ONCE per exam, not once per paper. A paper gets a tile: identity,
+// its own record, and the ways to sit it. One table holds every sitting in the
+// exam, with the paper named per row, so the exam scope is visible instead of
+// implied.
+
+function PaperRow({ pack, attempts, onStart, onResume }) {
   const qc = useQueryClient()
+  const [showWarn, setShowWarn] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const removePaper = async () => {
+    setBusy(true)
+    try {
+      await rest(`/packs/${pack.paper_id}`, { method: 'DELETE' })
+      setAsking(false)
+      qc.invalidateQueries({ queryKey: ['cbt', 'packs'] })
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+    } catch (e) { host.notifyError?.(apiFailed('Delete paper', e)) }
+    setBusy(false)
+  }
   const live = attempts.filter(a => a.status === 'in_progress')
-  // History is collapsed by default; clicking History toggle or any mode filter unfolds it.
-  const [open, setOpen] = useState(false)
-  // History filter: null = every sitting; otherwise the mode word ('assisted'|'exam').
-  // A mock's trend reads right only next to other mocks — the modes are kept apart
-  // by the evaluation too (prompts builds HISTORY per mode).
+  const kindLabel = pack.kind && KIND_LABELS[pack.kind] ? KIND_LABELS[pack.kind] : null
+  const meta = pack.invalid ? null : [
+    pack.year ? String(pack.year) : null,
+    `${pack.question_count} questions`,
+    `${pack.duration_minutes ?? '?'} min`,
+    pack.scope || null,
+  ].filter(Boolean).join(' · ')
+  // The line describes the PAPER only. Attempts / best / last belong to the exam and
+  // are already on the band above — repeating them per paper prints the same numbers
+  // twice on a one-paper exam and splits the eye's attention on a five-paper one.
+  // The one thing the band cannot say is which paper you have never opened.
+  const record = attempts.length ? null : 'never sat'
+
+  return jsxs('article', { className: 'cbt-paper', children: [
+    jsxs('div', { className: 'cbt-paper-main', children: [
+      jsxs('div', { className: 'cbt-paper-head', children: [
+        jsx('h4', { className: 'cbt-paper-title', children: pack.title || pack.paper_id }),
+        kindLabel ? jsx(Badge, { variant: 'outline', size: 'xs', children: kindLabel }) : null,
+        // An AI-drafted paper says so: its key was written by the model, never an exam key.
+        pack.key_status === 'self-authored' ? jsx(Badge, { variant: 'outline', size: 'xs', children: 'AI-drafted' }) : null,
+        pack.invalid ? jsx(Badge, { variant: 'destructive', size: 'xs', children: 'invalid' }) : null,
+      ] }),
+      jsxs('div', { className: 'cbt-sub cbt-paper-meta', children: [
+        jsx('span', { className: 'cbt-ellipsis', children: pack.invalid
+          ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
+          : meta }),
+        record ? jsx('span', { className: 'cbt-dash', children: '—' }) : null,
+        record ? jsx('span', { className: 'cbt-nowrap', children: record }) : null,
+      ] }),
+    ] }),
+    pack.invalid ? null : jsxs('div', { className: 'cbt-paper-actions', children: [
+      // The warning chip keeps its slot whether or not a paper has warnings, so the
+      // buttons sit in the same place on every row.
+      jsx('span', { className: 'cbt-warn-slot', children: pack.warnings?.length
+        ? jsx(Tip, { label: 'Show what was flagged', children:
+            jsx(Button, {
+              className: 'cbt-warn-chip',
+              variant: 'outline', size: 'micro', 'aria-haspopup': 'dialog', 'aria-label': `${pack.warnings.length} warnings`,
+              onClick: () => setShowWarn(true),
+              children: jsxs('span', { className: 'cbt-warn-count', children: [
+                icon('alert', 'size-3'),
+                `${pack.warnings.length}`,
+              ] }),
+            }) })
+        : null }),
+      jsx(Tip, { label: 'Side pane beside the chat — ask doubts while you answer', children:
+        jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onStart(pack, 'assisted'), children: 'Start assisted' }) }),
+      // The primary action holds the row's right edge: that is where the eye lands
+      // after the title, and it is the only filled button in the row.
+      jsx(Tip, { label: live.length ? 'Continue this sitting — the clock is still running'
+        : 'Full page, no chat, no hints — the score that counts', children:
+        jsx(Button, {
+          className: 'cbt-btn-fixed', variant: 'default', size: 'sm',
+          onClick: () => (live.length ? onResume(live[0].id, live[0].mode) : onStart(pack, 'mock')),
+          children: live.length ? 'Resume' : 'Start mock',
+        }) }),
+      jsx(Tip, { label: 'Delete this paper and its sittings', children:
+        jsx(Button, { className: 'cbt-icon-btn cbt-row-end', variant: 'ghost', size: 'xs', 'aria-label': 'Delete this paper',
+          onClick: () => setAsking(true), children: icon('trash', 'size-3') }) }),
+    ] }),
+    // Warnings are a report, not a paragraph: they open in a dialog, so reading them
+    // never reflows the row or pushes the exam below it down the page.
+    showWarn && pack.warnings?.length
+      ? jsx(Dialog, {
+          open: true,
+          onOpenChange: open => { if (!open) setShowWarn(false) },
+          children: jsxs(DialogContent, { className: 'cbt-dlg', 'aria-describedby': undefined, children: [
+            jsxs(DialogHeader, { children: [
+              jsx(DialogTitle, { children: `${pack.warnings.length} warning${pack.warnings.length === 1 ? '' : 's'}` }),
+              jsx(DialogDescription, { className: 'cbt-desc', children: pack.title || pack.paper_id }),
+            ] }),
+            jsx('ul', { className: 'cbt-list cbt-warn-list', children: pack.warnings.map((w, i) => jsx('li', { key: i, children: w })) }),
+            jsx(DialogFooter, { children:
+              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => setShowWarn(false), children: 'Close' }) }),
+          ] }) })
+      : null,
+    asking
+      ? jsx(Dialog, {
+          open: true,
+          onOpenChange: open => { if (!open) setAsking(false) },
+          children: jsxs(DialogContent, { className: 'cbt-dlg', 'aria-describedby': undefined, children: [
+            jsxs(DialogHeader, { children: [
+              jsx(DialogTitle, { children: 'Delete this paper?' }),
+              jsx(DialogDescription, { className: 'cbt-desc', children:
+                `${pack.title || pack.paper_id} — ${attempts.length} sitting${attempts.length === 1 ? '' : 's'} `
+                + 'go with it. This cannot be undone.' }),
+            ] }),
+            jsx(DialogFooter, { children: jsxs('div', { className: 'cbt-row', children: [
+              jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => setAsking(false), children: 'Cancel' }),
+              jsx(Button, { variant: 'destructive', size: 'sm', disabled: busy, onClick: () => void removePaper(), children: busy ? 'Deleting…' : 'Delete paper' }),
+            ] }) }),
+          ] }) })
+      : null,
+  ] })
+}
+
+// Every sitting in the exam, mode-separated (a mock's line must not read a sitting
+// where the tutor answered half the questions, and the reverse), newest first, live
+// ones pinned to the top. Counts are computed from the FULL set so a chip's number
+// never changes with the active filter.
+function ExamHistory({ exam, attempts, onResume, onViewResult }) {
+  const qc = useQueryClient()
+  // A short history is not worth a click: five sittings open by default, and the
+  // disclosure only earns its place once there is something to hide.
+  const [open, setOpen] = useState(attempts.length <= 5)
   const [modeFilter, setModeFilter] = useState(null)
+  // The mode filter can only ever filter when both modes exist in this exam. With one
+  // mode it is three words and three counts to say "all of them".
+  const bothModes = new Set(attempts.map(a => a.mode)).size > 1
   const [showAll, setShowAll] = useState(false)
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [showWarn, setShowWarn] = useState(false)
 
-  const isOpen = open === true
   const kept = attempts.filter(a => showDiscarded || a.status !== 'abandoned')
-  const ranked = kept.filter(a => !modeFilter || a.mode === modeFilter)
+  const activeMode = bothModes ? modeFilter : null
+  const ranked = kept.filter(a => !activeMode || a.mode === activeMode)
   const rank = a => (a.status === 'in_progress' ? 0 : 1)
   const ordered = [...ranked].sort((x, y) =>
     rank(x) - rank(y) || (y.submitted_at || y.started_at || 0) - (x.submitted_at || x.started_at || 0))
-  const shown = showAll ? ordered : ordered.slice(0, 6)
+  const shown = showAll ? ordered : ordered.slice(0, 8)
   const hidden = ordered.length - shown.length
   const discarded = attempts.length - attempts.filter(a => a.status !== 'abandoned').length
   const filterCount = m => attempts.filter(a => a.mode === m && (showDiscarded || a.status !== 'abandoned')).length
-  const scores = attempts.map(a => a.score).filter(v => typeof v === 'number')
-  const best = scores.length ? Math.max(...scores) : null
-  const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
-  const drift = (topics || []).filter(r => r.exam_id === pack.exam_id || (pack.family && r.exam_id === pack.family))
+  // The toggle says one thing: how many sittings this exam has. Discarded ones are the
+  // link's job on the right — printing the count here too stated it twice in one row.
+  const historyLabel = `History · ${kept.length}`
 
-  // A route this build asks for and the server does not serve means the dashboard is
-  // still running the plugin it loaded at boot — its Python routes are mounted once, so a
-  // plugin updated on disk keeps answering with the old route table. The bare "Not Found"
-  // that comes back is a restart instruction, not a bug report.
-  const routeGone = 'the dashboard is running an older build of this plugin — restart the dashboard, then retry'
-  const failed = (what, e) => {
-    const msg = String(e?.message ?? e)
-    return /(^|[^0-9])404([^0-9]|$)|not found/i.test(msg) ? `${what} failed: ${routeGone}` : `${what} failed: ${msg}`
-  }
+  const failed = apiFailed
   const del = async id => {
     setBusy(true)
     try {
@@ -1066,163 +1302,189 @@ function ExamCard({ pack, attempts, topics, onStart, onResume, onViewResult }) {
   const clearDiscarded = async () => {
     setBusy(true)
     try {
-      await rest('/attempts/prune', { method: 'POST', body: { exam_id: pack.exam_id } })
+      await rest('/attempts/prune', { method: 'POST', body: { exam } })
       qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
     } catch (e) { host.notifyError?.(failed('Clear', e)) }
     setBusy(false)
   }
 
-  const marks = [...new Set((pack.sections || [])
-    .map(s => sectionMarks(s, pack.pattern || {}))
-    .filter(m => m.correct != null)
-    .map(m => marksLabel({ marks_correct: m.correct, marks_wrong: m.wrong }, {})))]
-  const meta = [
-    pack.year ? String(pack.year) : null,
-    pack.invalid ? null : `${pack.question_count} questions`,
-    pack.invalid ? null : `${pack.duration_minutes ?? '?'} min`,
-    marks.length ? marks.join(' · ') : null,
-  ].filter(Boolean).join(' · ')
-
-  const kindLabel = pack.kind && KIND_LABELS[pack.kind] ? KIND_LABELS[pack.kind] : null
-  const hasScope = pack.scope && !(pack.title || '').toLowerCase().includes(pack.scope.toLowerCase())
-
-  return jsxs('section', { className: 'cbt-card', children: [
-    jsxs('div', { className: 'cbt-card-head', children: [
-      jsxs('div', { className: 'cbt-card-title', children: [
-        jsxs('div', { className: 'cbt-row', children: [
-          jsx('h3', { children: pack.title || pack.exam_id }),
-          kindLabel ? jsx(Badge, { variant: 'outline', size: 'xs', children: kindLabel }) : null,
-          pack.invalid ? jsx(Badge, { variant: 'destructive', children: 'invalid' }) : null,
-          // An AI-drafted paper says so: its key was written by the model, never an exam key.
-          pack.key_status === 'self-authored' ? jsx(Badge, { variant: 'outline', size: 'xs', children: 'AI-drafted' }) : null,
-          pack.warnings?.length
-            ? jsx(Tip, { label: showWarn ? 'Hide the warnings' : 'Show what was flagged', children:
-                jsx(Button, {
-                  variant: 'outline', size: 'micro', 'aria-expanded': showWarn,
-                  style: { background: 'color-mix(in srgb, #f59e0b 18%, transparent)', borderColor: '#f59e0b', color: '#b45309' },
-                  onClick: () => setShowWarn(v => !v),
-                  children: jsxs('span', { className: 'cbt-warn-count', children: [
-                    icon('alert', 'size-3'),
-                    `${pack.warnings.length} warning${pack.warnings.length === 1 ? '' : 's'}`,
-                  ] }),
-                }) })
-            : null,
-        ] }),
-        hasScope && !pack.invalid
-          ? jsx('div', { className: 'cbt-sub', style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: pack.scope })
+  return jsxs('div', { className: 'cbt-shelf-hist', children: [
+    jsxs('div', { className: 'cbt-hist-row', children: [
+      // A disclosure, not a fourth chip: no border, no fill.
+      jsx(Button, {
+        className: 'cbt-flush cbt-hist-toggle',
+        variant: 'ghost', size: 'sm', 'aria-expanded': open,
+        style: { color: 'var(--ui-text-secondary)' },
+        onClick: () => setOpen(!open),
+        children: [jsx(Codicon, { key: 'c', name: open ? 'chevron-down' : 'chevron-right', size: 12 }),
+          open ? 'Hide history' : historyLabel],
+      }),
+      // Filters are words, not chips — the same treatment as Show discarded — and they
+      // only render when both modes exist, otherwise they can never filter anything.
+      bothModes
+        ? jsxs('div', { className: 'cbt-row cbt-gap-sm', role: 'group', 'aria-label': 'Filter by mode', children: [
+            [['All', null], [MODE_LABEL.mock, 'mock'], [MODE_LABEL.assisted, 'assisted']].map(([label, m]) => jsx(Button, {
+              key: label,
+              className: 'cbt-filter' + (activeMode === m ? ' on' : ''),
+              variant: 'ghost', size: 'xs', 'aria-pressed': activeMode === m,
+              onClick: () => { setModeFilter(m); setOpen(true) },
+              children: `${label} ${m ? filterCount(m) : (showDiscarded ? attempts.length : kept.length)}`,
+            })),
+          ] })
+        : null,
+      // Everything destructive or bulk sits on the right edge, Hide discarded last.
+      discarded ? jsxs('div', { className: 'cbt-right', children: [
+        showDiscarded
+          ? jsx(Tip, { label: 'Delete every discarded attempt of this exam', children:
+              jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(),
+                style: { textDecoration: 'underline', color: 'var(--ui-accent)' }, children: 'Delete discarded' }) })
           : null,
-        jsx('div', { className: 'cbt-sub', children: pack.invalid
-          ? String(pack.invalid).replace(/^invalid pack:\s*/, '')
-          : meta }),
-        pack.provenance && !pack.invalid ? jsx('div', { className: 'cbt-sub', children: pack.provenance }) : null,
-        // open warnings push the card down instead of reflowing the title row
-        showWarn && pack.warnings?.length
-          ? jsx('ul', { className: 'cbt-list', children: pack.warnings.slice(0, 12).map((w, i) => jsx('li', { key: i, children: w })) })
-          : null,
-        attempts.length
-          ? jsx('div', { className: 'cbt-stat-row', children: [
-              `${attempts.length} attempt${attempts.length === 1 ? '' : 's'}`,
-              discarded ? `${discarded} discarded` : null,
-              best != null ? `best score ${fmtScore(best)}` : null,
-              last ? `last ${relTime(last)}` : null,
-            ].filter(Boolean).join(' · ') })
-          : null,
-        // What the evaluations keep finding — the ledger (topics.json), newest first.
-        drift.length && !pack.invalid
-          ? jsxs('div', { className: 'cbt-sub', children: [
-              'The AI keeps flagging: ',
-              jsxs('span', { className: 'cbt-row', children: [
-                drift.slice(0, 4).map(t => jsx(Badge, { key: t.topic, variant: 'outline', size: 'xs', children:
-                  `${t.topic}${t.hits > 1 ? ` ×${t.hits}` : ''}` })),
-              ] }),
-            ] })
-          : null,
-      ] }),
-      jsx('div', { className: 'cbt-card-actions', children: pack.invalid ? null : jsxs('div', { className: 'cbt-row', children: [
-        live.length
-          ? jsx(Button, { variant: 'default', size: 'sm', onClick: () => onResume(live[0].id, live[0].mode), children: 'Resume' })
-          : null,
-        jsx(Tip, { label: 'Side pane beside the chat — ask doubts while you answer', children:
-          jsx(Button, {
-            variant: 'outline', size: 'sm',
-            onClick: () => onStart(pack, 'assisted'), children: 'Start assisted',
-          }) }),
-        jsx(Tip, { label: 'Full page, no chat, no hints — the score that counts', children:
-          jsx(Button, {
-            variant: 'default', size: 'sm',
-            onClick: () => onStart(pack, 'mock'), children: 'Start mock',
-          }) }),
-      ] }) }),
+        jsx(Button, {
+          variant: 'ghost', size: 'sm',
+          style: { textDecoration: 'underline', color: 'var(--ui-accent)' },
+          onClick: () => setShowDiscarded(v => !v),
+          children: showDiscarded ? 'Hide discarded' : `Show ${discarded} discarded`,
+        }),
+      ] }) : null,
     ] }),
-    attempts.length
-      ? jsxs('div', { className: 'cbt-card-body', children: [
-          jsxs('div', { className: 'cbt-row', style: { marginBottom: 8, alignItems: 'center' }, children: [
-            jsx(Button, {
-              className: 'cbt-flush',
-              variant: 'ghost', size: 'sm', 'aria-expanded': isOpen,
-              style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', color: 'var(--ui-text-secondary, #666)' },
-              onClick: () => setOpen(!isOpen),
-              children: [jsx(Codicon, { key: 'c', name: isOpen ? 'chevron-down' : 'chevron-right', size: 12 }),
-                isOpen ? 'Hide history' : `History · ${ordered.length}`],
-            }),
-            jsx('nav', { className: 'cbt-row', style: { border: '1px solid var(--ui-stroke-secondary, #d4d4d4)', borderRadius: 4, padding: 1, gap: 1, background: 'transparent' }, children: [
-                  ['All', null], [MODE_LABEL.exam, 'exam'], [MODE_LABEL.assisted, 'assisted'],
-                ].map(([label, m]) => jsx(Button, {
-                  key: label, variant: modeFilter === m ? 'secondary' : 'ghost',
-                  size: 'xs',
-                  onClick: () => { setModeFilter(m); setOpen(true) },
-                  children: `${label} ${m ? filterCount(m) : (showDiscarded ? attempts.length : kept.length)}`,
-                })) }),
-            jsx('span', { style: { flex: 1 } }),
-            discarded
-              ? jsx(Button, {
-                  variant: 'ghost', size: 'sm',
-                  style: { textDecoration: 'underline', color: 'var(--ui-accent, #2563eb)' },
-                  onClick: () => setShowDiscarded(v => !v),
-                  children: showDiscarded ? 'Hide discarded' : `Show ${discarded} discarded`,
-                })
-              : null,
-            discarded && showDiscarded
-              ? jsx(Tip, { label: 'Delete every discarded attempt of this paper', children:
-                  jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => void clearDiscarded(), children: 'Delete discarded' }) })
-              : null,
-          ] }),
-          isOpen ? jsxs('table', { className: 'cbt-table cbt-hist', children: [
-            jsx('thead', { children: jsx('tr', { children: [
-              ['Mode', ''], ['Date', 'num'], ['Status', ''], ['Score', 'num'], ['Result', 'right'], ['Delete', 'right'],
-            ].map(([h, cls]) => jsx('th', { key: h, className: cls || undefined, children: h })) }) }),
-            jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
-              jsx('td', { children: jsx(Badge, { variant: 'outline', size: 'xs', children: MODE_LABEL[a.mode] || a.mode }) }),
-              jsx('td', { className: 'num muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
-              jsx('td', { children: jsx(Badge, {
-                variant: a.status === 'in_progress' ? 'default' : a.status === 'submitted' ? 'muted' : 'outline',
-                size: 'xs',
-                children: STATUS_LABEL[a.status] || a.status,
-              }) }),
-              jsx('td', { className: a.score == null ? 'num muted' : 'num', children: fmtScore(a.score) }),
-              jsx('td', { className: 'right', children: jsx(Button, {
-                variant: 'outline', size: 'xs',
-                onClick: a.status === 'in_progress' ? () => onResume(a.id, a.mode) : () => onViewResult(a.id),
-                children: 'Open',
-              }) }),
-              jsx('td', { className: 'right', children: confirmDel === a.id
-                ? jsxs('div', { className: 'cbt-row', children: [
-                    jsx('span', { className: 'cbt-sub', children: 'Delete this attempt?' }),
-                    jsx(Button, { variant: 'destructive', size: 'xs', disabled: busy, onClick: () => void del(a.id), children: busy ? 'Deleting…' : 'Delete' }),
-                    jsx(Button, { variant: 'ghost', size: 'xs', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
-                  ] })
-                : jsx(Tip, { label: 'Delete this attempt permanently', children:
-                    jsx(Button, { variant: 'ghost', size: 'xs', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }) }),
-            ] })) }),
-            hidden > 0
-              ? jsx('caption', { className: 'cbt-caption', children: jsx(Button, {
-                  variant: 'ghost', size: 'xs', onClick: () => setShowAll(true),
-                  children: `Show ${hidden} more`,
-                }) })
-              : null,
-          ] }) : null,
+    // Seven columns always: this table is the EXAM's history, so each row says which
+    // paper it was sat on. One paper today is still a paper you will add a second of.
+    open ? jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-hist has-paper', children: [
+      jsx('thead', { children: jsx('tr', { children: [
+        ['Paper', ''], ['Mode', ''], ['Date', ''], ['Status', ''], ['Score', 'num'], ['Result', ''], ['Delete', ''],
+        ].map(([h, cls]) => jsx('th', {
+        key: h, className: cls || undefined,
+        'aria-label': h === 'Delete' ? 'Delete' : undefined,
+        children: h === 'Delete' ? '' : h,
+      })) }) }),
+      jsx('tbody', { children: shown.map(a => jsxs('tr', { key: a.id, children: [
+        jsx('td', { children: jsx(Tip, { label: a.paper_title || a.paper_id, children: jsx('span', { className: 'cbt-ellipsis', children: a.paper_title || a.paper_id }) }) }),
+        jsx('td', { children: jsx(Badge, { variant: 'outline', size: 'xs', children: MODE_LABEL[a.mode] || a.mode }) }),
+        jsx('td', { className: 'muted', children: jsx(Tip, { label: fmtWhen(a.submitted_at || a.started_at), children: jsx('span', { children: relTime(a.submitted_at || a.started_at) }) }) }),
+        jsx('td', { children: jsx(Badge, {
+          variant: a.status === 'in_progress' ? 'default' : a.status === 'submitted' ? 'muted' : 'outline',
+          size: 'xs',
+          children: STATUS_LABEL[a.status] || a.status,
+        }) }),
+        jsx('td', { className: a.score == null ? 'num muted' : 'num', children: fmtScore(a.score) }),
+        jsx('td', { children: jsx(Button, {
+          variant: 'outline', size: 'xs',
+          onClick: a.status === 'in_progress' ? () => onResume(a.id, a.mode) : () => onViewResult(a.id),
+          children: 'Open',
+        }) }),
+        jsx('td', { children: jsx(Tip, { label: 'Delete this attempt permanently', children:
+          jsx(Button, { variant: 'ghost', size: 'xs', 'aria-label': 'Delete this attempt', onClick: () => setConfirmDel(a.id), children: icon('trash', 'size-3') }) }) }),
+      ] })) }),
+      hidden > 0
+        ? jsx('caption', { className: 'cbt-caption', children: jsx(Button, {
+            variant: 'ghost', size: 'xs', onClick: () => setShowAll(true),
+            children: `Show ${hidden} more`,
+          }) })
+        : null,
+    ] }) }) : null,
+    // Deleting is confirmed in a dialog, not inside a 9%-wide table cell: the inline
+    // prompt could never fit and pushed the row's height around.
+    confirmDel
+      ? jsx(Dialog, {
+          open: true,
+          onOpenChange: open => { if (!open) setConfirmDel(null) },
+          children: jsxs(DialogContent, { className: 'cbt-dlg', 'aria-describedby': undefined, children: [
+            jsxs(DialogHeader, { children: [
+              jsx(DialogTitle, { children: 'Delete this attempt?' }),
+              jsx(DialogDescription, { className: 'cbt-desc', children:
+                'The attempt and its behaviour log are removed. This cannot be undone.' }),
+            ] }),
+            jsx(DialogFooter, { children: jsxs('div', { className: 'cbt-row', children: [
+              jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => setConfirmDel(null), children: 'Cancel' }),
+              jsx(Button, { variant: 'destructive', size: 'sm', disabled: busy, onClick: () => void del(confirmDel), children: busy ? 'Deleting…' : 'Delete' }),
+            ] }) }),
+          ] }) })
+      : null,
+  ] })
+}
+
+// One exam: its band, its papers as tiles, its sittings in one table.
+function ExamShelf({ exam, packs, attempts, topics, onStart, onResume, onViewResult }) {
+  const qc = useQueryClient()
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // Deleting an exam takes its papers and their sittings with it, so it asks once and
+  // says exactly how much goes.
+  const removeExam = async () => {
+    setBusy(true)
+    try {
+      await rest(`/exams/${exam}`, { method: 'DELETE' })
+      setAsking(false)
+      qc.invalidateQueries({ queryKey: ['cbt', 'packs'] })
+      qc.invalidateQueries({ queryKey: ['cbt', 'attempts'] })
+    } catch (e) { host.notifyError?.(apiFailed('Delete exam', e)) }
+    setBusy(false)
+  }
+  const label = (exam || '').toUpperCase()
+  const scores = attempts.map(a => a.score).filter(v => typeof v === 'number')
+  const best = scores.length ? Math.max(...scores) : null
+  const last = attempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
+  const years = [...new Set(packs.map(p => p.year).filter(y => y != null && y !== ''))].sort((a, b) => b - a)
+  const drift = (topics || []).filter(r => r.exam === exam)
+  // One number per fact, in one place. The COUNT of sittings belongs to the history
+  // line below (`History · n`), which states it once and states it accurately; the band
+  // keeps only the two things no other line says — your best score and when you last
+  // sat it. The conducting body and the paper count are labels, not information.
+  const sentence = attempts.length
+    ? [
+        best != null ? `best ${fmtScore(best)}` : null,
+        last ? relTime(last) : null,
+      ].filter(Boolean).join(' · ') || null
+    : null
+
+  return jsxs('section', { className: 'cbt-shelf', children: [
+    jsxs('div', { className: 'cbt-exam-band', children: [
+      jsxs('div', { className: 'cbt-row cbt-gap-sm', style: { minWidth: 0 }, children: [
+        jsx('h3', { children: label }),
+        sentence ? jsx('span', { className: 'cbt-sub cbt-nowrap', children: sentence }) : null,
+      ] }),
+      jsxs('div', { className: 'cbt-row cbt-gap-sm', style: { flex: '0 0 auto' }, children: [
+        jsx(Tip, { label: 'Opens a chat: the agent asks which year, brings the official paper, or drafts one to the same pattern when none exists', children:
+          jsx(Button, { variant: 'outline', size: 'xs', onClick: () => { void launchSourcing(anotherPaperPrompt(label, years)) }, children: 'Add paper' }) }),
+        jsx(Tip, { label: 'Delete this exam, its papers and their sittings', children:
+          jsx(Button, { className: 'cbt-icon-btn', variant: 'ghost', size: 'xs', 'aria-label': 'Delete this exam',
+            onClick: () => setAsking(true), children: icon('trash', 'size-3') }) }),
+      ] }),
+    ] }),
+    // What the evaluations keep finding — the ledger (topics.json), per exam.
+    drift.length
+      ? jsxs('div', { className: 'cbt-sub cbt-row', children: [
+          'The AI keeps flagging: ',
+          drift.slice(0, 4).map(t => jsx(Badge, { key: t.topic, variant: 'outline', size: 'xs', children:
+            `${t.topic}${t.hits > 1 ? ` ×${t.hits}` : ''}` })),
         ] })
-      : jsx('div', { className: 'cbt-sub', style: { marginTop: 8 }, children: 'No attempts yet.' }),
+      : null,
+    jsx('div', { className: 'cbt-papers', children: packs.map(p => jsx(PaperRow, {
+      pack: p,
+      attempts: attempts.filter(a => a.paper_id === p.paper_id),
+      onStart,
+      onResume,
+    }, p.paper_id)) }),
+    attempts.length
+      ? jsx(ExamHistory, { exam, attempts, onResume, onViewResult })
+      : jsx('div', { className: 'cbt-sub', children: 'No sittings yet.' }),
+    asking
+      ? jsx(Dialog, {
+          open: true,
+          onOpenChange: open => { if (!open) setAsking(false) },
+          children: jsxs(DialogContent, { className: 'cbt-dlg', 'aria-describedby': undefined, children: [
+            jsxs(DialogHeader, { children: [
+              jsx(DialogTitle, { children: 'Delete this exam?' }),
+              jsx(DialogDescription, { className: 'cbt-desc', children:
+                `${label} — ${packs.length} paper${packs.length === 1 ? '' : 's'} and `
+                + `${attempts.length} sitting${attempts.length === 1 ? '' : 's'} are removed. This cannot be undone.` }),
+            ] }),
+            jsx(DialogFooter, { children: jsxs('div', { className: 'cbt-row', children: [
+              jsx(Button, { variant: 'ghost', size: 'sm', disabled: busy, onClick: () => setAsking(false), children: 'Cancel' }),
+              jsx(Button, { variant: 'destructive', size: 'sm', disabled: busy, onClick: () => void removeExam(), children: busy ? 'Deleting…' : 'Delete exam' }),
+            ] }) }),
+          ] }) })
+      : null,
   ] })
 }
 
@@ -1232,7 +1494,7 @@ function CbtHome({ onStart, onResume, onViewResult }) {
   const topicsQ = useQuery({ queryKey: ['cbt', 'topics'], queryFn: () => rest('/topics?limit=100') })
   const start = async (p, mode) => {
     try {
-      const full = await rest(`/packs/${p.exam_id}`)
+      const full = await rest(`/packs/${p.paper_id}`)
       onStart(full, mode)
     } catch (e) { host.notifyError?.(`Could not load pack: ${e?.message || e}`) }
   }
@@ -1245,28 +1507,35 @@ function CbtHome({ onStart, onResume, onViewResult }) {
 
   const groups = {}
   for (const p of packList) {
-    const fam = p.family || familyOf(p.exam_id)
-    if (!groups[fam]) groups[fam] = []
-    groups[fam].push(p)
+    const ex = p.exam || examOf(p.paper_id)
+    if (!groups[ex]) groups[ex] = []
+    groups[ex].push(p)
   }
-  const familyKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b))
-  for (const k of familyKeys) {
+  const examKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b))
+  for (const k of examKeys) {
     groups[k].sort((a, b) => {
       const yA = typeof a.year === 'number' ? a.year : -1
       const yB = typeof b.year === 'number' ? b.year : -1
       if (yA !== yB) return yB - yA
-      return (a.title || a.exam_id || '').localeCompare(b.title || b.exam_id || '')
+      return (a.title || a.paper_id || '').localeCompare(b.title || b.paper_id || '')
     })
   }
 
   return jsxs('div', { className: 'cbt cbt-page cbt-home', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx('h2', { children: 'Exam Desk' }),
-      jsx('span', { className: 'cbt-sub cbt-inline', children: liveCount ? `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` : 'exam-agnostic practice — any CBT, pattern is data' }),
-      jsx('span', { style: { flex: 1 } }),
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
-      jsx(Tip, { label: 'Opens a chat: the agent asks which exam and year, then brings the official paper — or drafts one to the same pattern when none exists', children:
-        jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }) }),
+      jsxs('div', { className: 'cbt-head-left', children: [
+        jsx('h2', { children: 'Exam Desk' }),
+        // A tagline that has to explain the engine is not a tagline. This slot carries
+        // state instead: whether a clock is running right now, and nothing when it is not.
+        liveCount
+          ? jsx('span', { className: 'cbt-sub cbt-inline', children: `${liveCount} attempt${liveCount === 1 ? '' : 's'} running` })
+          : null,
+      ] }),
+      jsxs('div', { className: 'cbt-head-right', children: [
+        jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => { packs.refetch(); hist.refetch(); topicsQ.refetch() }, children: 'Refresh' }),
+        jsx(Tip, { label: 'Opens a chat: the agent asks which exam and year, then brings the official paper — or drafts one to the same pattern when none exists', children:
+          jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }) }),
+      ] }),
     ] }),
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
@@ -1277,58 +1546,16 @@ function CbtHome({ onStart, onResume, onViewResult }) {
               jsx(EmptyState, { title: 'No papers yet', description: 'Ask the agent to source a previous-year paper — it files itself here once validated.' }),
               jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }),
             ] })
-          : familyKeys.map(famKey => {
-const famPacks = groups[famKey]
-                      const famAttempts = all.filter(a => (a.family || a.exam_id) === famKey || (a.family || '').toLowerCase() === famKey.toLowerCase())
-                      const famPapers = new Set(famAttempts.map(a => a.exam_id)).size
-                      const famBest = famAttempts.map(a => a.score).filter(v => typeof v === 'number')
-                      const famLast = famAttempts.reduce((n, a) => Math.max(n, a.submitted_at || a.started_at || 0), 0)
-                      const famAgg = famAttempts.length
-                        ? `${famAttempts.length} attempt${famAttempts.length === 1 ? '' : 's'} across ${famPapers || famPacks.length} paper${(famPapers || famPacks.length) === 1 ? '' : 's'}${famLast ? ` · last ${relTime(famLast)}` : ''}`
-                        : null
-              const bodies = [...new Set(famPacks.map(p => (p.body || '').trim()).filter(Boolean))]
-              // The band names the EXAM (family key), with the conducting body as a
-              // muted qualifier. The body alone reads like a category tag — "NTA / RCB
-              // (DBT)" says who runs it, not what you are about to sit.
-              const examLabel = (famKey || '').toUpperCase()
-              const bodyLabel = bodies.length === 1 && bodies[0].toLowerCase() !== examLabel.toLowerCase() ? bodies[0] : ''
-              const years = [...new Set(famPacks.map(p => p.year).filter(y => y != null && y !== ''))].sort((a, b) => b - a)
-              const anotherPrompt = anotherPaperPrompt(examLabel, years)
-              return jsxs('div', {
-                className: 'cbt-family-group',
-                children: [
-                  jsxs('div', {
-                    className: 'cbt-family-band',
-                    children: [
-                      jsxs('div', {
-                        className: 'cbt-row cbt-gap-sm',
-                        children: [
-                          jsx('h3', { style: { margin: 0 }, children: examLabel }),
-                          bodyLabel ? jsx('span', { className: 'cbt-sub', children: bodyLabel }) : null,
-                          jsx('span', { className: 'cbt-sub', children: `${famPacks.length} ${famPacks.length === 1 ? 'paper' : 'papers'}` }),
-                          famAgg ? jsx('span', { className: 'cbt-sub', children: famAgg }) : null,
-                        ]
-                      }),
-                      jsx(Button, {
-                        variant: 'outline',
-                        size: 'xs',
-                        onClick: () => { void launchSourcing(anotherPrompt) },
-                        children: 'Add paper'
-                      }),
-                    ]
-                  }),
-                  ...famPacks.map(p => jsx(ExamCard, {
-                    key: p.exam_id,
-                    pack: p,
-                    attempts: all.filter(a => a.exam_id === p.exam_id),
-                    topics: topicsQ.data?.topics || [],
-                    onStart: start,
-                    onResume,
-                    onViewResult,
-                  }))
-                ]
-              }, famKey)
-            })),
+          : examKeys.map(examKey => jsx(ExamShelf, {
+              exam: examKey,
+              packs: groups[examKey],
+              attempts: all.filter(a => (a.exam || a.paper_id) === examKey
+                || (a.exam || '').toLowerCase() === examKey.toLowerCase()),
+              topics: topicsQ.data?.topics || [],
+              onStart: start,
+              onResume,
+              onViewResult,
+            }, examKey))),
     hist.isError ? jsx(ErrorBox, { what: 'Loading attempts', onRetry: () => hist.refetch() }) : null,
   ] })
 }
@@ -1373,7 +1600,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
             : null,
           totals.blank ? jsx(Badge, { variant: 'destructive', children: `${totals.blank} unanswered` }) : null,
         ] }),
-        jsxs('table', { className: 'cbt-table cbt-stats', children: [
+        jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-stats', children: [
           jsx('thead', { children: jsx('tr', { children: [
             jsx('th', { children: 'Section' }),
             jsx('th', { className: 'num', children: 'Answered' }),
@@ -1388,7 +1615,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
             jsx('td', { className: 'num', children: String(x.not_answered) }),
             jsx('td', { className: 'num', children: String(x.not_visited) }),
           ] })) }),
-        ] }),
+        ] }) }),
         jsx('p', { className: 'cbt-sub', children: unanswered
           ? `${unanswered} unanswered (blank + not visited) will score 0 — a blank never carries a negative mark.`
           : 'Every question has an answer saved.' }),
@@ -1572,7 +1799,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
   }
   if (attempt.status !== 'in_progress') {
     return jsxs('div', { className: 'cbt cbt-page', children: [
-      jsx('h2', { children: pack.title || pack.exam_id }),
+      jsx('h2', { children: pack.title || pack.paper_id }),
       jsx('p', { className: 'cbt-sub', children: 'This attempt is submitted.' }),
       jsxs('div', { className: 'cbt-row', children: [
         jsx(Button, { variant: 'default', size: 'sm', onClick: () => onResult(attemptId), children: 'Open result' }),
@@ -1609,7 +1836,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       input,
       jsxs('span', { className: 'opt-body', children: [
         jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
-        figs ? mediaNode(figs, pack.exam_id, `opt${i}`) : null,
+        figs ? mediaNode(figs, pack.paper_id, `opt${i}`) : null,
       ] }),
     ] })
   }
@@ -1679,8 +1906,8 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     jsx(ScrollToTop, { dep: curIdResolved, targetRef: bodyRef }),
     jsxs('div', { className: 'cbt-head', style: { gridArea: 'head' }, children: [
       inPane ? null : jsx(SidebarButton, {}),
-      jsx(Tip, { label: pack.title || pack.exam_id, children:
-        jsx('strong', { className: 'cbt-head-title', children: pack.title || pack.exam_id }) }),
+      jsx(Tip, { label: pack.title || pack.paper_id, children:
+        jsx('strong', { className: 'cbt-head-title', children: pack.title || pack.paper_id }) }),
       isNarrow ? null : jsx(Badge, { variant: attempt.mode === 'assisted' ? 'outline' : 'muted', children: attempt.mode === 'assisted' ? 'Assisted' : 'Mock' }),
       jsx('span', { style: { flex: 1 } }),
       isNarrow
@@ -1733,7 +1960,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         jsx(Badge, { variant: curAnswered ? 'success' : 'outline', size: 'xs', children: curAnswered ? 'Answered' : 'Not answered' }),
       ] }),
       jsx('p', { className: 'cbt-qtext', children: cur.text }),
-      mediaNode(cur.media, pack.exam_id, 'q'),
+      mediaNode(cur.media, pack.paper_id, 'q'),
       cur.type === 'nat'
         ? jsx('input', {
             type: 'text', inputMode: 'decimal', placeholder: 'Your answer',
@@ -1852,14 +2079,14 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         className: 'cbt-dlg cbt-paper',
         children: [
           jsxs(DialogHeader, { children: [
-            jsx(DialogTitle, { children: pack.title || pack.exam_id }),
+            jsx(DialogTitle, { children: pack.title || pack.paper_id }),
             jsx(DialogDescription, { className: 'cbt-desc', children: 'A read-only copy of the paper. Close with Esc.' }),
           ] }),
           ...sections.map(s => jsxs('div', { key: s.id, children: [
             jsx('h3', { children: s.title }),
             ...secQs(s.id).map((x, i) => jsxs('div', { key: x.id, className: 'cbt-paper-q', children: [
               jsx('p', { children: [jsx('strong', { children: `${i + 1}. ` }), x.text] }),
-              mediaNode(x.media, pack.exam_id, `paper-${x.id}`),
+              mediaNode(x.media, pack.paper_id, `paper-${x.id}`),
             ] })),
           ] })),
         ],
@@ -2125,7 +2352,7 @@ function EvaluationCard({ d, pack }) {
 // (not on its own bar), so a negative bar or a bar on the max line cannot collide with it.
 function AttemptsChart({ seq, selectedId, onSelect }) {
   // Drills have different ceilings and would distort the scale; show full papers only.
-  const fullSeq = seq.filter(a => !/-drill(?:-\\d+)?$/.test(a.exam_id || ''))
+  const fullSeq = seq.filter(a => a.kind !== 'drill')
   const chartSeq = fullSeq.length ? fullSeq : seq
   const BAR_W = 28, BAR_GAP = 12, SLOT = 40, PLOT_H = 160
   const VALUE_H = 20, BASELINE_H = 24, AXIS_W = 44
@@ -2218,9 +2445,11 @@ function AttemptsChart({ seq, selectedId, onSelect }) {
           ] })),
         ...bars,
       ] }) }),
+    // No caption under the chart for a graded attempt: the card's own subtitle already
+    // says what the bars are, every bar prints its score above itself, and the selected
+    // one is drawn with a stroke and a bolder label. The line only said it a third time.
     selIdx >= 0
-      ? jsx('div', { className: 'cbt-sub', style: { marginTop: 8, fontVariantNumeric: 'tabular-nums' },
-          children: `Attempt ${selIdx + 1}: ${fmtScore(seq[selIdx].score ?? 0)} marks — the bars are every graded attempt, oldest first.` })
+      ? null
       : jsx('div', { className: 'cbt-sub', style: { marginTop: 8 },
           children: 'This attempt was never graded — click a bar to open a graded one.' }),
   ] })
@@ -2232,26 +2461,26 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
   const [drillBusy, setDrillBusy] = useState(false)
   const qc = useQueryClient()
 
-  // ── load the entry attempt to derive the exam family ──────────────────────
+  // ── load the entry attempt to derive its exam ─────────────────────────────
   const entryQ = useQuery({ queryKey: ['cbt', 'attempt', attemptId], queryFn: () => rest(`/attempts/${attemptId}`) })
   const entryAttempt = entryQ.data?.attempt || null
-  const family = entryAttempt?.family || (entryAttempt?.exam_id ? null : null)
+  const exam = entryAttempt?.exam || null
 
-  // ── load siblings for this exam family ────────────────────────────────────
+  // ── load siblings for this exam ───────────────────────────────────────────
   const siblingsQ = useQuery({
-    queryKey: ['cbt', 'attempts', 'family', family || entryAttempt?.exam_id],
-    queryFn: () => rest(`/attempts?family=${encodeURIComponent(family || entryAttempt?.exam_id)}&limit=500`),
+    queryKey: ['cbt', 'attempts', 'exam', exam || entryAttempt?.paper_id],
+    queryFn: () => rest(`/attempts?exam=${encodeURIComponent(exam || entryAttempt?.paper_id)}&limit=500`),
     enabled: !!entryAttempt,
   })
 
   // ── submitted sequence, oldest first (the chronological ordering) ──────────
   // Filtered here as well as on the server: a dashboard still running the previous
-  // build ignores ?exam_id and answers with every paper's attempts, and this page
+  // build ignores ?exam and answers with every paper's attempts, and this page
   // must not draw another exam's marks as this one's.
   const allSiblings = (siblingsQ.data?.attempts || []).filter(a => {
     if (!entryAttempt) return true
-    const f = family || entryAttempt.exam_id
-    const af = a.family || a.exam_id
+    const f = exam || entryAttempt.paper_id
+    const af = a.exam || a.paper_id
     return af === f || (typeof af === 'string' && typeof f === 'string' && af.toLowerCase() === f.toLowerCase())
   })
   const seq = allSiblings
@@ -2344,17 +2573,15 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
   const selAtt = selSeqIdx >= 0 ? seq[selSeqIdx] : null
   const shell = body => jsxs('div', { className: 'cbt cbt-page cbt-result', children: [
     jsxs('div', { className: 'cbt-head-row', children: [
-      jsx('h2', { children: pack.title || pack.exam_id }),
-      jsx(Badge, { variant: selAttempt?.mode === 'assisted' ? 'outline' : 'muted', children: MODE_LABEL[selAttempt?.mode] || selAttempt?.mode || '' }),
+      jsx('h2', { children: (pack.exam || examOf(pack.paper_id)).toUpperCase() }),
       jsx('span', { style: { flex: 1 } }),
-      jsx(SidebarButton, {}),
-      onRetake && selAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[selAttempt.mode] || selAttempt.mode} attempt on this paper`, children:
-        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, selAttempt.mode), children: 'Retake' }) }) : null,
+      jsx(Button, { className: 'cbt-head-nav', variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'Home' }),
       onDrill && q.data?.attempt?.status === 'submitted' && q.data?.attempt?.result
         ? jsx(Tip, { label: 'New paper holding this attempt\'s misses — wrong, skipped and not-counted, same key', children:
             jsx(Button, { variant: 'secondary', size: 'sm', loading: drillBusy, onClick: drill, children: 'Drill misses' }) })
         : null,
-      jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'Home' }),
+      onRetake && selAttempt ? jsx(Tip, { label: `New ${MODE_LABEL[selAttempt.mode] || selAttempt.mode} attempt on this paper`, children:
+        jsx(Button, { variant: 'default', size: 'sm', onClick: () => onRetake(pack, selAttempt.mode), children: 'Retake' }) }) : null,
     ] }),
     // One attempt at a time: the arrows walk the papers' graded attempts in the order
     // they were submitted, and clamp at both ends rather than wrap.
@@ -2363,7 +2590,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
       // The pill names the ATTEMPT; the exam's name is the heading above it. Keeping
       // the title out of both places is what stops the page saying it twice.
       jsx('div', { className: 'cbt-attempt-pill', children: selAtt
-        ? `Attempt ${selSeqIdx + 1} of ${seq.length} · ${selAtt.pack_title || selAtt.exam_id}${selAtt.year && !String(selAtt.pack_title || '').includes(String(selAtt.year)) ? ' ' + selAtt.year : ''} · ${fmtWhen(selAtt.submitted_at)} · ${MODE_LABEL[selAtt.mode] || selAtt.mode}`
+        ? `Attempt ${selSeqIdx + 1} of ${seq.length} · ${selAtt.paper_title || selAtt.paper_id}${selAtt.year && !String(selAtt.paper_title || '').includes(String(selAtt.year)) ? ' ' + selAtt.year : ''} · ${fmtWhen(selAtt.submitted_at)} · ${MODE_LABEL[selAtt.mode] || selAtt.mode}`
         : 'not a graded attempt' }),
       jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: seq.length === 0 || selSeqIdx >= seq.length - 1, 'aria-label': 'Next attempt', onClick: goNext, children: icon('chevron-right', 'size-4') }),
     ] }),
@@ -2453,7 +2680,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
     pack.pattern.sections.length > 1
       ? jsxs('div', { className: 'cbt-card', children: [
           jsx('div', { className: 'cbt-section', style: { margin: '0 0 12px' }, children: 'Sections' }),
-          jsxs('table', { className: 'cbt-table cbt-sec', children: [
+          jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-sec', children: [
             jsx('thead', { children: jsx('tr', { children: ['Section', 'Score', 'Max', 'Correct', 'Wrong', 'Skipped', 'Not counted'].map((h, i) => jsx('th', { key: h, className: i ? 'num' : undefined, children: h === 'Max'
               ? jsx(Tip, { label: 'Full marks for the section — each question carries its own marks, so a paper of 6 questions can be worth 9', children: jsx('span', { children: 'Max' }) })
               : h })) }) }),
@@ -2482,7 +2709,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
               jsx('td', { className: 'num', children: String(r.totals.skipped ?? 0) }),
               jsx('td', { className: 'num', children: String(r.totals.not_counted ?? 0) }),
             ] }) }),
-          ] }),
+          ] }) }),
         ] })
       : null,
     // Card 6 — Topics
@@ -2601,10 +2828,10 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
           }),
           expanded && jsxs('div', { className: 'cbt-review-body', children: [
             jsx('p', { children: qq.text }),
-            mediaNode(qq.media, pack.exam_id, `rev-${row.id}`),
+            mediaNode(qq.media, pack.paper_id, `rev-${row.id}`),
             (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'cbt-sub', children: [
               `${String.fromCharCode(65 + i)}) ${o}`,
-              qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.exam_id, `rev-${row.id}-o${i}`) : null,
+              qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.paper_id, `rev-${row.id}-o${i}`) : null,
             ] })),
             jsxs('div', { className: 'cbt-ans', children: [
               jsx('span', { className: 'cbt-ans-k', children: 'Your answer' }),
@@ -2716,7 +2943,7 @@ function CbtPage() {
       // normal instructions page so the drill sits inside no special view
       onDrill: async aid => {
         const r = await rest(`/attempts/${aid}/drill`, { method: 'POST' })
-        const full = await rest(`/packs/${r.exam_id}`)
+        const full = await rest(`/packs/${r.paper_id}`)
         qc.invalidateQueries({ queryKey: ['cbt', 'packs'] })
         qc.invalidateQueries({ queryKey: ['cbt', 'topics'] })
         setView({ name: 'instructions', pack: full, mode: 'mock' })

@@ -35,22 +35,22 @@ clicking a bar selects that attempt and everything below re-renders for it.
 ### 1. Backend — one added query param
 
 `GET /api/plugins/exam-desk/attempts` already returns, newest first, for each
-attempt: `id, exam_id, mode, status, started_at, submitted_at, score, totals,
-has_evaluation`. Add an optional `exam_id: str | None = None` query param that
+attempt: `id, paper_id, mode, status, started_at, submitted_at, score, totals,
+has_evaluation`. Add an optional `paper_id: str | None = None` query param that
 filters that list, keeping the existing `limit` (default `HISTORY_LIMIT` = 50,
 hard cap 500). Nothing else about the endpoint changes. Add one test to
-`tests/test_api.py` proving: two packs, attempts on both, `?exam_id=` returns
-only that pack's attempts and no `exam_id` still returns everything.
+`tests/test_api.py` proving: two packs, attempts on both, `?paper_id=` returns
+only that pack's attempts and no `paper_id` still returns everything.
 
 ### 2. Result screen becomes exam-scoped
 
 Keep `CbtResult({attemptId, onHome, onRetake})` as the entry and keep the
 `attemptId` prop — it decides the *initially selected* attempt.
 
-- Derive `exam_id` from the loaded attempt (the `/attempts/{id}` response
-  carries `attempt.exam_id` and the full `pack`).
-- Load siblings with `/attempts?exam_id=<exam_id>&limit=500` (react-query key
-  `['cbt','attempts',exam_id]`).
+- Derive `paper_id` from the loaded attempt (the `/attempts/{id}` response
+  carries `attempt.paper_id` and the full `pack`).
+- Load siblings with `/attempts?paper_id=<paper_id>&limit=500` (react-query key
+  `['cbt','attempts',paper_id]`).
 - Hold the selected attempt in component state (`useState`), not in `view`.
   Switching attempts must NOT navigate, must NOT remount the page, and must keep
   the header/chart on screen. `CbtPage` renders `CbtResult` with

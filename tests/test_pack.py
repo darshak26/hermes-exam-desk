@@ -2,7 +2,7 @@ import sys, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, family_of, pack_hash, YR, pack_family, derive_kind, KINDS
+from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, exam_of, pack_hash, YR, pack_exam, derived_kind, KINDS
 from tests.helpers import base_pack
 
 class PackTests(unittest.TestCase):
@@ -12,8 +12,8 @@ class PackTests(unittest.TestCase):
     def test_rejects_bad_schema_slug_duration(self):
         p = base_pack(); p["schema"] = "wrong"
         self.assertIn("schema must be", " ".join(validate_pack(p)))
-        p = base_pack(); p["exam_id"] = "Bad Slug!"
-        self.assertTrue(any("exam_id" for e in validate_pack(p)))
+        p = base_pack(); p["paper_id"] = "Bad Slug!"
+        self.assertTrue(any("paper_id" for e in validate_pack(p)))
         p = base_pack(); p["pattern"]["duration_minutes"] = 0
         self.assertTrue(any("duration_minutes" for e in validate_pack(p)))
 
@@ -39,7 +39,7 @@ class PackTests(unittest.TestCase):
 
     def test_summarize_shape(self):
         sm = summarize(base_pack())
-        self.assertEqual(sm["exam_id"], "gat-b-demo")
+        self.assertEqual(sm["paper_id"], "gat-b-demo")
         self.assertEqual(sm["question_count"], 6)
         self.assertEqual(sm["sections"][1]["attempt_limit"], 2)
         # the panel's Marks column reads these — omitting them rendered "+undefined"
@@ -58,15 +58,15 @@ class PackTests(unittest.TestCase):
         p = base_pack(); p["key_status"] = "random"
         self.assertEqual(summarize(p)["key_status"], "random")
 
-    def test_family_of_rules_and_examples(self):
-        self.assertEqual(family_of("gat-b"), "gat-b")
-        self.assertEqual(family_of("gat-b-2023"), "gat-b")
-        self.assertEqual(family_of("gat-b-2023-shift1"), "gat-b")
-        self.assertEqual(family_of("gat-b-2023-drill"), "gat-b")
-        self.assertEqual(family_of("gat-b-2023-drill-2"), "gat-b")
-        self.assertEqual(family_of("gat-b-2023-superseded-4f2a9c1b0d3e"), "gat-b")
-        self.assertEqual(family_of("demo-basics"), "demo-basics")
-        self.assertEqual(family_of("csir-net-set-a"), "csir-net-set-a")
+    def test_exam_of_rules_and_examples(self):
+        self.assertEqual(exam_of("gat-b"), "gat-b")
+        self.assertEqual(exam_of("gat-b-2023"), "gat-b")
+        self.assertEqual(exam_of("gat-b-2023-shift1"), "gat-b")
+        self.assertEqual(exam_of("gat-b-2023-drill"), "gat-b")
+        self.assertEqual(exam_of("gat-b-2023-drill-2"), "gat-b")
+        self.assertEqual(exam_of("gat-b-2023-superseded-4f2a9c1b0d3e"), "gat-b")
+        self.assertEqual(exam_of("demo-basics"), "demo-basics")
+        self.assertEqual(exam_of("csir-net-set-a"), "csir-net-set-a")
         self.assertTrue(YR.search("-2023"))
 
     def test_pack_hash(self):
@@ -82,10 +82,10 @@ class PackTests(unittest.TestCase):
 
     def test_summarize_has_family(self):
         p = base_pack()
-        p["exam_id"] = "gat-b-2023"
+        p["paper_id"] = "gat-b-2023"
         p["year"] = 2023
         sm = summarize(p)
-        self.assertEqual(sm["family"], "gat-b")
+        self.assertEqual(sm["exam"], "gat-b")
 
     def test_validate_pack_set_and_year(self):
         p = base_pack()
@@ -96,7 +96,7 @@ class PackTests(unittest.TestCase):
         self.assertTrue(any("set" in e for e in validate_pack(p)))
 
         p = base_pack()
-        p["exam_id"] = "gat-b-2023"
+        p["paper_id"] = "gat-b-2023"
         p["year"] = 2023
         self.assertEqual(validate_pack(p), [])
 
@@ -107,33 +107,33 @@ class PackTests(unittest.TestCase):
         self.assertTrue(any("year" in e for e in validate_pack(p)))
 
         p_no_yr = base_pack()
-        p_no_yr["exam_id"] = "demo-basics"
+        p_no_yr["paper_id"] = "demo-basics"
         p_no_yr.pop("year", None)
         self.assertEqual(validate_pack(p_no_yr), [])
 
-    def test_pack_family_stated_wins_and_legacy_fallback(self):
+    def test_pack_exam_stated_wins_and_legacy_fallback(self):
         # Stated family wins
-        self.assertEqual(pack_family({"exam_id": "csir-net-set-a", "family": "csir-net"}), "csir-net")
-        self.assertEqual(pack_family({"exam_id": "gat-b-practice-bioinfo", "family": "gat-b"}), "gat-b")
-        # Legacy packs without family fall back to family_of
-        self.assertEqual(pack_family({"exam_id": "gat-b-2023"}), "gat-b")
-        self.assertEqual(pack_family({"exam_id": "csir-net-set-a"}), "csir-net-set-a")
-        self.assertEqual(pack_family({"exam_id": "demo-basics"}), "demo-basics")
+        self.assertEqual(pack_exam({"paper_id": "csir-net-set-a", "exam": "csir-net"}), "csir-net")
+        self.assertEqual(pack_exam({"paper_id": "gat-b-practice-bioinfo", "exam": "gat-b"}), "gat-b")
+        # Legacy packs without family fall back to exam_of
+        self.assertEqual(pack_exam({"paper_id": "gat-b-2023"}), "gat-b")
+        self.assertEqual(pack_exam({"paper_id": "csir-net-set-a"}), "csir-net-set-a")
+        self.assertEqual(pack_exam({"paper_id": "demo-basics"}), "demo-basics")
 
-    def test_derive_kind_heuristics(self):
+    def test_derived_kind_heuristics(self):
         # -drill in slug -> drill
-        self.assertEqual(derive_kind("gat-b-2023-drill"), "drill")
-        self.assertEqual(derive_kind("gat-b-drill-2"), "drill")
+        self.assertEqual(derived_kind("gat-b-2023-drill"), "drill")
+        self.assertEqual(derived_kind("gat-b-drill-2"), "drill")
         # year token -> pyq
-        self.assertEqual(derive_kind("gat-b-2023"), "pyq")
-        self.assertEqual(derive_kind("gate-bt-2024-shift1"), "pyq")
+        self.assertEqual(derived_kind("gat-b-2023"), "pyq")
+        self.assertEqual(derived_kind("gate-bt-2024-shift1"), "pyq")
         # practice token -> practice
-        self.assertEqual(derive_kind("gat-b-practice-bioinfo"), "practice")
-        self.assertEqual(derive_kind("demo-practice"), "practice")
+        self.assertEqual(derived_kind("gat-b-practice-bioinfo"), "practice")
+        self.assertEqual(derived_kind("demo-practice"), "practice")
         # else None
-        self.assertIsNone(derive_kind("demo-basics"))
-        self.assertIsNone(derive_kind("csir-net-set-a"))
-        self.assertIsNone(derive_kind(None))
+        self.assertIsNone(derived_kind("demo-basics"))
+        self.assertIsNone(derived_kind("csir-net-set-a"))
+        self.assertIsNone(derived_kind(None))
 
     def test_validate_pack_new_fields(self):
         # Legacy pack without kind/family validates clean
@@ -147,16 +147,16 @@ class PackTests(unittest.TestCase):
         self.assertTrue(any("kind must be one of" in e for e in errs), errs)
 
         p["kind"] = "practice"
-        p["family"] = "gat-b"
+        p["exam"] = "gat-b"
         self.assertEqual(validate_pack(p), [])
 
-        # family/slug mismatch is an error
+        # exam/slug mismatch is an error
         p_mismatch = base_pack()
-        p_mismatch["exam_id"] = "gat-b-2023"
+        p_mismatch["paper_id"] = "gat-b-2023"
         p_mismatch["year"] = 2023
-        p_mismatch["family"] = "csir-net"
+        p_mismatch["exam"] = "csir-net"
         errs = validate_pack(p_mismatch)
-        self.assertTrue(any("does not sit under stated family" in e for e in errs), errs)
+        self.assertTrue(any("does not sit under exam" in e for e in errs), errs)
 
         # pyq requires year
         p_pyq = base_pack()
@@ -176,20 +176,20 @@ class PackTests(unittest.TestCase):
 
     def test_summarize_fields(self):
         p = base_pack()
-        p["family"] = "gat-b"
+        p["exam"] = "gat-b"
         p["kind"] = "practice"
         p["scope"] = "Photosynthesis"
         sm = summarize(p)
-        self.assertEqual(sm["family"], "gat-b")
+        self.assertEqual(sm["exam"], "gat-b")
         self.assertEqual(sm["kind"], "practice")
         self.assertEqual(sm["scope"], "Photosynthesis")
 
         # Legacy pack derives kind and has None scope
         p_leg = base_pack()
-        p_leg["exam_id"] = "gat-b-2023"
+        p_leg["paper_id"] = "gat-b-2023"
         p_leg["year"] = 2023
         sm_leg = summarize(p_leg)
-        self.assertEqual(sm_leg["family"], "gat-b")
+        self.assertEqual(sm_leg["exam"], "gat-b")
         self.assertEqual(sm_leg["kind"], "pyq")
         self.assertIsNone(sm_leg["scope"])
 

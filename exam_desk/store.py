@@ -15,6 +15,7 @@ read time. What is not boring is the failure handling:
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import uuid
@@ -22,7 +23,7 @@ from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 
-from . import grading, pack as pack_mod
+from . import grading, pack as pack_mod, vocab
 
 ENV_DATA_DIR = "EXAM_DESK_DATA_DIR"
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -61,15 +62,15 @@ EVENT_TRUNCATED = {"type": "truncated"}  # marker appended when the cap bites
 
 
 
-def pack_assets_dir(exam_id):
-    """Where a paper's figures live: `packs/<exam_id>.assets/`.
+def paper_assets_dir(paper_id):
+    """Where a paper's figures live: `packs/<paper_id>.assets/`.
 
     Kept beside the JSON rather than inside it so a pack stays one readable file
     and images are served as static bytes, not base64 blobs in the model context.
     """
-    if not _ID.match(str(exam_id or "")):
-        raise KeyError(f"pack id {exam_id!r} is not a plain id")
-    return packs_dir() / f"{exam_id}.assets"
+    if not _ID.match(str(paper_id or "")):
+        raise KeyError(f"paper id {paper_id!r} is not a plain slug")
+    return packs_dir() / f"{paper_id}.assets"
 
 
 def _file_in(directory, ident, kind):
@@ -96,17 +97,38 @@ def list_packs():
         try:
             out.append(pack_mod.load_pack_file(p))
         except (ValueError, KeyError) as e:
-            out.append({"exam_id": p.stem, "invalid": str(e)})
+            out.append({"paper_id": p.stem, "invalid": str(e)})
     return out
 
 
-def get_pack(exam_id):
-    return pack_mod.load_pack_file(_file_in(packs_dir(), exam_id, "pack"))
+def get_pack(paper_id):
+    return pack_mod.load_pack_file(_file_in(packs_dir(), paper_id, "paper"))
 
 
-def get_pack_view(exam_id):
+def remove_pack(paper_id):
+    """Delete a paper file and its asset directory. Returns the paper id.
+
+    Sittings are deliberately not touched here: an attempt is its own record, and a
+    caller that wants the paper's history gone says so through `prune_attempts`
+    rather than losing it as a side effect of removing a file.
+    """
+    path = _file_in(packs_dir(), paper_id, "paper")
+    if not path.exists():
+        raise KeyError(f"no such paper: {paper_id}")
+    path.unlink()
+    try:
+        assets = paper_assets_dir(paper_id)
+    except KeyError:
+        assets = None
+    if assets is not None and assets.is_dir():
+        shutil.rmtree(assets, ignore_errors=True)
+    pack_mod.clear_cache()
+    return paper_id
+
+
+def get_pack_view(paper_id):
     """The answer-free copy — what an in-progress attempt is allowed to see."""
-    return pack_mod.load_pack_view(_file_in(packs_dir(), exam_id, "pack"))
+    return pack_mod.load_pack_view(_file_in(packs_dir(), paper_id, "paper"))
 
 
 # --------------------------------------------------------------------------- #
@@ -135,13 +157,39 @@ def _atomic_write(path, data, durable=False):
             tmp.unlink()
 
 
+# 0.9.0 field names → current. `paper_id` was `exam_id`, `exam` was `family`,
+# `paper_hash`/`paper_title` were `pack_hash`/`pack_title`.
+_LEGACY_FIELDS = (("exam_id", "paper_id"), ("family", "exam"),
+                  ("pack_hash", "paper_hash"), ("pack_title", "paper_title"))
+
+
+def migrate_attempt(a):
+    """Fold legacy field names and the legacy mode spelling into the current ones.
+
+    One-way and idempotent: a value is carried forward under its new name and the
+    old key is then dropped, so a file rewritten by `save_attempt` comes out
+    single-sourced. Nothing here can lose a value — the legacy key is only dropped
+    once the new one holds something.
+    """
+    if not isinstance(a, dict):
+        return a
+    for old, new in _LEGACY_FIELDS:
+        if old in a:
+            if not a.get(new):
+                a[new] = a[old]
+            del a[old]
+    if not a.get("exam"):
+        a["exam"] = pack_mod.exam_of(a.get("paper_id"))
+    if "mode" in a:
+        a["mode"] = vocab.normalize_mode(a["mode"])
+    return a
+
+
 def _read_attempt(path):
     a = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(a, dict) or not a.get("id") or not a.get("status"):
         raise ValueError("not an attempt record")
-    if not a.get("family"):
-        a["family"] = pack_mod.family_of(a.get("exam_id"))
-    return a
+    return migrate_attempt(a)
 
 
 _LOCKS = {}
@@ -260,9 +308,9 @@ def attempt_lock(aid):
 
 def new_attempt(pack, mode, assisted_session_id=None):
     now = time.time()
-    a = {"id": f"a-{uuid.uuid4().hex[:10]}", "exam_id": pack["exam_id"],
-         "family": pack_mod.pack_family(pack),
-         "pack_hash": pack_mod.pack_hash(pack), "pack_title": pack.get("title"),
+    a = {"id": f"a-{uuid.uuid4().hex[:10]}", "paper_id": pack["paper_id"],
+         "exam": pack_mod.pack_exam(pack),
+         "paper_hash": pack_mod.pack_hash(pack), "paper_title": pack.get("title"),
          # The chat the tutor sat in for an assisted sitting (a Hermes session id). Recorded
          # at creation because the desk cannot find it later any other way; the review
          # skill then reads its tutor answers when diagnosing missed questions.
@@ -271,7 +319,7 @@ def new_attempt(pack, mode, assisted_session_id=None):
          # Sessions are the desk's evidence of its own conversations: the review reads
          # past discussion instead of re-deriving it.
          "review_session_ids": [],
-         "mode": mode,
+         "mode": vocab.normalize_mode(mode),
          "status": "in_progress", "started_at": now,
          "duration_seconds": pack["pattern"]["duration_minutes"] * 60,
          "answers": {}, "answer_seq": [], "marked": [], "visited": [], "current": None,
@@ -303,10 +351,10 @@ def is_expired(a, now=None):
     return a.get("status") == "in_progress" and remaining_seconds(a, now) <= 0
 
 
-def iter_attempts(limit=None, exam_id=None, family=None):
+def iter_attempts(limit=None, paper_id=None, exam=None):
     """Yield ``(attempt, None)`` for readable files, ``(None, {'id','error'})`` for corrupt ones.
 
-    Newest first by file mtime. Filters by ``exam_id`` and/or ``family`` before applying ``limit``.
+    Newest first by file mtime. Filters by ``paper_id`` and/or ``exam`` before applying ``limit``.
     """
     d = attempts_dir()
     if not d.exists():
@@ -317,7 +365,7 @@ def iter_attempts(limit=None, exam_id=None, family=None):
         except OSError:
             return 0.0
     paths = sorted(d.glob("*.json"), key=_mtime, reverse=True)
-    if limit is not None and not exam_id and not family:
+    if limit is not None and not paper_id and not exam:
         paths = paths[:limit]
     yielded = 0
     for p in paths:
@@ -326,9 +374,9 @@ def iter_attempts(limit=None, exam_id=None, family=None):
         except (OSError, ValueError) as e:
             yield None, {"id": p.stem, "error": str(e)}
             continue
-        if exam_id is not None and a.get("exam_id") != exam_id:
+        if paper_id is not None and a.get("paper_id") != paper_id:
             continue
-        if family is not None and a.get("family") != family:
+        if exam is not None and a.get("exam") != exam:
             continue
         yield a, None
         yielded += 1
@@ -336,9 +384,9 @@ def iter_attempts(limit=None, exam_id=None, family=None):
             break
 
 
-def list_attempts(limit=None, exam_id=None, family=None):
+def list_attempts(limit=None, paper_id=None, exam=None):
     """Readable attempts only — a corrupt file never breaks the list."""
-    return [a for a, err in iter_attempts(limit=limit, exam_id=exam_id, family=family) if a is not None]
+    return [a for a, err in iter_attempts(limit=limit, paper_id=paper_id, exam=exam) if a is not None]
 
 
 def submit_attempt(a, pack, now=None):
@@ -389,7 +437,7 @@ def delete_attempt(aid):
     return True
 
 
-def prune_attempts(statuses=("abandoned",), exam_id=None, family=None):
+def prune_attempts(statuses=("abandoned",), paper_id=None, exam=None):
     """Delete finished attempts in bulk. Returns the ids removed.
 
     `statuses` is intersected with the deletable set — a live attempt is never
@@ -397,7 +445,7 @@ def prune_attempts(statuses=("abandoned",), exam_id=None, family=None):
     """
     wanted = {s for s in statuses if s != "in_progress"}
     removed = []
-    for a, err in iter_attempts(exam_id=exam_id, family=family):
+    for a, err in iter_attempts(paper_id=paper_id, exam=exam):
         if err is not None or a is None:
             continue
         if a.get("status") not in wanted:
@@ -445,7 +493,8 @@ def write_live_context(a, pack, qid=None):
         saved = answers.get(q["id"])
         lines = [
             "# CBT exam — live question context",
-            f"attempt: {a['id']}   exam: {a.get('exam_id')}   mode: {a.get('mode')}",
+            f"attempt: {a['id']}   paper: {a.get('paper_id')}   "
+            f"exam: {a.get('exam')}   mode: {a.get('mode')}",
             f"remaining: {max(0, int(remaining_seconds(a)))}s",
             "",
             f"QUESTION {q['id']} ({q['section']}, {q['type'].upper()}, topic: {q.get('topic', 'n/a')})",

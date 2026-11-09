@@ -4,7 +4,7 @@ from exam_desk.pack import SCHEMA
 
 def base_pack():
     return {
-        "schema": SCHEMA, "exam_id": "gat-b-demo", "title": "Demo", "year": 2026,
+        "schema": SCHEMA, "paper_id": "gat-b-demo", "title": "Demo", "year": 2026,
         "body": "Demo Board", "language": "en", "source_url": "https://example.com/paper",
         "provenance": "DEMO — synthetic questions, not real PYQs",
         "pattern": {"duration_minutes": 6, "sections": [

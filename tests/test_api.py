@@ -18,7 +18,7 @@ def seed_pack():
     (DATA / "packs" / "gat-b-demo.json").write_text(json.dumps(base_pack()))
 
 def make_attempt():
-    r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam"})
+    r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "exam"})
     assert r.status_code == 200, r.text
     return r.json()["attempt"]["id"]
 
@@ -48,7 +48,7 @@ class ApiTests(unittest.TestCase):
         packs = client.get("/packs").json()["packs"]
         self.assertEqual(len(packs), 1)
         self.assertEqual(packs[0]["sections"][1]["attempt_limit"], 2)
-        self.assertEqual(packs[0]["family"], "gat-b-demo")
+        self.assertEqual(packs[0]["exam"], "gat-b-demo")
         self.assertIn("kind", packs[0])
         self.assertIn("scope", packs[0])
         pack = client.get("/packs/gat-b-demo").json()
@@ -60,17 +60,17 @@ class ApiTests(unittest.TestCase):
         bad = base_pack(); bad["questions"] = []
         (DATA / "packs" / "badpack.json").write_text(json.dumps(bad))
         listing = client.get("/packs").json()["packs"]
-        self.assertTrue(any(p.get("exam_id") == "badpack" and "invalid" in p for p in listing))
+        self.assertTrue(any(p.get("paper_id") == "badpack" and "invalid" in p for p in listing))
         self.assertEqual(client.get("/packs/badpack").status_code, 422)
-        r = client.post("/attempts", json={"exam_id": "badpack", "mode": "exam"})
+        r = client.post("/attempts", json={"paper_id": "badpack", "mode": "exam"})
         self.assertEqual(r.status_code, 422)
 
     def test_create_attempt_validation(self):
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "bogus"})
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "bogus"})
         self.assertEqual(r.status_code, 422)
-        r = client.post("/attempts", json={"exam_id": "nope", "mode": "exam"})
+        r = client.post("/attempts", json={"paper_id": "nope", "mode": "exam"})
         self.assertEqual(r.status_code, 404)
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam"})
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "exam"})
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertIn("attempt", body)
@@ -81,11 +81,11 @@ class ApiTests(unittest.TestCase):
 
     def test_create_attempt_records_the_assisted_chat(self):
         """An assisted sitting carries the chat it happened in; a mock ignores it."""
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "assisted",
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "assisted",
                                            "assisted_session_id": "chat-abc"})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["attempt"]["assisted_session_id"], "chat-abc")
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam",
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "exam",
                                            "assisted_session_id": "chat-xyz"})
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.json()["attempt"]["assisted_session_id"])
@@ -182,21 +182,21 @@ class ApiTests(unittest.TestCase):
         # result view carries the full pack (answers included)
         self.assertIn("answer", r.json()["pack"]["questions"][0])
 
-    def test_list_attempts_exam_id_filter(self):
-        """?exam_id= returns only that pack's attempts; omitting it returns all."""
+    def test_list_attempts_paper_id_filter(self):
+        """?paper_id= returns only that pack's attempts; omitting it returns all."""
         import json as _json
         alt = base_pack()
-        alt["exam_id"] = "alt-demo"
+        alt["paper_id"] = "alt-demo"
         alt["title"] = "Alt Demo"
         (DATA / "packs" / "alt-demo.json").write_text(_json.dumps(alt))
         # create and submit one attempt on each pack
-        a1 = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam"}).json()["attempt"]["id"]
-        a2 = client.post("/attempts", json={"exam_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
+        a1 = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "exam"}).json()["attempt"]["id"]
+        a2 = client.post("/attempts", json={"paper_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
         client.post(f"/attempts/{a1}/submit")
         client.post(f"/attempts/{a2}/submit")
         # filtered
-        filtered = client.get("/attempts", params={"exam_id": "gat-b-demo"}).json()["attempts"]
-        self.assertTrue(all(a["exam_id"] == "gat-b-demo" for a in filtered))
+        filtered = client.get("/attempts", params={"paper_id": "gat-b-demo"}).json()["attempts"]
+        self.assertTrue(all(a["paper_id"] == "gat-b-demo" for a in filtered))
         self.assertTrue(any(a["id"] == a1 for a in filtered))
         self.assertFalse(any(a["id"] == a2 for a in filtered))
         # unfiltered returns both
@@ -206,9 +206,9 @@ class ApiTests(unittest.TestCase):
         self.assertIn(a2, ids)
         # the filter applies before the cap: newer attempts of another paper must not
         # crowd an older paper's history out of a narrow page
-        a3 = client.post("/attempts", json={"exam_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
+        a3 = client.post("/attempts", json={"paper_id": "alt-demo", "mode": "exam"}).json()["attempt"]["id"]
         client.post(f"/attempts/{a3}/submit")
-        narrow = client.get("/attempts", params={"exam_id": "gat-b-demo", "limit": 1}).json()["attempts"]
+        narrow = client.get("/attempts", params={"paper_id": "gat-b-demo", "limit": 1}).json()["attempts"]
         self.assertEqual([a["id"] for a in narrow], [a1])
 
 class FakeResult:
@@ -249,8 +249,8 @@ class LlmApiTests(unittest.TestCase):
         if self._old is not None:
             os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
-    def _attempt(self, mode="assisted", exam_id="gat-b-demo"):
-        r = client.post("/attempts", json={"exam_id": exam_id, "mode": mode})
+    def _attempt(self, mode="assisted", paper_id="gat-b-demo"):
+        r = client.post("/attempts", json={"paper_id": paper_id, "mode": mode})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["attempt"]["id"]
 
@@ -277,9 +277,9 @@ class LlmApiTests(unittest.TestCase):
 
     def test_evaluate_refuses_random_key(self):
         pack = base_pack()
-        pack["exam_id"], pack["key_status"] = "gat-b-nokey", "random"
+        pack["paper_id"], pack["key_status"] = "gat-b-nokey", "random"
         (DATA / "packs" / "gat-b-nokey.json").write_text(json.dumps(pack))
-        aid = self._answer(self._attempt(exam_id="gat-b-nokey"))
+        aid = self._answer(self._attempt(paper_id="gat-b-nokey"))
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/evaluate")
         self.assertEqual(r.status_code, 409)
@@ -493,7 +493,7 @@ class DeleteTests(unittest.TestCase):
     def test_prune_only_touches_the_named_exam(self):
         dropped = make_attempt()
         client.post(f"/attempts/{dropped}/abandon")
-        r = client.post("/attempts/prune", json={"exam_id": "some-other-exam"})
+        r = client.post("/attempts/prune", json={"paper_id": "some-other-exam"})
         self.assertEqual(r.json()["deleted"], 0)
         self.assertIn(dropped, {a["id"] for a in client.get("/attempts").json()["attempts"]})
 
@@ -548,15 +548,19 @@ class DrillTests(unittest.TestCase):
         if self._old is not None:
             os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
-    def test_mock_alias_names_the_exam_mode(self):
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "mock"})
+    def test_mock_is_the_stored_word_and_exam_still_reads(self):
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "mock"})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()["attempt"]["mode"], "exam")
+        self.assertEqual(r.json()["attempt"]["mode"], "mock")
+        # 0.9.0 stored 'exam'; a request that says it must land on the same mode
+        r2 = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "exam"})
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.json()["attempt"]["mode"], "mock")
 
     def test_invalid_mode_still_names_the_words(self):
-        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "bogus"})
+        r = client.post("/attempts", json={"paper_id": "gat-b-demo", "mode": "bogus"})
         self.assertEqual(r.status_code, 422)
-        self.assertIn("assisted/mock/exam", r.json()["detail"])
+        self.assertIn("assisted/mock", r.json()["detail"])
 
     def test_drill_files_a_pack_of_the_misses(self):
         aid = make_attempt()
@@ -564,14 +568,14 @@ class DrillTests(unittest.TestCase):
         client.post(f"/attempts/{aid}/submit")
         r = client.post(f"/attempts/{aid}/drill")
         self.assertEqual(r.status_code, 200, r.text)
-        drill_id = r.json()["exam_id"]
+        drill_id = r.json()["paper_id"]
         self.assertTrue(drill_id.startswith("gat-b-demo-drill"), drill_id)
         view = client.get(f"/packs/{drill_id}").json()
         ids = [q["id"] for q in view["questions"]]
         self.assertEqual(ids, ["A-01", "A-02", "A-03", "B-01", "B-02", "B-03"])  # skip counts as a miss
         self.assertEqual([s["attempt_limit"] for s in view["pattern"]["sections"]], [None, None])
         # a resumable paper: a mock on the drill grades like any other paper
-        r2 = client.post("/attempts", json={"exam_id": drill_id, "mode": "mock"})
+        r2 = client.post("/attempts", json={"paper_id": drill_id, "mode": "mock"})
         aid2 = r2.json()["attempt"]["id"]
         client.patch(f"/attempts/{aid2}", json={"answers": {"A-02": 0}})   # correct this time
         g = client.post(f"/attempts/{aid2}/submit").json()
@@ -601,10 +605,10 @@ class DrillTests(unittest.TestCase):
         r3 = client.get(f"/attempts/{aid}").json()
         self.assertTrue(r3["pack_changed"])
 
-        # Legacy attempt without pack_hash
+        # Legacy attempt: no paper_hash at all (0.9.0 files looked like this)
         att_file = DATA / "attempts" / f"{aid}.json"
         att_data = json.loads(att_file.read_text())
-        att_data.pop("pack_hash", None)
+        att_data.pop("paper_hash", None)
         att_file.write_text(json.dumps(att_data))
 
         r4 = client.get(f"/attempts/{aid}").json()
@@ -646,4 +650,4 @@ class EvalLedgerTests(LlmApiTests):
         before = len(FAKE_LLM.calls)
         client.post(f"/attempts/{aid}/evaluate")
         text = FAKE_LLM.calls[before]["input"][0]["text"]
-        self.assertIn("MODE: exam", text)
+        self.assertIn("MODE: mock", text)

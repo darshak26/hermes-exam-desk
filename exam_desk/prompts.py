@@ -51,8 +51,8 @@ def evaluation_input(pack, attempt, prior=None, timeline_view=None):
     of the same pack (newest first) and `timeline_view` the behaviour view; both are
     optional so old callers keep working."""
     r = attempt["result"]
-    lines = [f"EXAM: {pack.get('title', pack['exam_id'])} ({pack.get('provenance', '')})",
-             f"MODE: {attempt['mode']}"]
+    lines = [f"EXAM: {pack.get('title', pack['paper_id'])} ({pack.get('provenance', '')})",
+             f"MODE: {mode_label(attempt['mode'])}"]
     ks = pack.get("key_status") or "official"
     lines.append("KEY: official exam key" if ks == "official" else
                  f"KEY: {ks} — not an official key; a mis-keyed item is a finding, not a student error")
@@ -70,7 +70,7 @@ def evaluation_input(pack, attempt, prior=None, timeline_view=None):
         for p in prior:
             if p.get("kind") == "drill":
                 continue
-            eid = p.get("exam_id") or ""
+            eid = p.get("paper_id") or ""
             if "-drill" in eid:
                 continue
             valid_prior.append(p)
@@ -81,10 +81,10 @@ def evaluation_input(pack, attempt, prior=None, timeline_view=None):
         lines.append("HISTORY: earlier attempts in this exam family in this same mode (drills excluded), newest first")
         for p in valid_prior:
             rr = (p.get("result") or {}).get("totals") or {}
-            title = p.get("pack_title") or p.get("exam_id") or "Unknown Paper"
+            title = p.get("paper_title") or p.get("paper_id") or "Unknown Paper"
             year = p.get("year")
             if not year:
-                ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", str(p.get("exam_id", "")))
+                ym = re.search(r"-((?:19|20)\d{2})(?:-|$)", str(p.get("paper_id", "")))
                 if ym:
                     year = ym.group(1)
             paper_desc = f"{title} ({year})" if (year and str(year) not in str(title)) else str(title)

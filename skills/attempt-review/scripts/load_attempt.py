@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import exam_desk
 from exam_desk import timeline as timeline_mod                # noqa: E402
-from exam_desk.store import _ID                               # noqa: E402
+from exam_desk.store import _ID, migrate_attempt              # noqa: E402
 
 DATA = os.environ.get("EXAM_DESK_DATA_DIR") or os.path.expanduser(
     "~/.hermes/plugin-data/exam-desk")
@@ -33,25 +33,25 @@ def main(argv):
     if not f.is_file():
         print(f"FAIL no attempt named {a.attempt_id} under {atts}")
         return 1
-    att = json.loads(f.read_text(encoding="utf-8"))
+    att = migrate_attempt(json.loads(f.read_text(encoding="utf-8")))
     if att.get("status") != "submitted":
         print(f"FAIL attempt {a.attempt_id} has status {att.get('status')!r} — only "
               "submitted attempts are reviewable")
         return 1
 
-    exam_id = att.get("exam_id")
-    if not _ID.match(str(exam_id or "")):
-        print(f"FAIL invalid exam id {exam_id!r}")
+    paper_id = att.get("paper_id")
+    if not _ID.match(str(paper_id or "")):
+        print(f"FAIL invalid paper id {paper_id!r}")
         return 1
 
-    pack_path = Path(a.data_dir) / "packs" / f"{exam_id}.json"
+    pack_path = Path(a.data_dir) / "packs" / f"{paper_id}.json"
     if not pack_path.is_file():
-        print(f"FAIL the pack vanished; attempt {a.attempt_id} is orphaned")
+        print(f"FAIL the paper vanished; attempt {a.attempt_id} is orphaned")
         return 1
     pack = json.loads(pack_path.read_text(encoding="utf-8"))
     r = att.get("result")
 
-    print(f"ATTEMPT {att['id']} | pack {att['exam_id']} — {pack.get('title', '')}")
+    print(f"ATTEMPT {att['id']} | paper {paper_id} ({att.get('exam')}) — {pack.get('title', '')}")
     print(f"MODE {att.get('mode')} | submitted {att.get('submitted_at')}")
     if att.get('mode') == 'assisted':
         sid = att.get('assisted_session_id')
@@ -66,8 +66,8 @@ def main(argv):
     review_ids = att.get('review_session_ids') or []
     if review_ids:
         print(f"REVIEW CHATS DISCUSSING THIS ATTEMPT: {len(review_ids)} (ids: {', '.join(review_ids)})")
-    print(f"PACK provenance: {pack.get('provenance')}")
-    print(f"PACK key_status: {pack.get('key_status', 'absent (official)')}")
+    print(f"PAPER provenance: {pack.get('provenance')}")
+    print(f"PAPER key_status: {pack.get('key_status', 'absent (official)')}")
     if r:
         print(f"SCORE {r['score']} | TOTALS {json.dumps(r['totals'])}")
 

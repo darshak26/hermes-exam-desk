@@ -5,6 +5,7 @@ one fails loudly instead of quietly costing a student marks.
 """
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -33,7 +34,7 @@ DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 def write_pack(pack, name=None):
     d = DATA / "packs"
     d.mkdir(parents=True, exist_ok=True)
-    path = d / f"{name or pack['exam_id']}.json"
+    path = d / f"{name or pack['paper_id']}.json"
     path.write_text(json.dumps(pack))
     return path
 
@@ -41,7 +42,7 @@ def write_pack(pack, name=None):
 def big_pack(count=160):
     """A realistic size: one section, `count` mcq questions."""
     p = base_pack()
-    p["exam_id"] = "big-demo"
+    p["paper_id"] = "big-demo"
     p["pattern"]["duration_minutes"] = 180
     p["pattern"]["sections"] = [{"id": "A", "title": "Section A", "question_count": count,
                                  "attempt_limit": None, "marks_correct": 1,
@@ -68,7 +69,7 @@ class Base(unittest.TestCase):
             os.environ["EXAM_DESK_DATA_DIR"] = self._old
 
     def start(self, mode="exam", exam="gat-b-demo"):
-        r = client.post("/attempts", json={"exam_id": exam, "mode": mode})
+        r = client.post("/attempts", json={"paper_id": exam, "mode": mode})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["attempt"]["id"]
 
@@ -657,13 +658,13 @@ class Audit070Regressions(Base):
         self.assertEqual(mod.main(["bad_id!", "--data-dir", str(DATA)]), 1)
         self.assertEqual(mod.main(["A-01", "--data-dir", str(DATA)]), 1)
 
-        # If attempt has invalid exam_id, also rejected before reading pack
+        # If attempt has invalid paper_id, also rejected before reading pack
         aid = self.start()
         client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
         client.post(f"/attempts/{aid}/submit")
         f = DATA / "attempts" / f"{aid}.json"
         data = json.loads(f.read_text())
-        data["exam_id"] = "../evil-pack"
+        data["paper_id"] = "../evil-pack"
         f.write_text(json.dumps(data))
 
         self.assertEqual(mod.main([aid, "--data-dir", str(DATA)]), 1)
@@ -729,6 +730,105 @@ class Audit070Regressions(Base):
         """0.7.0 finding 11: LLM bridge under plugins.isolation: host constraint documented."""
         readme = (ROOT / "README.md").read_text()
         self.assertIn("plugins.isolation: in_process", readme)
+
+class NamingContract(unittest.TestCase):
+    """0.10.0: one word per thing, and the 0.9.0 names keep reading.
+
+    0.9.0 called the paper `exam_id` and the exam `family`, and stored the mock's
+    mode as `exam`. Three fields, two of them lying about what they held. The
+    rename is one-way (`paper_id`, `exam`, `mode: mock`) with readers that fold
+    the old keys forward, so a half-migrated data directory must answer the same
+    as a migrated one — these tests pin exactly that, plus the two slug rules the
+    rename made checkable.
+    """
+
+    def setUp(self):
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        write_pack(base_pack())
+        pack_mod.clear_cache()
+
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
+        else:
+            os.environ.pop("EXAM_DESK_DATA_DIR", None)
+
+    def _legacy_attempt_file(self, aid="a-0123456789"):
+        """An attempt exactly as 0.9.0 wrote it: old keys, old mode, no `exam`."""
+        att = {
+            "id": aid, "exam_id": "gat-b-demo", "family": "gat-b-demo",
+            "pack_hash": "deadbeef1234", "pack_title": "Demo",
+            "mode": "exam", "status": "submitted", "started_at": time.time() - 60,
+            "duration_seconds": 360, "answers": {"A-01": 1}, "answer_seq": ["A-01"],
+            "marked": [], "visited": [], "current": None,
+            "result": {"score": 1, "totals": {"correct": 1}},
+            "evaluation": None, "submitted_at": time.time() - 30,
+            "updated_at": time.time(),
+        }
+        d = DATA / "attempts"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{aid}.json").write_text(json.dumps(att))
+        return aid
+
+    def test_legacy_attempt_reads_under_the_new_names(self):
+        """A 0.9.0 file on disk answers with paper_id/exam/paper_hash, not the old keys."""
+        aid = self._legacy_attempt_file()
+        a = store.get_attempt(aid)
+        self.assertEqual((a["paper_id"], a["exam"], a["mode"]),
+                         ("gat-b-demo", "gat-b-demo", "mock"))
+        self.assertEqual((a["paper_hash"], a["paper_title"]), ("deadbeef1234", "Demo"))
+        for gone in ("exam_id", "family", "pack_hash", "pack_title"):
+            self.assertNotIn(gone, a)
+
+    def test_migrate_attempt_is_idempotent_and_new_names_win(self):
+        """A file carrying both spellings must keep the new value and drop the old key."""
+        a = {"id": "x", "status": "submitted", "paper_id": "keep-me", "exam_id": "drop-me"}
+        store.migrate_attempt(a)
+        store.migrate_attempt(a)
+        self.assertEqual(a["paper_id"], "keep-me")
+        self.assertNotIn("exam_id", a)
+
+    def test_history_accepts_the_legacy_filter_names(self):
+        """?exam_id= and ?family= are the 0.9.0 spellings of ?paper_id= and ?exam=."""
+        self._legacy_attempt_file()
+        old = client.get("/attempts", params={"exam_id": "gat-b-demo"}).json()["attempts"]
+        new = client.get("/attempts", params={"paper_id": "gat-b-demo"}).json()["attempts"]
+        by_exam = client.get("/attempts", params={"family": "gat-b-demo"}).json()["attempts"]
+        self.assertEqual([r["id"] for r in old], ["a-0123456789"])
+        self.assertEqual([r["id"] for r in new], [r["id"] for r in old])
+        self.assertEqual([r["id"] for r in by_exam], [r["id"] for r in old])
+
+    def test_rows_carry_the_new_names_and_still_echo_the_old(self):
+        """A row speaks paper_id/exam, and echoes exam_id/family for an un-updated panel."""
+        self._legacy_attempt_file()
+        row = client.get("/attempts").json()["attempts"][0]
+        self.assertEqual((row["paper_id"], row["exam"], row["mode"]),
+                         ("gat-b-demo", "gat-b-demo", "mock"))
+        self.assertEqual((row["exam_id"], row["family"]), ("gat-b-demo", "gat-b-demo"))
+
+    def test_a_stated_kind_must_be_the_kind_the_slug_declares(self):
+        """A `practice` pack named after a year would group as a PYQ on the home card."""
+        p = base_pack()
+        p.update({"paper_id": "gat-b-2024", "year": 2024, "exam": "gat-b", "kind": "practice"})
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("disagrees with paper_id" in e for e in errs), errs)
+
+    def test_a_paper_cannot_belong_to_an_exam_it_is_not_named_under(self):
+        """The exam owns the paper: `csir-net` cannot claim a `gat-b-…` slug."""
+        p = base_pack()
+        p["exam"] = "csir-net"
+        errs = pack_mod.validate_pack(p)
+        self.assertTrue(any("does not sit under exam" in e for e in errs), errs)
+
+    def test_legacy_post_body_still_starts_a_sitting(self):
+        """A panel posting {exam_id, mode: 'exam'} gets a paper_id/mock attempt back."""
+        r = client.post("/attempts", json={"exam_id": "gat-b-demo", "mode": "exam"})
+        self.assertEqual(r.status_code, 200, r.text)
+        att = r.json()["attempt"]
+        self.assertEqual((att["paper_id"], att["exam"], att["mode"]),
+                         ("gat-b-demo", "gat-b-demo", "mock"))
 
 
 if __name__ == "__main__":

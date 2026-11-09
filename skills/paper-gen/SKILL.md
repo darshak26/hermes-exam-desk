@@ -80,9 +80,9 @@ Never re-ask what the opening turn already contained.
   <exam> pattern; questions and key are original, not exam items."`
   per-question `provenance` may say the topic basis. A pack of any other shape
   (claiming official keys) is a falsified pack — never write one.
-- **Pack identity fields:** set `family` (the exam slug, e.g. `gat-b`),
+- **Paper identity fields:** set `exam` (the exam slug, e.g. `gat-b`),
   `kind: "practice"`, and `scope` (free text naming the syllabus area covered,
-  e.g. `Photosynthesis`). The `exam_id` slug is a cosmetic human label: it may
+  e.g. `Photosynthesis`). The `paper_id` slug is a cosmetic human label: it may
   use a shortform token from `exam_desk/vocab.py` (`ABBREVIATIONS`) for tidiness
   (e.g. `gat-b-practice-bioinfo`), else the full word. Deduplication now compares
   fields — two slugs abbreviating the same scope differently are still two papers
@@ -110,7 +110,7 @@ Never re-ask what the opening turn already contained.
    where `<plugin-dir>` is the installed exam-desk plugin (`~/.hermes/plugins/exam-desk/`).
    Must print `PASS: <id> ...` (exit 0). Fix all `WARN:` lines too — placeholder
    topics, duplicate options, very short questions.
-5. **Install:** run `python3 <plugin-dir>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper; ensure file stem equals `exam_id`). Never copy directly into `packs/`. Confirm the
+5. **Install:** run `python3 <plugin-dir>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper; ensure file stem equals `paper_id`). Never copy directly into `packs/`. Confirm the
    pack appears with the panel's own list (`GET /api/plugins/exam-desk/packs`) and
    carries the "AI-drafted" badge (that comes from the key status alone).
 6. **Report, concisely and honestly:** exam + pattern source, topics covered,
@@ -125,7 +125,7 @@ Never re-ask what the opening turn already contained.
   an official page. Wrong-pattern drafts teach the wrong exam.
 - **A drafted paper is not a PYQ.** Never pitch it to the user as previous-year
   material, never name sections after years it does not contain, and keep the
-  `exam_id` off the real papers' id space.
+  `paper_id` off the real papers' id space.
 - Don't ask the LLM (you, mid-flow) to "generate 160 questions" in one go — quality
   falls apart past ~25 per batch. Draft in batches of ≤25, self-check each batch
   against step 3 before moving on.

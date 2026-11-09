@@ -12,7 +12,7 @@ DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 def write_pack(pack, name=None):
     d = DATA / "packs"
     d.mkdir(parents=True, exist_ok=True)
-    (d / f"{name or pack['exam_id']}.json").write_text(json.dumps(pack))
+    (d / f"{name or pack['paper_id']}.json").write_text(json.dumps(pack))
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
@@ -27,12 +27,12 @@ class StoreTests(unittest.TestCase):
         write_pack(base_pack())
         packs = store.list_packs()
         self.assertEqual(len(packs), 1)
-        self.assertEqual(packs[0]["exam_id"], "gat-b-demo")
+        self.assertEqual(packs[0]["paper_id"], "gat-b-demo")
 
     def test_invalid_pack_listed_not_raised(self):
         bad = base_pack(); bad["questions"] = []
         write_pack(bad, name="badpack")
-        by_id = {p["exam_id"]: p for p in store.list_packs()}
+        by_id = {p["paper_id"]: p for p in store.list_packs()}
         self.assertIn("badpack", by_id)
         self.assertIn("invalid", by_id["badpack"])
 
@@ -46,8 +46,8 @@ class StoreTests(unittest.TestCase):
         b = store.new_attempt(pack, "assisted")
         self.assertNotEqual(a["id"], b["id"])
         self.assertEqual(store.get_attempt(a["id"]), a)
-        self.assertTrue(a.get("pack_hash"))
-        self.assertEqual(a.get("pack_title"), pack.get("title"))
+        self.assertTrue(a.get("paper_hash"))
+        self.assertEqual(a.get("paper_title"), pack.get("title"))
 
     def test_save_attempt_atomic_and_persists(self):
         a = store.new_attempt(base_pack(), "exam")

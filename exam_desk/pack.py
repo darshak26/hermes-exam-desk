@@ -18,12 +18,14 @@ import math
 import re
 from pathlib import Path, PurePosixPath
 
+from .vocab import KIND_VALUES
+
 SCHEMA = "cbt-pack/1"
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 QID = re.compile(r"^[A-Za-z0-9_-]+$")
 QTYPES = ("mcq", "msq", "nat")
 DIFFICULTIES = ("easy", "medium", "hard")
-KINDS = ("pyq", "practice", "drill")
+KINDS = KIND_VALUES
 # How much the pack's `answer` fields can be trusted. Absent means "official"
 # (every hand-written pack, and the bundled demo), so this is opt-out only.
 # `self-authored` marks an AI-drafted paper: the model that wrote the questions
@@ -38,9 +40,10 @@ _DRILL = re.compile(r"-drill(?:-\d+)?$")
 _SHIFT_AFTER_YEAR = re.compile(r"(?<=-(?:19|20)\d{2})-(?:shift|set|slot)\d+$")
 
 
-def family_of(exam_id):
-    """The exam family slug, stripping year, shift/set/slot and drill/superseded suffixes from right."""
-    slug = str(exam_id or "")
+def exam_of(paper_id):
+    """The exam slug for a paper slug — year, shift/set/slot, drill and superseded
+    suffixes stripped from the right."""
+    slug = str(paper_id or "")
     while True:
         m = _SUPERSEDED.search(slug)
         if m:
@@ -62,19 +65,27 @@ def family_of(exam_id):
     return slug
 
 
-def pack_family(pack):
-    """The pack's exam family: stated family when present, else family_of(exam_id)."""
+def pack_exam(pack):
+    """The pack's exam: the stated `exam` when present, else exam_of(paper_id).
+
+    The stated field wins. Slug parsing is a legacy fallback for packs written
+    before `exam` existed — no other code is allowed to read a slug for meaning.
+    """
     if isinstance(pack, dict):
-        fam = pack.get("family")
-        if fam:
-            return fam
-        return family_of(pack.get("exam_id"))
-    return family_of(pack)
+        ex = pack.get("exam")
+        if ex:
+            return ex
+        return exam_of(pack.get("paper_id"))
+    return exam_of(pack)
 
 
-def derive_kind(exam_id):
-    """Best-effort display kind for old packs: drill, pyq, practice or None."""
-    slug = str(exam_id or "")
+def derived_kind(paper_id):
+    """The kind a slug declares — drill, pyq, practice — or None when it declares none.
+
+    Read by `summarize` for packs that state no `kind`, and by the validator to
+    check that a stated kind agrees with the paper's own slug.
+    """
+    slug = str(paper_id or "")
     if "-drill" in slug:
         return "drill"
     if re.search(r"-(?:19|20)\d{2}(?:-|$)", slug):
@@ -169,7 +180,7 @@ def _media_error(tag, block, where):
     """One media block → an error string, or None when it is usable.
 
     Images are addressed two ways: an http(s) URL the browser fetches, or a path
-    relative to `packs/<exam_id>.assets/`. A relative path may not climb out of
+    relative to `packs/<paper_id>.assets/`. A relative path may not climb out of
     that directory — the asset route relies on this too.
     """
     if not isinstance(block, dict):
@@ -220,28 +231,38 @@ def validate_pack(pack):
         return ["pack must be a JSON object"]
     if pack.get("schema") != SCHEMA:
         errs.append(f"schema must be '{SCHEMA}'")
-    if not SLUG.match(str(pack.get("exam_id", ""))):
-        errs.append("exam_id must be a lowercase slug like 'gat-b-2024'")
+    if not SLUG.match(str(pack.get("paper_id", ""))):
+        errs.append("paper_id must be a lowercase slug like 'gat-b-2024'")
     if pack.get("set") is not None:
         if not isinstance(pack["set"], str) or not SLUG.match(pack["set"]):
             errs.append("set must be a lowercase slug")
 
+    slug_str = str(pack.get("paper_id", ""))
+
     if "kind" in pack:
         if pack["kind"] not in KINDS:
             errs.append(f"kind must be one of {KINDS}")
-
-    slug_str = str(pack.get("exam_id", ""))
-    if "family" in pack:
-        if not isinstance(pack["family"], str) or not SLUG.match(pack["family"]):
-            errs.append("family must be a lowercase slug")
         else:
-            # Stated family must own the slug: the id is the family itself or the
-            # family plus a suffix. This is the check the slug parser cannot do for
-            # generated papers (their ids keep the kind token, so family_of sees
-            # them unchanged) and it catches a wrong family on every pack shape.
-            if not (slug_str == pack["family"] or slug_str.startswith(pack["family"] + "-")):
-                errs.append(f"exam_id '{slug_str}' does not sit under stated family '{pack['family']}' "
-                            "— fix the family (or the exam_id)")
+            # A stated kind must be the kind the slug declares. Without this, a
+            # practice paper named after a year reads as a PYQ on the home card
+            # and a PYQ named "-practice" reads as practice: the slug is the only
+            # thing the panel groups by, so the two spellings have to agree.
+            declared = derived_kind(slug_str)
+            if declared and declared != pack["kind"]:
+                errs.append(f"kind '{pack['kind']}' disagrees with paper_id '{slug_str}' "
+                            f"(the slug declares '{declared}') — fix the slug or the kind")
+
+    if "exam" in pack:
+        if not isinstance(pack["exam"], str) or not SLUG.match(pack["exam"]):
+            errs.append("exam must be a lowercase slug")
+        else:
+            # The exam must own the paper: the slug is the exam itself or the exam
+            # plus a suffix. This is the check the slug parser cannot do for
+            # generated papers (their ids keep a kind token, so exam_of sees them
+            # unchanged) and it catches a wrong exam on every pack shape.
+            if not (slug_str == pack["exam"] or slug_str.startswith(pack["exam"] + "-")):
+                errs.append(f"paper_id '{slug_str}' does not sit under exam '{pack['exam']}' "
+                            "— fix the exam (or the paper_id)")
 
     if pack.get("kind") == "pyq" and pack.get("year") is None:
         errs.append("kind 'pyq' requires year")
@@ -254,9 +275,9 @@ def validate_pack(pack):
     if ym:
         slug_year = ym.group(1)
         if pack.get("year") is None:
-            errs.append(f"exam_id carries year '{slug_year}' but pack has no year")
+            errs.append(f"paper_id carries year '{slug_year}' but pack has no year")
         elif str(pack["year"]) != slug_year:
-            errs.append(f"pack year '{pack['year']}' does not match exam_id year '{slug_year}'")
+            errs.append(f"pack year '{pack['year']}' does not match paper_id year '{slug_year}'")
 
     pat = pack.get("pattern") or {}
     dur = pat.get("duration_minutes")
@@ -518,11 +539,11 @@ def key_status(pack):
 
 
 def summarize(pack, assets_dir=None):
-    return {"exam_id": pack["exam_id"],
-            "family": pack_family(pack),
-            "kind": pack.get("kind") or derive_kind(pack.get("exam_id")),
+    return {"paper_id": pack["paper_id"],
+            "exam": pack_exam(pack),
+            "kind": pack.get("kind") or derived_kind(pack.get("paper_id")),
             "scope": pack.get("scope"),
-            "title": pack.get("title", pack["exam_id"]),
+            "title": pack.get("title", pack["paper_id"]),
             "year": pack.get("year"), "body": pack.get("body"),
             "duration_minutes": pack["pattern"]["duration_minutes"],
             "question_count": len(pack["questions"]),

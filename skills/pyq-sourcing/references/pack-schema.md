@@ -7,8 +7,11 @@ A plain-English mirror of what `exam_desk/pack.py` + `scripts/validate_pack.py` 
 | Field | Rule |
 |---|---|
 | `schema` | exactly `"cbt-pack/1"` |
-| `exam_id` | lowercase slug, filename is `<exam_id>.json` (`gat-b-2024`, `gate-bt-2023`) |
-| `title`, `year`, `body`, `language` | display strings |
+| `paper_id` | lowercase slug, and the filename: `<paper_id>.json` (`gat-b-2024`, `gate-bt-2023`). **This identifies the paper** — the thing you sit. |
+| `exam` | lowercase slug of the exam the paper belongs to (`gat-b`). `paper_id` must be `exam` itself or start with `exam-`, so a paper can never belong to an exam it is not named under. Omit it and the slug is parsed for it (legacy only — always state it). |
+| `kind` | `pyq` · `practice` · `drill`. Must be the kind the slug declares: a `pyq` carries a year (`gat-b-2024`), `practice` carries the word (`gat-b-practice-bioinfo`), `drill` carries `-drill`. Disagreeing is an error. Omit it and the slug is parsed (legacy only). |
+| `scope` | free text — the syllabus area a practice paper covers (`Photosynthesis`), shown under the paper's title. |
+| `title`, `year`, `body`, `language` | display strings. A `pyq` must carry `year`, and it must match the year in `paper_id`. |
 | `source_url` | required — where the paper came from |
 | `provenance` | required — official/memory-based label (see `sources.md`) |
 | `key_status` | optional: `official` (the default when absent) · `unverified` · `self-authored` · `random`. `random` means the `answer` fields are placeholders — it still grades, but the AI evaluation refuses to run on a scoreline that means nothing. `unverified` analyses run and must flag mis-keyed items. `self-authored` marks an AI-drafted paper (the model wrote the questions *and* the key): analyses run and treat a wrong key as a finding; the panel badges the pack "AI-drafted". |
@@ -49,7 +52,7 @@ data tables, and a stem like "the gel below shows…" is useless without them.
 ]
 ```
 
-- **Where images live:** `packs/<exam_id>.assets/` next to the JSON — e.g.
+- **Where images live:** `packs/<paper_id>.assets/` next to the JSON — e.g.
   `packs/gat-b-2023.assets/figures/A-23-gel.png`, referenced as
   `figures/A-23-gel.png`. A path may not climb out of that directory (`..`,
   leading `/` and absolute paths are rejected), and `http(s)` URLs are allowed
@@ -81,7 +84,7 @@ They are the OCR guard: a freshly sourced paper is usually full of them.
 - a `topic` that just repeats the exam title (placeholder — the AI evaluation is only as good as the topics)
 - question text shorter than 15 characters
 - an image with no `alt` text
-- an image whose file is missing from `packs/<exam_id>.assets/`
+- an image whose file is missing from `packs/<paper_id>.assets/`
 - only some options carrying a figure
 
 Fix them before sitting the exam; they do not block grading.
@@ -91,7 +94,9 @@ Fix them before sitting the exam; they do not block grading.
 ```json
 {
   "schema": "cbt-pack/1",
-  "exam_id": "gat-b-2024",
+  "paper_id": "gat-b-2024",
+  "exam": "gat-b",
+  "kind": "pyq",
   "title": "GAT-B 2024",
   "year": 2024,
   "body": "NTA / RCB",

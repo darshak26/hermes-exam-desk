@@ -19,7 +19,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Install a CBT question pack JSON.")
     ap.add_argument("pack_file", help="Path to validated pack JSON")
     ap.add_argument("--replace", action="store_true", default=False,
-                    help="Replace and retire an existing pack of the same exam_id")
+                    help="Replace and retire an existing paper of the same paper_id")
     default_data = os.environ.get("EXAM_DESK_DATA_DIR") or os.path.expanduser("~/.hermes/plugin-data/exam-desk")
     ap.add_argument("--data-dir", default=default_data, help="Plugin data directory")
     args = ap.parse_args(argv)
@@ -39,9 +39,9 @@ def main(argv=None):
         print("FAIL pack must be a JSON object")
         return 1
 
-    exam_id = pack.get("exam_id")
-    if not exam_id or src_path.stem != exam_id:
-        print(f"FAIL exam_id {exam_id!r} does not match file stem {src_path.stem!r}")
+    paper_id = pack.get("paper_id")
+    if not paper_id or src_path.stem != paper_id:
+        print(f"FAIL paper_id {paper_id!r} does not match file stem {src_path.stem!r}")
         return 1
 
     errs = pack_mod.validate_pack(pack)
@@ -53,19 +53,19 @@ def main(argv=None):
 
     packs_dir = Path(args.data_dir) / "packs"
     packs_dir.mkdir(parents=True, exist_ok=True)
-    target = packs_dir / f"{exam_id}.json"
+    target = packs_dir / f"{paper_id}.json"
 
     if target.exists():
         if not args.replace:
             try:
                 old_pack = json.loads(target.read_text(encoding="utf-8"))
-                old_title = old_pack.get("title", exam_id)
+                old_title = old_pack.get("title", paper_id)
                 old_year = old_pack.get("year")
                 if old_year is None:
                     old_year = "no year"
             except Exception:
-                old_title, old_year = exam_id, "unknown"
-            print(f"REFUSED {exam_id} — a paper with that id already exists ({old_title}, {old_year}). "
+                old_title, old_year = paper_id, "unknown"
+            print(f"REFUSED {paper_id} — a paper with that id already exists ({old_title}, {old_year}). "
                   "Re-run with --replace to retire it.")
             return 2
 
@@ -77,35 +77,35 @@ def main(argv=None):
 
         superseded_dir = packs_dir / "superseded"
         superseded_dir.mkdir(parents=True, exist_ok=True)
-        retired_file = f"{exam_id}.{old_hash}.json"
+        retired_file = f"{paper_id}.{old_hash}.json"
         retired_path = superseded_dir / retired_file
         shutil.move(str(target), str(retired_path))
 
-        tmp_target = packs_dir / f"{exam_id}.{os.getpid()}.tmp"
+        tmp_target = packs_dir / f"{paper_id}.{os.getpid()}.tmp"
         tmp_target.write_text(json.dumps(pack, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp_target, target)
-        print(f"PASS replaced {exam_id}; previous kept as superseded/{retired_file}")
+        print(f"PASS replaced {paper_id}; previous kept as superseded/{retired_file}")
         return 0
 
-    if not pack.get("family"):
-        fam = pack_mod.pack_family(pack)
-        print(f"NOTE no family field; derived '{fam}' from exam_id — state it in the pack to pin it. "
-              "(To the installing agent: write family/kind in the pack you hand over.)")
+    if not pack.get("exam"):
+        ex = pack_mod.pack_exam(pack)
+        print(f"NOTE no exam field; derived '{ex}' from paper_id — state it in the pack to pin it. "
+              "(To the installing agent: write exam/kind in the pack you hand over.)")
 
-    fam = pack.get("family") or pack_mod.pack_family(pack)
+    ex = pack.get("exam") or pack_mod.pack_exam(pack)
     kind = pack.get("kind")
     scope = pack.get("scope")
-    parts = [f"family {fam}"]
+    parts = [f"exam {ex}"]
     if kind:
         parts.append(str(kind))
     if scope:
         parts.append(f"scope {scope}")
     meta = f" ({', '.join(parts)})"
 
-    tmp_target = packs_dir / f"{exam_id}.{os.getpid()}.tmp"
+    tmp_target = packs_dir / f"{paper_id}.{os.getpid()}.tmp"
     tmp_target.write_text(json.dumps(pack, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp_target, target)
-    print(f"PASS installed {exam_id}{meta}")
+    print(f"PASS installed {paper_id}{meta}")
     return 0
 
 

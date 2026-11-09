@@ -26,7 +26,7 @@ from . import pack as pack_mod
 
 SCHEMA = "cbt-topics/1"
 PRIORITIES = ("high", "medium", "low")
-# exam_id keys inside the same file the packs live beside.
+# exam keys inside the same file the packs live beside.
 NAME = "topics.json"
 _LOCK = threading.Lock()
 
@@ -43,7 +43,7 @@ def _fresh():
 def _read():
     """The whole ledger, tolerating absence and corruption (fresh dict on both).
 
-    Migration on read: folds keys that are paper slugs into their family,
+    Migration on read: folds keys that are paper slugs into their exam,
     merging counts, attempt lists and papers lists.
     """
     try:
@@ -61,7 +61,7 @@ def _read():
     for raw_eid, raw_book in raw_exams.items():
         if not isinstance(raw_book, dict):
             continue
-        fam = pack_mod.family_of(raw_eid)
+        fam = pack_mod.exam_of(raw_eid)
         fam_book = migrated.setdefault(fam, {})
         for tkey, entry in raw_book.items():
             if not isinstance(entry, dict):
@@ -113,13 +113,17 @@ def _weakest(rows):
     return PRIORITIES[min(ranks)] if ranks else "low"
 
 
-def record(exam_id, attempt_id, weak_topics, now=None, family=None):
+def record(paper_id, attempt_id, weak_topics, now=None, exam=None):
     """Fold one evaluation's `weak_topics` rows (list of dicts with topic /
-    evidence / priority) into the ledger. Idempotent per topic+attempt."""
-    if not isinstance(weak_topics, list) or not str(exam_id or "").strip():
+    evidence / priority) into the ledger. Idempotent per topic+attempt.
+
+    The row is filed under its EXAM (`exam`) and remembers the paper it came from,
+    so "keeps appearing" can be read per exam while each hit still names its paper.
+    """
+    if not isinstance(weak_topics, list) or not str(paper_id or "").strip():
         return 0
-    eid = str(exam_id).strip()
-    fam = str(family).strip() if family is not None and str(family).strip() else pack_mod.family_of(eid)
+    eid = str(paper_id).strip()
+    fam = str(exam).strip() if exam is not None and str(exam).strip() else pack_mod.exam_of(eid)
     folded, now_n = 0, float(now if now is not None else time.time())
     with _LOCK:
         data = _read()
@@ -155,22 +159,21 @@ def record(exam_id, attempt_id, weak_topics, now=None, family=None):
     return folded
 
 
-def summarize(exam_id=None, limit=6):
-    """The panel-facing view: the most recent topics overall or for one paper/family.
+def summarize(exam=None, limit=6):
+    """The panel-facing view: the most recent topics overall, or for one exam.
 
-    Rows come back newest-first with the family id attached, so a caller sorting
-    for one card does not need the raw file.
+    Rows come back newest-first with the exam slug attached and the papers that
+    produced them, so a caller sorting for one card does not need the raw file.
     """
     data = _read()
-    fam_filter = pack_mod.family_of(exam_id) if exam_id is not None else None
+    fam_filter = pack_mod.exam_of(exam) if exam is not None else None
     rows = []
     for fam, book in data["exams"].items():
         if fam_filter is not None and fam != fam_filter:
             continue
         for entry in book.values():
             rows.append({
-                "exam_id": fam,
-                "family": fam,
+                "exam": fam,
                 "papers": sorted(set(entry.get("papers", []))),
                 "topic": entry.get("topic", ""),
                 "hits": entry.get("hits", 0),
@@ -182,12 +185,12 @@ def summarize(exam_id=None, limit=6):
     return rows[:max(0, limit)]
 
 
-def forget(exam_id, family=None):
-    """Drop one paper or family's rows — called when that paper's data is being removed."""
-    if not str(exam_id or "").strip():
+def forget(paper_id, exam=None):
+    """Drop one paper's or one exam's rows — called when that paper's data is being removed."""
+    if not str(paper_id or "").strip():
         return False
-    eid = str(exam_id).strip()
-    fam = str(family).strip() if family is not None and str(family).strip() else pack_mod.family_of(eid)
+    eid = str(paper_id).strip()
+    fam = str(exam).strip() if exam is not None and str(exam).strip() else pack_mod.exam_of(eid)
     with _LOCK:
         data = _read()
         book = data["exams"].pop(eid, None)

@@ -30,7 +30,7 @@ def main(argv):
             print(f"ERROR: {e}")
         print(f"FAIL: {len(errs)} error(s) in {argv[1]}")
         return 1
-    print(f"PASS: {pack['exam_id']} — {len(pack['questions'])} questions, "
+    print(f"PASS: {pack['paper_id']} — {len(pack['questions'])} questions, "
           f"{len(pack['pattern']['sections'])} sections, "
           f"{pack['pattern']['duration_minutes']} min")
     warns = lint_pack(pack)

@@ -35,7 +35,7 @@ def write_data_root(root):
     return pack
 
 def submitted_attempt(aid, mode="assisted"):
-    return {"id": aid, "exam_id": "gat-b-demo", "mode": mode, "status": "submitted",
+    return {"id": aid, "paper_id": "gat-b-demo", "mode": mode, "status": "submitted",
             "submitted_at": 1700000000, "started_at": 1700000000,
             "duration_seconds": 900, "answers": {"A-01": 1}, "answer_seq": ["A-01"],
             "marked": [], "visited": [], "current": None,

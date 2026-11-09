@@ -15,7 +15,7 @@ def seeded_pack(pack=None, name="gat-b-demo"):
     d = DATA / "packs"
     d.mkdir(parents=True, exist_ok=True)
     p = dict(pack or base_pack())
-    p["exam_id"] = name
+    p["paper_id"] = name
     f = d / f"{name}.json"
     f.write_text(json.dumps(p))
     pack_mod.clear_cache()
@@ -28,7 +28,7 @@ def submitted_attempt(source_pack, aid="a-test-01", answers=None, client=None):
     from exam_desk.store import new_attempt, submit_attempt
     a = new_attempt(source_pack, "mock" if client else "exam") if not client else None
     if client:
-        r = client.post("/attempts", json={"exam_id": source_pack["exam_id"], "mode": "mock"})
+        r = client.post("/attempts", json={"paper_id": source_pack["paper_id"], "mode": "mock"})
         r.raise_for_status()
         a = r.json()["attempt"]
         client.patch(f"/attempts/{a['id']}", json={"answers": answers or {}})
@@ -44,24 +44,26 @@ def submitted_attempt(source_pack, aid="a-test-01", answers=None, client=None):
 
 class VocabTests(unittest.TestCase):
     def test_mock_label(self):
+        # the legacy stored word and the current one render identically
         self.assertEqual((vocab.mode_label("exam"), vocab.mode_label("assisted"),
-                          vocab.mode_label("mock"), vocab.mode_label(None)), ("mock", "assisted", "", ""))
+                          vocab.mode_label("mock"), vocab.mode_label(None)),
+                         ("mock", "assisted", "mock", ""))
 
 
 class HistoryFeedTests(unittest.TestCase):
     def test_priors_filter_mode(self):
         import plugin_api
         rows = [                                        # newest first, as list_attempts feeds
-            {"id": "a8", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
-            {"id": "a7", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
-            {"id": "a6", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
-            {"id": "a5", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
-            {"id": "a4", "exam_id": "other", "mode": "exam", "status": "submitted"},
-            {"id": "a3", "exam_id": "gat-b-demo", "mode": "exam", "status": "in_progress"},
-            {"id": "a2", "exam_id": "gat-b-demo", "mode": "assisted", "status": "submitted"},
-            {"id": "a1", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
+            {"id": "a8", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
+            {"id": "a7", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
+            {"id": "a6", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
+            {"id": "a5", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
+            {"id": "a4", "paper_id": "other", "mode": "exam", "status": "submitted"},
+            {"id": "a3", "paper_id": "gat-b-demo", "mode": "exam", "status": "in_progress"},
+            {"id": "a2", "paper_id": "gat-b-demo", "mode": "assisted", "status": "submitted"},
+            {"id": "a1", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"},
         ]
-        mine = {"id": "me", "exam_id": "gat-b-demo", "mode": "exam", "status": "submitted"}
+        mine = {"id": "me", "paper_id": "gat-b-demo", "mode": "exam", "status": "submitted"}
         got = [p["id"] for p in plugin_api.history_rows(rows, mine)]
         self.assertEqual(got, ["a8", "a7", "a6"])   # newest three, mocks only
         assisted = dict(mine, mode="assisted")
@@ -92,7 +94,7 @@ class DrillTests(unittest.TestCase):
     def test_drill_holds_only_misses_with_source_key(self):
         a = self._attempt({"A-01": 1, "A-02": 3})       # correct, wrong; A-03 + all B skipped
         drill_id, p = drill.install_drill(self.pack, a)
-        self.assertEqual((drill_id, p["exam_id"]), ("gat-b-demo-drill", drill_id))
+        self.assertEqual((drill_id, p["paper_id"]), ("gat-b-demo-drill", drill_id))
         ids = [q["id"] for q in p["questions"]]
         self.assertEqual(ids, ["A-02", "A-03", "B-01", "B-02", "B-03"])  # wrong + skipped, paper order
         self.assertEqual([q["id"] for q in p["questions"] if "answer" not in q], [])
@@ -134,15 +136,15 @@ class DrillTests(unittest.TestCase):
         for p in (p1, p2):
             self.assertEqual(pack_mod.validate_pack(p), [])
 
-    def test_drill_pack_stamps_kind_family_scope(self):
+    def test_drill_pack_stamps_kind_exam_scope(self):
         source = dict(self.pack)
-        source["family"] = "gat-b"
+        source["exam"] = "gat-b"
         source["kind"] = "practice"
         source["scope"] = "Photosynthesis"
         a = self._attempt({"A-01": 1}, pack=source)
         drill_pack = drill.build_drill_pack(source, a, "gat-b-practice-drill")
         self.assertEqual(drill_pack["kind"], "drill")
-        self.assertEqual(drill_pack["family"], "gat-b")
+        self.assertEqual(drill_pack["exam"], "gat-b")
         self.assertEqual(drill_pack["scope"], "Photosynthesis")
         errs = pack_mod.validate_pack(drill_pack)
         self.assertEqual(errs, [])
@@ -194,16 +196,16 @@ class TopicsTests(unittest.TestCase):
     def test_cross_paper_rows(self):
         topics.record("p1", "a", [{"topic": "A", "priority": "high"}], now=1)
         topics.record("p2", "b", [{"topic": "B", "priority": "low"}], now=2)
-        self.assertEqual([r["exam_id"] for r in topics.summarize()], ["p2", "p1"])
-        self.assertEqual(len(topics.summarize(exam_id="p1")), 1)
+        self.assertEqual([r["exam"] for r in topics.summarize()], ["p2", "p1"])
+        self.assertEqual(len(topics.summarize("p1")), 1)
 
-    def test_family_bucketing_and_papers_list(self):
+    def test_exam_bucketing_and_papers_list(self):
         topics.record("gat-b-2023", "a-01", [{"topic": "Genetics", "priority": "high"}], now=100)
         topics.record("gat-b-2022", "a-02", [{"topic": "genetics", "priority": "medium"}], now=200)
         rows = topics.summarize("gat-b")
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["family"], "gat-b")
-        self.assertEqual(rows[0]["exam_id"], "gat-b")
+        self.assertEqual(rows[0]["exam"], "gat-b")
+        self.assertEqual(rows[0]["exam"], "gat-b")
         self.assertEqual(rows[0]["papers"], ["gat-b-2022", "gat-b-2023"])
         self.assertEqual(rows[0]["hits"], 2)
         self.assertEqual(rows[0]["attempts"], ["a-01", "a-02"])
@@ -240,16 +242,16 @@ class TopicsTests(unittest.TestCase):
         second_read = topics._read()
         self.assertEqual(second_read, read_data)
 
-    def test_record_stated_family_and_legacy_call(self):
-        # record with family=... lands in the stated family bucket
+    def test_record_stated_exam_and_legacy_call(self):
+        # record with exam=... lands in the stated family bucket
         topics.record("custom-slug-01", "a-01", [{"topic": "Bioinformatics", "priority": "high"}],
-                      now=100, family="gat-b")
+                      now=100, exam="gat-b")
         rows = topics.summarize("gat-b")
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["family"], "gat-b")
+        self.assertEqual(rows[0]["exam"], "gat-b")
         self.assertEqual(rows[0]["papers"], ["custom-slug-01"])
 
-        # Legacy keyword-only call still works (falls back to family_of(exam_id))
+        # Legacy keyword-only call still works (falls back to exam_of(paper_id))
         topics.record("gat-b-2024", "a-02", [{"topic": "Bioinformatics", "priority": "medium"}],
                       now=200)
         rows2 = topics.summarize("gat-b")

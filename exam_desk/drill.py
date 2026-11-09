@@ -68,13 +68,13 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
     key = source.get("key_status")
     return {
         "schema": pack_mod.SCHEMA,
-        "exam_id": drill_id,
-        "family": pack_mod.pack_family(source),
+        "paper_id": drill_id,
+        "exam": pack_mod.pack_exam(source),
         "kind": "drill",
-        "title": f"{source.get('title', source['exam_id'])} — drill ({n} misses)",
+        "title": f"{source.get('title', source['paper_id'])} — drill ({n} misses)",
         "language": source.get("language"),
         "provenance": (
-            f"Drill derived from attempt {attempt.get('id', '?')} of {source['exam_id']} "
+            f"Drill derived from attempt {attempt.get('id', '?')} of {source['paper_id']} "
             f"({n} misses: wrong, skipped and not-counted). The source paper's answers, "
             f"explanations and tolerances are kept unchanged; questions appear in the "
             f"source paper's order."
@@ -85,26 +85,30 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
         **({"year": source["year"]} if "year" in source else {}),
         **({"key_status": key} if key and key != "official" else {}),
         "derived": True,                       # a fact about the file, not a validator field
-        "derived_from": {"exam_id": source["exam_id"], "attempt_id": attempt.get("id"),
+        "derived_from": {"paper_id": source["paper_id"], "attempt_id": attempt.get("id"),
                          "built_at": now_n},
     }
 
 
-def _free_id(exam_id):
-    """`<exam_id>-drill` (then `-2`, `-3`, …) as a slug that names no existing pack."""
+def _free_id(paper_id):
+    """`<paper_id>-drill` (then `-2`, `-3`, …) as a slug that names no existing paper.
+
+    The drill hangs off the paper it drills, so the slug stays inside that paper's
+    exam by construction: `gat-b-2023` → `gat-b-2023-drill`.
+    """
     from . import store as store_mod
     base = store_mod.packs_dir()
     taken = {p.stem for p in base.glob("*.json")}
-    cand, n = f"{exam_id}-drill", 1
+    cand, n = f"{paper_id}-drill", 1
     while cand in taken:
         n += 1
-        cand = f"{exam_id}-drill-{n}"
+        cand = f"{paper_id}-drill-{n}"
     return cand
 
 
 def install_drill(source, attempt):
     """Validate `build_drill_pack` output and file it; returns (drill_id, pack)."""
-    drill_id = _free_id(str(source["exam_id"]))
+    drill_id = _free_id(str(source["paper_id"]))
     pack = build_drill_pack(source, attempt, drill_id)
     errs = pack_mod.validate_pack(pack)
     if errs:                                   # never install something the grader will 500 on

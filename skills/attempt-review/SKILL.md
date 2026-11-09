@@ -28,12 +28,12 @@ Don't use for: an attempt still running (`exam-desk:exam-assist` and the live fi
    `terminal(command="{venv-python} {skill}/scripts/load_attempt.py <ATTEMPT-ID>", timeout=30)`
    where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`) and `{skill}` is this skill's directory.
    If the attempt does not exist or its status is not `submitted`, say so plainly and stop — do not reconstruct a result from memory.
-   **Completion criterion:** the printed JSON carries the exam id, score totals and per-question verdicts.
+   **Completion criterion:** the printed report carries the paper and its exam, score totals and per-question verdicts.
 
-2. **Load the pack for the key.** The report includes the pack path. Questions carry the full text, options, the answer and the explanation; per-question verdicts, awarded marks and the topic live on the attempt's `result.questions`.
-   `provenance` and `key_status` matter: a pack declared `random` or `unverified` has no trustworthy key — say which items you could not audit instead of grading the student against placeholders.
+2. **Read the paper's key.** The report prints the paper's `provenance` and `key_status` and then every question with its full text, options, the answer and the explanation; per-question verdicts, awarded marks and the topic live on the attempt's `result.questions`.
+   `provenance` and `key_status` matter: a paper declared `random` or `unverified` has no trustworthy key — say which items you could not audit instead of grading the student against placeholders.
 
-3. **Walk the misses in the student's order, one by one.** For every wrong or skipped line, give: the question id, what the item tests, what the student chose (or "skipped"), why the recorded answer is right — a mechanism, not a letter — and the step to fix it. Keep the same rules the panel's AI analysis already followed: only a chosen option is evidence; a skip gets what the item tests, never an invented misconception; solve each item yourself and say so when the pack's key is wrong. Skip the ones the same misconception already covered — name it once and list the ids under it.
+3. **Walk the misses in the student's order, one by one.** For every wrong or skipped line, give: the question id, what the item tests, what the student chose (or "skipped"), why the recorded answer is right — a mechanism, not a letter — and the step to fix it. Keep the same rules the panel's AI analysis already followed: only a chosen option is evidence; a skip gets what the item tests, never an invented misconception; solve each item yourself and say so when the paper's key is wrong. Skip the ones the same misconception already covered — name it once and list the ids under it.
    **Completion criterion:** every `wrong`/`skipped`/`not_counted` non-correct row is either explained or folded under a named misconception.
 
 4. **End with a study plan.** Prioritise the misconceptions by marks lost (awarded × occurrences), give each a concrete drill and rough dates in days from today, and keep it short — a plan someone would actually run, so two or three bullets per block and the block order justified in one line.

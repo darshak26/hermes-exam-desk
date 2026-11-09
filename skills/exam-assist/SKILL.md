@@ -29,7 +29,7 @@ Don't use for: exam (non-assisted) mode — the headless mock has no live file a
 2. **Prove it is still live, then read it.** The header line of the file carries the attempt id. Confirm that attempt is still running before answering anything:
    `terminal(command="{venv-python} -c \"import json;from plugins.plugin_storage import plugin_data_dir;d=plugin_data_dir('exam-desk');a=json.loads((d/'attempts'/'<ATTEMPT-ID>.json').read_text());print(a['status'], int(a['duration_seconds']-(__import__('time').time()-a['started_at'])))\"")`
    If the status is not `in_progress`, or the remaining time is ≤ 0, this context is stale: say the exam appears to have ended and stop — do not answer from it. (The plugin prunes files for finished attempts, so a live-looking file for a dead attempt means someone is mid-write; treat it as stale.)
-   Then `read_file` the live file. It contains: attempt id, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
+   Then `read_file` the live file. It contains: attempt id, paper, exam, remaining time, the CURRENT question (id, section, type, topic, marks, full text, options), the student's last SAVED answer (if any), and a reminder that on-screen state may differ from saved.
 
 3. **Answer like a tutor, not a solver:**
    - Default to a hint that nudges toward the answer (name the underlying concept the doubt is about; walk back from the wrong option the student chose).

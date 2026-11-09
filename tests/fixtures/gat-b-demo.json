@@ -1,6 +1,5 @@
 {
  "schema": "cbt-pack/1",
- "exam_id": "gat-b-demo",
  "title": "Demo",
  "year": 2026,
  "body": "Demo Board",
@@ -125,5 +124,7 @@
    "explanation": "-log(0.01)",
    "source_url": "https://example.com/paper"
   }
- ]
+ ],
+ "paper_id": "gat-b-demo",
+ "exam": "gat-b-demo"
 }

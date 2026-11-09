@@ -1,10 +1,9 @@
 {
  "schema": "cbt-pack/1",
- "exam_id": "demo-basics",
- "title": "Demo paper \u2014 how this panel works",
+ "title": "Demo paper — how this panel works",
  "body": "bundled sample",
  "language": "en",
- "provenance": "bundled demo, written for this plugin \u2014 not a previous-year paper. Delete it once you have sourced a real one.",
+ "provenance": "bundled demo, written for this plugin — not a previous-year paper. Delete it once you have sourced a real one.",
  "pattern": {
   "duration_minutes": 15,
   "sections": [
@@ -53,10 +52,10 @@
    "topic": "Acids and bases",
    "text": "A solution of pH 3 is how many times more acidic than a solution of pH 5?",
    "options": [
-    "2\u00d7 as acidic",
-    "10\u00d7 as acidic",
-    "100\u00d7 as acidic",
-    "1000\u00d7 as acidic"
+    "2× as acidic",
+    "10× as acidic",
+    "100× as acidic",
+    "1000× as acidic"
    ],
    "answer": 2,
    "explanation": "pH is logarithmic: two pH units = a hundredfold difference in hydrogen ion concentration.",
@@ -130,5 +129,7 @@
    "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
   }
  ],
- "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+ "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json",
+ "paper_id": "demo-basics",
+ "exam": "demo-basics"
 }
