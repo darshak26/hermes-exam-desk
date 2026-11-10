@@ -33,6 +33,9 @@ always read as practice, never as a real attempt's proof.
 Don't use for: previous-year papers (`exam-desk:pyq-sourcing` — real questions),
 mid-exam doubts (`exam-desk:exam-assist`), post-exam review (`exam-desk:attempt-review`),
 or writing study notes.
+While a CBT attempt is still running, adding a NEW pack is fine — but never `--replace`,
+overwrite or delete the paper that attempt is sitting: the live exam shell reads the pack
+during the attempt. File it after the sitting submits.
 
 ## The interview (how a run usually starts)
 

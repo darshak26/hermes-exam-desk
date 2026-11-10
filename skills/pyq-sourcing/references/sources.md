@@ -4,6 +4,7 @@ Portals **rotate yearly** (the GATE and JAM organizing institute changes every y
 
 | Exam family | Who conducts it | Starting points to search |
 |---|---|---|
+| **Anything NOT listed here** | the exam's own conducting body | locate it with `web_search` first ("<exam> <year> information brochure official"), then proceed with the SAME procedure — the table is a shortcut for common families, not a gate |
 | JEE Main, CUET, UGC NET, GPAT, CMAT and other NTA exams | NTA | `nta.ac.in`; per-exam portals like `jeemain.nta.ac.in` |
 | GAT-B / BET | NTA for Regional Centre for Biotechnology (DBT) | `dbt.nta.ac.in`; RCB's DBT-PG portal `rcb.res.in/DBTPG` |
 | GATE (all papers incl. BT) | A rotating IIT | `gate.iitg.ac.in` / the organizing IIT's GATE page for that year; official question papers + answer keys are published on the GATE portal |

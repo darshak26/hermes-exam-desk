@@ -20,13 +20,18 @@ Turn an exam + year into a validated `cbt-pack/1` JSON installed in the exam-des
 - User asks "what's the exam pattern for <exam>" in the context of the CBT plugin.
 
 Don't use for: writing study notes, explaining concepts, or non-CBT (pen-and-paper) exams.
+While a CBT attempt is still running, adding a NEW pack is fine — but never `--replace`,
+overwrite or delete the paper that attempt is sitting: the live exam shell reads the pack
+during the attempt. File it after the sitting submits.
 
 ## The interview (how a run usually starts)
 
-The CBT panel has one button for adding material — **Add a paper** — and its turn names
-both this skill and `exam-desk:paper-gen`, with no exam or year: the conversation is the
-form. You are the first route, because an official paper is the better material whenever
-one exists. Open with ONE question, never a checklist:
+The CBT panel has two labels for adding material, one per level: **Add exam**
+(the home top row and the empty state — a brand-new exam family) and **Add paper**
+(on an exam's band — another paper for an exam the panel already holds). Either
+turn names both this skill and `exam-desk:paper-gen`, with no exam or year: the
+conversation is the form. You are the first route, because an official paper is
+the better material whenever one exists. Open with ONE question, never a checklist:
 
 1. **Which exam?** Take a name, an abbreviation, or a description ("the DBT one").
    If the answer is vague, offer the two or three most likely candidates — prefer
@@ -60,8 +65,16 @@ affected, and let the user decide whether to keep the pack.
 ## Prerequisites
 
 - The `exam-desk` plugin exists as a package on this machine (`~/.hermes/plugins/exam-desk/`).
-- The packs directory — compute it, never hardcode it (profile/symlink safe):
-  `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; print(plugin_data_dir('exam-desk') / 'packs')\"", timeout=60)` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). The printed path is the install target; `EXAM_DESK_DATA_DIR` env var may override it — check with `terminal(command="echo $EXAM_DESK_DATA_DIR")` first.
+- The pack target directory — resolve the interpreter from the machine, never hardcode it:
+  first check `terminal(command="echo $EXAM_DESK_DATA_DIR")` (it may redirect the data root),
+  then find the gateway plug-in data dir with
+  `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; print(plugin_data_dir('exam-desk') / 'packs')\"", timeout=60)`
+  where `{venv-python}` is the interpreter the Hermes gateway itself runs under
+  (on a standard Linux install `~/.hermes/hermes-agent/.venv/bin/python`; on other
+  layouts, locate that install's venv). The `plugin_storage` import is the test:
+  if a `python3` that is not the gateway's raises ImportError there, the interpreter
+  is wrong — find the right one rather than falling back to a plain `python3`.
+  The printed path is the install target.
 - The validator at `skills/pyq-sourcing/scripts/validate_pack.py` and installer at `skills/pyq-sourcing/scripts/install_pack.py` inside the plugin package.
 
 ## How to Run
@@ -80,7 +93,7 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 
 5. **Validate:** `terminal(command="python3 <plugin>/skills/pyq-sourcing/scripts/validate_pack.py <scratch pack>", timeout=60)`. Must print `PASS: <id> — N questions, S sections, D min` (exit 0). Fix and re-run until PASS — section `question_count` MUST equal the actual per-section question count; answer indices are **0-based**; `marks_wrong` is negative. Then read every `WARN:` line it prints (OCR debris, placeholder topics, duplicated options) and fix them too: they don't block grading, but a question whose options are transcription noise is unanswerable. **Completion criterion:** exit 0 and no `WARN:` lines you can fix.
 
-6. **Install:** run `python3 <plugin>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper). Never write or copy directly into `packs/`. Verify with `web_extract` or the CBT plugin's home page (ask the user to look, or check via the plugin's own tests) that the pack appears in the list. **Completion criterion:** `install_pack.py` prints `PASS installed <slug>` (or `PASS replaced <slug>...`) and the pack shows up in `GET /api/plugins/exam-desk/packs` (desktop home page).
+6. **Install:** run `python3 <plugin>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper). Never write or copy directly into `packs/`. Verify from the machine itself: `install_pack.py`'s own `PASS installed <slug>` line IS the proof — it also lists the installed path; do **not** probe `GET /api/plugins/exam-desk/packs` to confirm the pack exists, that API answers `401` before routing to an unauthenticated caller and proves nothing either way. The panel shows the pack after a `Refresh` on the home card (the panel's query cache hides a new file until then) — ask the user to look, if you did not start from a panel turn. **Completion criterion:** `install_pack.py` prints `PASS installed <slug>` (or `PASS replaced <slug>...`), exit 0.
 
 7. **Report provenance to the user**, concisely: which year/exam, official vs memory-based, answer-key source, number of questions per section, and any gaps (missing questions → say how many and why).
 
@@ -113,5 +126,5 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 ## Verification
 
 - Validator prints PASS on the installed file path.
-- The pack appears on the CBT plugin's home page (or via `GET /api/plugins/exam-desk/packs`).
+- The pack appears on the CBT plugin's home page after a `Refresh` (the HTTP API answers `401` to an unauthenticated caller — it proves nothing about the pack's existence).
 - A 1-question smoke attempt starts and submits against it (the plugin's own flow; if in doubt, say so — don't fake it).

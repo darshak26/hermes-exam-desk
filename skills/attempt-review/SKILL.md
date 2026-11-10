@@ -21,12 +21,15 @@ Detailed post-exam review for the exam-desk plugin. The result page shows the sc
 - The user asks about a specific finished attempt (" analyse my GAT-B attempt a-1a2b3c4d5", "why did I lose marks in section B").
 
 Don't use for: an attempt still running (`exam-desk:exam-assist` and the live file cover that; there must be no help mid-exam) or sourcing a paper (`exam-desk:pyq-sourcing`).
+If the user asks mid-exam questions through this skill's context while a mock is still running anywhere in the panel, decline: say the sitting must stay unaided by design, and answer after submission.
 
 ## Procedure
 
 1. **Load the attempt.** The id is in the priming turn. Read the packaged JSON via the skill's script — it also validates that the attempt is finished:
    `terminal(command="{venv-python} {skill}/scripts/load_attempt.py <ATTEMPT-ID>", timeout=30)`
-   where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`) and `{skill}` is this skill's directory.
+   where `{venv-python}` is any working `python3` — the script is stdlib-only, so the
+   system python runs it; the hardcoded gateway-venv path other skills mention is
+   NOT needed here — and `{skill}` is this skill's directory.
    If the attempt does not exist or its status is not `submitted`, say so plainly and stop — do not reconstruct a result from memory.
    **Completion criterion:** the printed report carries the paper and its exam, score totals and per-question verdicts.
 

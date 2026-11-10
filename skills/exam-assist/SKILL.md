@@ -19,11 +19,12 @@ Mid-exam tutor for the exam-desk plugin's ASSISTED mode. The user takes the exam
 - The exam-desk plugin primes you with a message when an assisted attempt starts ("Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam"). After that, the user's doubts about exam questions are yours to answer.
 - The user asks about a question ("what does this mean", "why is option B wrong here", "hint for B-03") while an assisted attempt is open.
 Don't use for: exam (non-assisted) mode — the headless mock has no live file and there must be no help; post-exam review (use the result page / evaluation instead); sourcing questions (`exam-desk:pyq-sourcing`).
+If the user asks an exam doubt while a MOCK attempt is running anywhere in the panel (a mock has no live file, and a mock's record says mode `mock`), decline to help mid-mock: say the sitting must stay unaided by design and offer to explain after submission.
 
 ## Procedure
 
 1. **Find the live file.** The newest file in the plugin data root's `live/` folder:
-   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('exam-desk') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the gateway venv python (`~/.hermes/hermes-agent/.venv/bin/python`). If there is no file, there is no active assisted exam — say so and stop.
+   `terminal(command="{venv-python} -c \"from plugins.plugin_storage import plugin_data_dir; import os; d = plugin_data_dir('exam-desk') / 'live'; print(sorted(d.glob('*.md'), key=os.path.getmtime)[-1] if d.exists() and list(d.glob('*.md')) else 'none')\"")` where `{venv-python}` is the interpreter the Hermes gateway itself runs under (on a standard Linux install `~/.hermes/hermes-agent/.venv/bin/python`; on other layouts, locate that install's venv — a plain `python3` fails this `plugin_storage` import, which is how you know you picked the wrong one). If there is no file, there is no active assisted exam — say so and stop.
    **Completion criterion:** the newest live file's path.
 
 2. **Prove it is still live, then read it.** The header line of the file carries the attempt id. Confirm that attempt is still running before answering anything:

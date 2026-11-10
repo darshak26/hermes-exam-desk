@@ -927,11 +927,9 @@ function Countdown({ left, onExpire, compact = false }) {
   })
 }
 
-// Stage text in whichever composer is live. `submit(null, …)` is a no-op on a
-// fresh chat, so a draft was the reliable path and submit the fallback for an older
-// desktop without setDraft. That inverted priority WAS the assisted-mode defect —
-// the intent is "create a turn", never "leave text for the user to send", so this
-// function is dead code; goToChatAndStage below submits directly instead.
+// Stage text in whichever composer is live. Submits the turn directly — staging a
+// draft was the old assisted-mode defect, and "create a turn" is never "leave text
+// for the user to send".
 
 // Staging text is useless if the composer is not on screen — every caller that
 // wants the user to send something goes to the chat first, then stages.
