@@ -285,6 +285,10 @@ const CSS = `
 .cbt .cbt-shelf-hist{display:flex;flex-direction:column;gap:12px;min-width:0;padding-top:4px}
 .cbt .cbt-hist-row{display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:wrap}
 .cbt .cbt-hist-row .cbt-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+/* An empty history: one statement and what fills it, on the history block's own left
+   edge. No box, no icon — it sits where the first row will. */
+.cbt .cbt-hist-empty{display:flex;flex-direction:column;gap:2px;padding:2px 0 6px}
+.cbt .cbt-hist-empty strong{font-size:13px;font-weight:600}
 .cbt .cbt-filter{color:var(--ui-text-secondary)}
 .cbt .cbt-filter.on{color:var(--ui-text-primary);text-decoration:underline;text-underline-offset:3px}
 .cbt .cbt-ellipsis{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -836,6 +840,8 @@ const apiFailed = (what, e) => {
 
 const KIND_LABELS = { pyq: 'PYQ', practice: 'practice', drill: 'drill' }
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+
 function fmtScore(v) {
   if (v === null || v === undefined) return '—'
   const n = Number(v)
@@ -1171,7 +1177,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
   const sections = pack.pattern.sections || []
   const showAttemptLimit = sections.some(s => s.attempt_limit)
   const facts = [
-    `${pack.questions.length} questions`,
+    plural(pack.questions.length, 'question', 'questions'),
     duration,
     types.map(t => QTYPE_LABEL[t] || t).join(', '),
     sections.length > 1 ? `${sections.length} sections` : null,
@@ -1255,7 +1261,7 @@ function PaperRow({ pack, attempts, onStart, onResume }) {
   const kindLabel = pack.kind && KIND_LABELS[pack.kind] ? KIND_LABELS[pack.kind] : null
   const meta = pack.invalid ? null : [
     pack.year ? String(pack.year) : null,
-    `${pack.question_count} questions`,
+    plural(pack.question_count, 'question', 'questions'),
     `${pack.duration_minutes ?? '?'} min`,
     pack.scope || null,
   ].filter(Boolean).join(' · ')
@@ -1379,6 +1385,18 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
   // The toggle says one thing: how many sittings this exam has. Discarded ones are the
   // link's job on the right — printing the count here too stated it twice in one row.
   const historyLabel = `History · ${kept.length}`
+  // An empty history is the first thing a new exam shows, and a table with a header
+  // and nothing under it reads as a page that failed to load. One line saying what
+  // fills it reads as a place to start; the copy is a statement of how to begin, not
+  // a cheer. (An exam with no sittings at all never mounts this component — its line
+  // lives with the shelf.)
+  const emptyState = (() => {
+    if (ordered.length) return null
+    if (activeMode) return [`No ${MODE_LABEL[activeMode]} sittings yet`, 'Start one and its score lands here with the rest.']
+    return ['Nothing scored yet',
+      `The ${discarded === 1 ? 'sitting' : 'sittings'} here ${discarded === 1 ? 'was' : 'were'} discarded, `
+      + 'so there is no score to compare against. Your next mock sets the baseline.']
+  })()
 
   const failed = apiFailed
   const del = async id => {
@@ -1440,7 +1458,14 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
     ] }),
     // Seven columns always: this table is the EXAM's history, so each row says which
     // paper it was sat on. One paper today is still a paper you will add a second of.
-    open ? jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-hist has-paper', children: [
+    // Nothing to show is a place to start, not a header with empty air under it: say
+    // what is missing and what fills it.
+    open ? (emptyState
+      ? jsxs('div', { className: 'cbt-hist-empty', children: [
+          jsx('strong', { children: emptyState[0] }),
+          jsx('span', { className: 'cbt-sub', children: emptyState[1] }),
+        ] })
+      : jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-hist has-paper', children: [
       jsx('thead', { children: jsx('tr', { children: [
         ['Paper', ''], ['Mode', ''], ['Date', ''], ['Status', ''], ['Score', 'num'], ['Result', ''], ['Delete', ''],
         ].map(([h, cls]) => jsx('th', {
@@ -1472,7 +1497,7 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
             children: `Show ${hidden} more`,
           }) })
         : null,
-    ] }) }) : null,
+    ] }) }) ) : null,
     // Deleting is confirmed in a dialog, not inside a 9%-wide table cell: the inline
     // prompt could never fit and pushed the row's height around.
     confirmDel
@@ -1558,7 +1583,10 @@ function ExamShelf({ exam, packs, attempts, topics, onStart, onResume, onViewRes
     }, p.paper_id)) }),
     attempts.length
       ? jsx(ExamHistory, { exam, attempts, onResume, onViewResult })
-      : jsx('div', { className: 'cbt-sub', children: 'No sittings yet.' }),
+      : jsxs('div', { className: 'cbt-hist-empty', children: [
+          jsx('strong', { children: 'No sittings yet' }),
+          jsx('span', { className: 'cbt-sub', children: 'Start a mock — the first one sets the baseline you go on to beat.' }),
+        ] }),
     asking
       ? jsx(Dialog, {
           open: true,
@@ -1683,7 +1711,7 @@ function SubmitDialog({ stats, unanswered, submitting, onCancel, onSubmit, onDis
           jsx(DialogDescription, { className: 'cbt-desc', children: 'This cannot be undone.' }),
         ] }),
         jsxs('div', { className: 'cbt-row cbt-gap-sm', children: [
-          jsx(Badge, { variant: 'outline', children: `${totals.total} questions` }),
+          jsx(Badge, { variant: 'outline', children: plural(totals.total, 'question', 'questions') }),
           jsx(Badge, { variant: 'success', children: `${totals.answered} answered` }),
           totals.marked
             ? jsx(Tip, { label: 'Flagged for review — a flagged question can also be answered', children:
