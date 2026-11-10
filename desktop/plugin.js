@@ -458,6 +458,11 @@ const CSS = `
 .cbt .media-table{border-collapse:collapse;margin:0 0 16px;font-size:12.5px}
 .cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cbt .media-table th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary)}
+/* the media table is a bordered GRID — every cell carries all four edges. The
+   data-table rule below (.cbt tbody tr:last-child td{border-bottom:0}) also
+   matched it and cut the closing line: that zero exists for hairline-row tables
+   whose next block owns the bottom boundary, which a grid table has none of. */
+.cbt .media-table tbody tr:last-child td{border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .media-table caption{caption-side:bottom;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding-top:6px}
 .cbt .media-note{font-size:12px;color:var(--ui-text-secondary);border-left:2px solid var(--ui-stroke-secondary);padding-left:12px;margin:0 0 16px}
 .cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--ui-scrim,rgba(0,0,0,.8));cursor:zoom-out}
