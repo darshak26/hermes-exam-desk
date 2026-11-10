@@ -11,7 +11,7 @@ import sys
 import types
 from pathlib import Path
 
-VERSION = "0.11.0"
+VERSION = "0.12.0"
 BRIDGE = "exam_desk_ctx_bridge"
 
 
@@ -37,6 +37,16 @@ def register(ctx):
         module = types.ModuleType(BRIDGE)
         sys.modules[BRIDGE] = module
     setattr(module, "ctx", ctx)     # plain ModuleType: attribute set via setattr on purpose
+
+    # 4) The agent-facing surface: tools + pre_llm_call injection + /examdesk +
+    #    the evening-digest blueprint. Kept in its own try-block BY DESIGN: a
+    #    failure here must not take the skills and the evaluation bridge down
+    #    (a register() crash disables the whole plugin). Prints to gateway stdout.
+    try:
+        from .exam_desk.agent_tools import register_agent_surface
+        register_agent_surface(ctx)
+    except Exception as e:                                  # noqa: BLE001 — deliberately broad at the plugin boundary
+        print(f"[exam-desk] agent surface not registered: {e!r} (skills/bridge unaffected)")
 
 
 def _seed_packs() -> None:

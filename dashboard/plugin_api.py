@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-VERSION = "0.11.0"
+VERSION = "0.12.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 ALLOWED_ASSET_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 

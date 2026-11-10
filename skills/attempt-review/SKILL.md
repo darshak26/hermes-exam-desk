@@ -25,7 +25,11 @@ If the user asks mid-exam questions through this skill's context while a mock is
 
 ## Procedure
 
-1. **Load the attempt.** The id is in the priming turn. Read the packaged JSON via the skill's script — it also validates that the attempt is finished:
+1. **Load the attempt with the tool.** The id is in the priming turn. The plugin registers an agent tool for this:
+   call `exam_desk_attempt` with `attempt_id`. It answers `{"error": ...}` for unknown ids and refuses nothing
+   else — a non-submitted attempt comes back with `result: null` and a note instead of rows; say so plainly and stop.
+   The response carries the session ids too: `assisted_session_id` (the tutor chat) and `review_session_ids`.
+   If the tool is missing (a plugin half that predates it), fall back to the script:
    `terminal(command="{venv-python} {skill}/scripts/load_attempt.py <ATTEMPT-ID>", timeout=30)`
    where `{venv-python}` is any working `python3` — the script is stdlib-only, so the
    system python runs it; the hardcoded gateway-venv path other skills mention is
@@ -33,7 +37,7 @@ If the user asks mid-exam questions through this skill's context while a mock is
    If the attempt does not exist or its status is not `submitted`, say so plainly and stop — do not reconstruct a result from memory.
    **Completion criterion:** the printed report carries the paper and its exam, score totals and per-question verdicts.
 
-2. **Read the paper's key.** The report prints the paper's `provenance` and `key_status` and then every question with its full text, options, the answer and the explanation; per-question verdicts, awarded marks and the topic live on the attempt's `result.questions`.
+2. **Read the paper's key.** The tool's response (or the script's report) carries the paper's `provenance` and `key_status` and then every question with its full text, options, the answer and the explanation; per-question verdicts, awarded marks and the topic live on the attempt's `result.questions`.
    `provenance` and `key_status` matter: a paper declared `random` or `unverified` has no trustworthy key — say which items you could not audit instead of grading the student against placeholders.
 
 3. **Walk the misses in the student's order, one by one.** For every wrong or skipped line, give: the question id, what the item tests, what the student chose (or "skipped"), why the recorded answer is right — a mechanism, not a letter — and the step to fix it. Keep the same rules the panel's AI analysis already followed: only a chosen option is evidence; a skip gets what the item tests, never an invented misconception; solve each item yourself and say so when the paper's key is wrong. Skip the ones the same misconception already covered — name it once and list the ids under it.
@@ -43,7 +47,7 @@ If the user asks mid-exam questions through this skill's context while a mock is
 
 ## The assisted chat
 
-If the sitting was assisted, `load_attempt.py` prints an **ASSISTED CHAT** line: the id
+If the sitting was assisted, the tool response (and `load_attempt.py`) carries the **ASSISTED CHAT** field: the id
 of the Hermes session where the tutor sat with the student. That transcript survives
 (submit clears only the plugin's scratch pointer, never the chat) — open it when a
 missed question has a recorded doubt, and read what you told them. It is the best
@@ -51,7 +55,7 @@ evidence of the gap; what it is **not** is evidence the student knew it afterwar
 residual miss after being told is exactly the opinion you diagnose. Also treat the
 sitting's scoreline as weaker proof than a mock's, on the same reasoning.
 
-`load_attempt.py` also prints any **REVIEW CHATS** linked to this attempt. If one
+The tool response lists any **REVIEW CHATS** linked to this attempt under `review_session_ids`. If one
 exists, open it before starting so this review continues the previous discussion
 instead of re-inventing it.
 

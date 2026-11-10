@@ -3,7 +3,24 @@
 One paragraph per release, in the words a user cares about. The commit history
 carries the detail; this file carries the deltas worth reading before an update.
 
-## 0.11.0 — unreleased
+## 0.12.0 — the agent gets first-class access
+
+- **Five real tools** (registered in the manifest, loadable by any Hermes agent on
+  the host — no desktop app or panel needed): `exam_desk_live_context` (the live
+  question mirror), `exam_desk_attempt` (one sitting's full record), `exam_desk_log_doubt`
+  (the only agent-initiated write: one tutor-doubt event on a live sitting),
+  `exam_desk_topics`, `exam_desk_papers`.
+- **The tutor chat feeds itself**: a `pre_llm_call` hook injects the current
+  question (never the key) into turns of the session an assisted sitting is
+  linked to; other chats get nothing.
+- **`/examdesk`** — the desk's status from any chat (papers, what's running,
+  latest sittings, what keeps being flagged).
+- **An automation blueprint** — "Exam Desk evening digest": an evening cron
+  recipe that summarises sittings and the topics ledger using the tools.
+- The exam-assist and attempt-review skills now lead with the tools and keep
+  their scripts as explicit fallbacks.
+
+## 0.11.0 — export, cross-process locks, the record leaves the desk
 
 - **Export a sitting.** `GET /attempts/{id}/export` (and an `Export JSON` button on
   the result page) downloads the full record — answers, verdicts, the paper with

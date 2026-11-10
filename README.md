@@ -102,6 +102,22 @@ first start so the panel is not empty — two sections, one multi-select, one
 numerical, marking on. Use it to see how the timer, palette and result page behave,
 then delete it.
 
+## What the agent can do without the app
+
+The plugin registers Hermes agent **tools** (bound when the gateway starts) — an
+agent in any chat on the host can read the desk without the panel:
+
+- `exam_desk_papers` — what papers exist; `exam_desk_topics` — the weak-topic ledger
+- `exam_desk_live_context` — the question on screen during an assisted sitting
+- `exam_desk_attempt` — one sitting's full record (key only once submitted)
+- `exam_desk_log_doubt` — logs a tutor doubt on a live sitting (its only write)
+
+Plus **`/examdesk`** — a one-message status (papers, what's running, latest
+sittings, weakest topics) in any chat — and an automation blueprint
+("Exam Desk evening digest") in `/blueprint`. During an **assisted** sitting the
+plugin also injects the current question into the tutor chat's turns by itself;
+the answer key never rides that channel.
+
 For real papers, click **Add a paper**: it opens a chat and the agent runs
 `exam-desk:pyq-sourcing` — it asks which exam and which year (one question at a time),
 finds the official paper, extracts the questions, validates and files them. When no
