@@ -232,8 +232,15 @@ def answer_error(q, val):
                        for x in val)):
             return "answer must be a non-empty list of distinct option indices"
     elif t == "nat":
-        if not _is_numeric(val):
-            return "answer must be a number or numeric string"
+        if _is_numeric(val):
+            return None
+        # A key that is not a number ("2 to 3", "x > 2") is legal only where the
+        # FIELD is text as well: grading already falls back to an exact string
+        # match for such keys, and `answer_input` is what decides the field, so
+        # declaring `input: text` is the one way to unlock a text answer.
+        if answer_input(q) == "text" and isinstance(val, str) and val.strip():
+            return None
+        return "answer must be a number or numeric string"
     else:
         return f"unknown question type {t!r}"
     return None
@@ -535,6 +542,12 @@ def lint_pack(pack, assets_dir=None):
             warns.append(f"{qid}: question text runs into the paper's tail "
                          f"({leak.group(0)!r}) — the last question swallowed the answer key; "
                          "trim the text at the end of the question")
+        # A nat key that is not a number is legal (grading matches it as a string),
+        # but it is also what a mangled OCR key looks like — so say it out loud
+        # and name the declaration that makes it deliberate.
+        if q.get("type") == "nat" and q.get("answer") is not None and not _is_numeric(q.get("answer")):
+            warns.append(f"{qid}: numerical answer {str(q.get('answer'))[:24]!r} is not a number — "
+                         "grading will compare it as text, so declare input 'text' if that is intended")
         opts = q.get("options") or []
         norm = [str(o).strip().lower() for o in opts]
         dupes = sorted({o for o in norm if norm.count(o) > 1})

@@ -302,6 +302,32 @@ class MediaPackTests(unittest.TestCase):
         p["questions"][5]["input"] = "decimal"
         self.assertEqual(validate_pack(p), [])
 
+    def test_text_mode_is_the_one_way_to_a_text_answer(self):
+        """A range key ("2 to 3") is legal where the field is text, and only there.
+
+        Grading already falls back to an exact string match; the validator used to
+        refuse the key outright, which made `input: text` impossible to declare.
+        """
+        from exam_desk.pack import answer_error
+        p = base_pack()
+        q = p["questions"][5]
+        self.assertTrue(answer_error(q, "2 to 3"))          # decimal field: refused
+        text_q = {**q, "answer": "2 to 3", "input": "text"}
+        text_q.pop("tolerance", None)
+        self.assertIsNone(answer_error(text_q, "2 to 3"))
+        self.assertIsNone(answer_error(text_q, 2))          # a number is lenient-legal; it just grades wrong
+        p["questions"][5] = text_q
+        self.assertEqual(validate_pack(p), [])
+
+    def test_non_numeric_nat_key_is_announced(self):
+        from exam_desk.pack import lint_pack
+        p = base_pack()
+        p["questions"][5].update(answer="2 to 3", input="text")
+        p["questions"][5].pop("tolerance", None)
+        warns = [w for w in lint_pack(p) if "is not a number" in w]
+        self.assertEqual(len(warns), 1, warns)
+        self.assertIn("input 'text'", warns[0])
+
     def test_question_text_carrying_the_answer_key_is_a_warning(self):
         """The last question of a QP+AK PDF sweeps up the paper's trailer.
 

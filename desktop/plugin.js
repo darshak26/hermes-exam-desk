@@ -313,9 +313,10 @@ const CSS = `
 .cbt .opt input{flex:0 0 auto;margin:5.5px 0 0}
 /* A free-entry answer is a FIELD, and the browser default draws nothing on this
    background — the box carries its own stroke, radius, fill and focus ring. It is
-   capped at 320px because an answer is a number, not prose, and the rule beside
-   it (whole number / decimal / free text) comes from the pack's own instruction
-   for THAT question, so the field stops a mistyped unit before it is saved. */
+   capped at 320px because an answer is a number, not prose. The rule for THAT
+   question (digits only / one decimal point / free text) lives in the field's own
+   filtering and its placeholder — a line of helper text under an empty box said the
+   same thing twice. */
 .cbt .cbt-qbody .cbt-entry{display:flex;flex-direction:column;gap:6px;max-width:320px;margin-inline:0}
 .cbt .cbt-entry-field{
   box-sizing:border-box;width:100%;font:inherit;font-size:16px;line-height:1.4;
@@ -326,7 +327,6 @@ const CSS = `
 }
 .cbt .cbt-entry-field::placeholder{color:var(--ui-text-secondary)}
 .cbt .cbt-entry-field:focus{outline:none;border-color:var(--ui-accent);box-shadow:0 0 0 1px var(--ui-accent)}
-.cbt .cbt-entry-hint{font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap;cursor:pointer}
 /* one verdict width for every row: "Skipped" and "Wrong (-0.5)" must not move the
    type/topic text that follows, so the label lives in a reserved slot */
@@ -2020,7 +2020,6 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
                 value: sel == null ? '' : String(sel),
                 onChange: e => setSel(cleanEntry(e.target.value, kind)),
               }),
-              jsx('span', { className: 'cbt-entry-hint', children: INPUT_HINT[kind] }),
             ] })
           })()
         : cur.options.map((o, i) => optRow(i, o, cur.type)),
