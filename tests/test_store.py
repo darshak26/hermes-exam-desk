@@ -104,5 +104,34 @@ class StoreTests(unittest.TestCase):
         self.assertFalse(p.exists())
         store.clear_live_context(a)   # clearing twice is a no-op
 
+    def test_attempt_lock_is_cross_process_and_re_entrant(self):
+        """The file lock is the half a second plugin process can see: while a
+        context holds it, an independent open (what the other service would do)
+        cannot take it non-blockingly; after exit it can. The RLock keeps the
+        same-thread re-entrancy the handlers rely on."""
+        import fcntl
+        pack = base_pack()
+        store.new_attempt(pack, "mock")
+        rows = [a for a, _ in store.iter_attempts()]
+        self.assertEqual(len(rows), 1, rows)
+        aid = rows[0]["id"]
+        path = store.attempt_lock_path(aid)
+        with store.attempt_lock(aid):
+            # re-entrant in the same thread — the nested take is instant
+            with store.attempt_lock(aid):
+                pass
+            with open(path, "a+", encoding="utf-8") as probe:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with open(path, "a+", encoding="utf-8") as probe:
+            fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)   # free again
+
+    def test_attempt_lock_refuses_non_plain_ids(self):
+        # the guard fires when the context is ENTERED (a @contextmanager body
+        # runs at __enter__, not at the call), so assert the with-statement
+        with self.assertRaises(KeyError):
+            with store.attempt_lock("../escape"):
+                pass
+
 if __name__ == "__main__":
     unittest.main()

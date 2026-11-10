@@ -19,10 +19,10 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 ALLOWED_ASSET_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
@@ -41,6 +41,7 @@ timeline_mod = importlib.import_module(_name + ".timeline")
 prompt_mod_topics = importlib.import_module(_name + ".topics")
 drill_mod = importlib.import_module(_name + ".drill")
 vocab_mod = importlib.import_module(_name + ".vocab")
+llm_mod = importlib.import_module(_name + ".llm")
 
 router = APIRouter()
 BRIDGE = "exam_desk_ctx_bridge"         # set by the plugin's register(ctx)
@@ -359,6 +360,30 @@ def get_attempt(aid: str):
     return _view(a, pack)
 
 
+@router.get("/attempts/{aid}/export")
+def export_attempt(aid: str):
+    """The whole record as one downloadable JSON — the user's data, portable.
+
+    attempt + pack (the real pack: a submitted attempt is allowed to reveal the
+    key, and export is a post-submission operation by definition) + the
+    behaviour view. `Content-Disposition` is best-effort: the panel downloads
+    through an authenticated fetch, so a browser cannot honour the header —
+    it is still correct for any token-authenticated client."""
+    a, pack = _load(aid, touch=True)
+    if a["status"] != "submitted" or not a.get("result"):
+        raise HTTPException(409, "export a submitted attempt — abandon or submit this sitting first")
+    payload = {
+        "schema": "cbt-export/1",
+        "exported_at": time.time(),
+        "attempt": a,
+        "pack": pack,
+        **{"timeline": timeline_mod.build(a, pack)},
+    }
+    body = json.dumps(payload, ensure_ascii=False, indent=1)
+    return Response(content=body, media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="exam-desk-{aid}.json"'})
+
+
 @router.patch("/attempts/{aid}")
 def patch_attempt(aid: str, patch: AnswerPatch):
     with store_mod.attempt_lock(aid):
@@ -549,29 +574,15 @@ def get_topics(paper_id: str | None = None, exam: str | None = None,
     return {"topics": prompt_mod_topics.summarize(exam=ex, limit=max(1, min(limit, 100)))}
 
 
-# Richest constraint first: a real json_schema, then json_object, then plain text.
-# `_SHAPE_OK` remembers which one this process last got a usable answer from, because a
-# provider that refuses json_schema refuses it on EVERY call — re-asking costs a wasted
-# 400 round trip per evaluation. The remembered shape goes first; the rest stay behind
-# it, so a provider change (or a model that suddenly accepts a schema) degrades and
-# recovers on its own without a restart.
-_SHAPE_ORDER = ("json_schema", "json_mode", "text")
+# Richest shape first, then the fallbacks, come from exam_desk.llm.plan(). What
+# stays here is the process's memory of which shape last worked: a provider that
+# refuses json_schema refuses it on EVERY call — re-asking costs a wasted 400
+# round trip per evaluation. The remembered shape goes first; the rest stay behind
+# it, so a provider change (or a model that suddenly accepts a schema) degrades
+# and recovers on its own without a restart.
 _SHAPE_OK = {"name": None}
 _EVAL_IN_FLIGHT = set()
 _EVAL_LOCK = threading.Lock()
-
-
-def _shape_attempts():
-    """(shape name, complete_structured kwargs) in the order to try them."""
-    attempts = [
-        ("json_schema", {"json_schema": prompt_mod.EVAL_SCHEMA, "schema_name": "cbt.evaluation"}),
-        ("json_mode", {"json_mode": True, "schema_name": "cbt.evaluation"}),
-        ("text", {}),
-    ]
-    known = _SHAPE_OK["name"]
-    if known:
-        attempts.sort(key=lambda item: 0 if item[0] == known else 1)   # stable sort
-    return attempts
 
 
 @router.post("/attempts/{aid}/evaluate")
@@ -608,11 +619,7 @@ async def evaluate(aid: str, force: bool = False):
         # Degrade through the structured shapes providers actually support: a schema,
         # then json_object, then plain text with the JSON dug out of the reply. Atlas /
         # opencode-go answers a json_schema request with 400 "not yet supported".
-        for i, (shape, extra) in enumerate(_shape_attempts()):
-            # First shape gets a short budget: a provider that cannot answer in 90 s
-            # under a 2,000-token cap will not answer in 180 — falling through to the
-            # next shape fast beats half a call's ceiling stuck on the wrong shape.
-            timeout = 90 if i == 0 else 180
+        for shape, timeout, extra in llm_mod.plan(_SHAPE_OK["name"]):
             try:
                 # await, not a thread call: the handler is async, so the wait runs on
                 # the event loop and no threadpool worker is parked for up to 3x180 s

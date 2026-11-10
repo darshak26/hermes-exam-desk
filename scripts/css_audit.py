@@ -25,9 +25,9 @@ COMMENT = re.compile(r"/\*.*?\*/", re.S)
 
 
 def extract_css(js_text):
-    """The template string between `const CSS = \`` and its closing backtick."""
+    r"""The template string between `const CSS = \`` and its closing backtick."""
     if MARKER not in js_text:
-        raise SystemExit("no `const CSS = \`` marker in the file")
+        raise SystemExit(r"no `const CSS = \`` marker in the file")
     start = js_text.index(MARKER) + len(MARKER)
     end = js_text.index("\n`;", start)
     return js_text[start:end]

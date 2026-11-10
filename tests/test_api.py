@@ -633,6 +633,49 @@ class DrillTests(unittest.TestCase):
         self.assertEqual(client.get("/topics").json()["topics"], [])   # an ungraded scoreline feeds nothing
 
 
+class ExportTests(unittest.TestCase):
+    """The whole record as one blob — the user's data, portable, not just durable."""
+
+    def setUp(self):
+        self._old = os.environ.get("EXAM_DESK_DATA_DIR")
+        os.environ["EXAM_DESK_DATA_DIR"] = str(DATA)
+        shutil.rmtree(DATA, ignore_errors=True)
+        seed_pack()
+
+    def tearDown(self):
+        if self._old is not None:
+            os.environ["EXAM_DESK_DATA_DIR"] = self._old
+
+    def test_export_carries_attempt_pack_and_key(self):
+        aid = make_attempt()
+        client.patch(f"/attempts/{aid}", json={"answers": {"A-01": 1}})
+        client.post(f"/attempts/{aid}/submit")
+        r = client.get(f"/attempts/{aid}/export")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("attachment", r.headers.get("content-disposition", ""), r.headers)
+        self.assertIn(f"exam-desk-{aid}.json", r.headers.get("content-disposition", ""))
+        payload = r.json()
+        self.assertEqual(payload["schema"], "cbt-export/1")
+        self.assertEqual(payload["attempt"]["id"], aid)
+        # the REAL pack, key included: a submitted attempt reveals it
+        self.assertIsNotNone(payload["pack"]["questions"][0].get("answer"))
+        self.assertEqual(
+            sum(1 for q in payload["attempt"]["result"]["questions"]),
+            6,
+            "verdicts ride along",
+        )
+        self.assertIn("timeline", payload, "the behaviour view rides the export")
+
+    def test_export_refuses_a_live_sitting(self):
+        aid = make_attempt()
+        r = client.get(f"/attempts/{aid}/export")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("submitted", r.json()["detail"])
+
+    def test_export_unknown_attempt_404(self):
+        self.assertEqual(client.get("/attempts/a-nope/export").status_code, 404)
+
+
 class EvalLedgerTests(LlmApiTests):
     """The one class needing the bridge: evaluation → ledger recording."""
 

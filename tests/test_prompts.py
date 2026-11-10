@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from exam_desk.grading import grade_attempt
+from exam_desk.llm import FIRST_SHAPE_TIMEOUT, NEXT_SHAPE_TIMEOUT, plan
 from exam_desk.prompts import evaluation_input, validate_evaluation
 from tests.helpers import base_pack
 
@@ -33,7 +34,7 @@ class PromptTests(unittest.TestCase):
         self.assertIsNone(validate_evaluation(None))
         self.assertIsNone(validate_evaluation({}))
         good = {"overall_comment": "fine", "sections": [{"section_id": "A", "comment": "ok"}],
-                "weak_topics": [{"topic": "t", "evidence": "e", "priority": "high"}],
+                 "weak_topics": [{"topic": "t", "evidence": "e", "priority": "high"}],
                 "wrong_answer_notes": [{"question_id": "A-02", "note": "n"}],
                 "study_plan": ["revise x"]}
         out = validate_evaluation(good)
@@ -50,6 +51,30 @@ class PromptTests(unittest.TestCase):
         self.assertEqual(out2["weak_topics"], [])
         self.assertEqual(out2["wrong_answer_notes"], [])
         self.assertEqual(out2["study_plan"], ["ok"])
+
+class LlmPlanTests(unittest.TestCase):
+    """The provider shape policy lives in exam_desk.llm, pinned here like its
+    former HTTP-side constants were (the fake-bridge tests pin call budgets)."""
+
+    def test_richest_first_then_the_fallbacks(self):
+        shapes = [s for s, _, _ in plan()]
+        self.assertEqual(shapes, ["json_schema", "json_mode", "text"])
+
+    def test_known_shape_leads(self):
+        plan2 = plan("json_mode")
+        self.assertEqual(plan2[0][0], "json_mode")
+        self.assertEqual([s for s, _, _ in plan2][1:], ["json_schema", "text"],
+                         "known shape first, the rest keep their order behind it")
+
+    def test_timeouts(self):
+        self.assertEqual(plan()[0][1], FIRST_SHAPE_TIMEOUT)
+        self.assertEqual(plan()[1][1], NEXT_SHAPE_TIMEOUT)
+        self.assertEqual(plan("text")[0][1], NEXT_SHAPE_TIMEOUT,
+                         "a remembered shape keeps its OWN budget, not the short first one")
+
+    def test_schema_rides_json_schema_only(self):
+        self.assertIn("json_schema", plan()[0][2])
+        self.assertNotIn("json_schema", plan()[2][2])
 
 if __name__ == "__main__":
     unittest.main()

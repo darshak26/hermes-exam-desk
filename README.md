@@ -216,7 +216,7 @@ question keeps the full width in a narrow split.
 
 ```bash
 # in the repo: run the suite, then commit + push
-python -m pytest -q                          # 210 tests, ~5 s — needs a venv with fastapi/pytest (the gateway's)
+python -m pytest -q                          # 219 tests, ~5 s — needs a venv with fastapi/pytest (the gateway's)
 hermes plugins validate .                    # catalog gate
 git commit -m "..." && git push
 

@@ -195,6 +195,79 @@ def _read_attempt(path):
 
 _LOCKS = {}
 _LOCKS_GUARD = threading.Lock()
+_LOCK_DEPTH = {}          # attempt id → re-entrancy depth (guarding thread holds the RLock)
+
+
+def attempt_lock_path(aid):
+    """`locks/<aid>.lock` beside the data — the cross-process half of attempt_lock."""
+    try:
+        d = data_root() / "locks"
+        d.mkdir(parents=True, exist_ok=True)
+        return d / f"{aid}.lock"
+    except OSError:
+        return None
+
+
+def _flock_shared_mode():
+    """fcntl when it exists (POSIX). On a layout without it (Windows) the file
+    lock is skipped: the RLock still serialises the single process, which is the
+    only process a desktop-only install actually runs."""
+    try:
+        import fcntl
+        return fcntl
+    except ImportError:
+        return None
+
+
+@contextmanager
+def attempt_lock(aid):
+    """Serialize read-modify-write on one attempt — in-process AND cross-process.
+
+    The threading RLock (re-entrant: a handler that re-enters its own loader
+    does not self-deadlock) guards the easy case. At depth 1 it also takes an
+    exclusive fcntl lock on `locks/<aid>.lock`, so a second plugin process (the
+    gateway and its dashboard serve the same data root on one host) cannot
+    interleave a save: two tabs racing across services now serialise the same
+    way two tabs in one process already did. The kernel drops the file lock if
+    the holder dies, so a crashed process cannot wedge the other. On a layout
+    without fcntl the file lock is skipped, with the in-process contract intact.
+    """
+    if not _ID.match(str(aid or "")):
+        raise KeyError(f"attempt id {aid!r} is not a plain id")
+    lock = _LOCKS.setdefault(aid, threading.RLock())
+    lock.acquire()
+    depth = _LOCK_DEPTH.get(aid, 0) + 1
+    _LOCK_DEPTH[aid] = depth
+    fd = None
+    if depth == 1:
+        fcntl = _flock_shared_mode()
+        path = attempt_lock_path(aid)
+        if fcntl is not None and path is not None:
+            try:
+                fd = open(path, "a+", encoding="utf-8")
+                fcntl.flock(fd.fileno(), fcntl.LOCK_EX)   # blocking: the same serialisation, across processes
+            except OSError:
+                try:
+                    if fd is not None:
+                        fd.close()
+                except OSError:
+                    pass
+                fd = None            # degrade to the in-process lock, like every other best-effort guard here
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                import fcntl
+                fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            except (ImportError, OSError):
+                pass
+            try:
+                fd.close()
+            except OSError:
+                pass
+        _LOCK_DEPTH[aid] = depth - 1
+        lock.release()
 
 
 def log_events(aid, events, *, now=None):
@@ -291,20 +364,6 @@ def read_events(aid):
             return out
     except OSError:
         return []
-
-
-@contextmanager
-def attempt_lock(aid):
-    """Serialise read-modify-write on one attempt.
-
-    Re-entrant on purpose: a handler that holds the lock can call `_load`, which
-    may itself need to grade an expired attempt. One small lock per attempt id,
-    kept for the process lifetime (attempts are counted in dozens, not millions).
-    """
-    with _LOCKS_GUARD:
-        lock = _LOCKS.setdefault(aid, threading.RLock())
-    with lock:
-        yield
 
 
 def new_attempt(pack, mode, assisted_session_id=None):

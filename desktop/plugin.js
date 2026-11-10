@@ -1110,6 +1110,26 @@ async function primeAssistedChat(attemptId) {
   } catch { /* attempt stays unlinked; load_attempt reports that plainly */ }
 }
 
+// One click to take the whole record out of the panel: answers, verdicts, the
+// paper and its key, the behaviour view. The fetch is authenticated, so the
+// browser cannot honour Content-Disposition from it — the payload is rebuilt
+// as a blob and handed to the browser's own download path instead.
+async function exportAttempt(aid) {
+  try {
+    const data = await rest(`/attempts/${aid}/export`)
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `exam-desk-${aid}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    host.notify?.({ kind: 'error', message: 'Export failed — the dashboard may be running an older build without the export route. Restart it, then retry.' })
+  }
+}
+
 // One door for "start a paper", shared by the instructions page and Retake: it
 // creates the attempt, then either docks it in a side pane (assisted) or hands the
 // id back so the caller can show it full page. Returns null when a pane took it.
@@ -1667,7 +1687,8 @@ function CbtHome({ onStart, onResume, onViewResult }) {
         ? jsx(ErrorBox, { what: 'Loading packs', onRetry: () => packs.refetch() })
         : (packList.length === 0
           ? jsxs('div', { children: [
-              jsx(EmptyState, { title: 'No papers yet', description: 'Ask the agent to source a previous-year paper — it files itself here once validated.' }),
+              jsx(EmptyState, { title: 'No papers yet',
+                description: 'Click Add exam and the agent sources the official previous-year paper — it files itself here once validated (or drafts one when none exists). A hand-written pack works too: `validate_pack.py` then `install_pack.py` from the plugin’s skills directory.' }),
               jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }),
             ] })
           : examKeys.map(examKey => jsx(ExamShelf, {
@@ -2719,6 +2740,10 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
       jsx('h2', { children: (pack.exam || examOf(pack.paper_id)).toUpperCase() }),
       jsx('span', { style: { flex: 1 } }),
       jsx(Button, { className: 'cbt-head-nav', variant: 'ghost', size: 'sm', onClick: () => onHome(), children: 'Home' }),
+      q.data?.attempt?.status === 'submitted' && q.data?.attempt?.result
+        ? jsx(Tip, { label: 'Download the whole record — answers, verdicts, the paper and its key, the behaviour view — as one JSON file', children:
+            jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => void exportAttempt(q.data.attempt.id), children: 'Export JSON' }) })
+        : null,
       onDrill && q.data?.attempt?.status === 'submitted' && q.data?.attempt?.result
         ? jsx(Tip, { label: 'New paper holding this attempt\'s misses — wrong, skipped and not-counted, same key', children:
             jsx(Button, { variant: 'secondary', size: 'sm', loading: drillBusy, onClick: drill, children: 'Drill misses' }) })
@@ -2873,12 +2898,13 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
           : jsx(Button, { variant: 'outline', size: 'sm', disabled: evalBusy,
               onClick: () => { setShowEval(true); void runEval(false) }, children: 'Analyse this attempt' }),
       ] }),
-      // A closed card still has to say what it would open, and whether opening it is
-      // free: a stored analysis is served from the attempt, a new one costs a model call.
+      // A closed card still has to say what it would open, whether opening is free,
+      // and — at the trust line — what the analysis is NOT: the marks above are
+      // graded from recorded answers against the paper's key; this adds words only.
       !showEval
         ? jsx('div', { className: 'cbt-sub', style: { marginTop: 12 }, children: attempt.evaluation
-            ? `Saved analysis from ${fmtWhen(attempt.evaluation.generated_at)} — open it for the per-section notes and the weak topics.`
-            : 'The analysis runs once, on demand — nothing on this page depends on it.' })
+            ? `Saved analysis from ${fmtWhen(attempt.evaluation.generated_at)} — commentary only: marks are graded from your recorded answers against the paper's key. Open it for the per-section notes and the weak topics.`
+            : 'Commentary only — marks are graded from your recorded answers against the paper’s key; this adds words, never numbers. It runs once, on demand.' })
         : null,
       pack.key_status && pack.key_status !== 'official'
         ? jsx('div', { className: 'cbt-row cbt-sub', style: { marginTop: 12 }, children:
