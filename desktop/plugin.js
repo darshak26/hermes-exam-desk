@@ -388,7 +388,13 @@ const CSS = `
    its first tab by 2px, and the row is plain words now, so they line up at 20. */
 .cbt-head{display:flex;align-items:center;gap:8px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-.cbt .timer{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600}
+/* The clock reads as a control beside Submit: the kit button's own height (24px),
+   radius and outline — not a lookalike of another primitive, the same numbers the
+   sm button computes to. Urgency stays colour-only inside the box, so late-paper
+   state changes never shift the header. */
+.cbt .timer{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;height:24px;padding:0 10px;white-space:nowrap;
+  border:1px solid var(--ui-stroke-secondary);border-radius:2.5px}
 .cbt .timer.low{color:var(--ui-text-warn,var(--ui-accent))}
 .cbt .timer.crit{color:var(--ui-red)}
 /* Section switcher: words with a count, not a segmented control — the same treatment
@@ -450,11 +456,11 @@ const CSS = `
 }
 
 /* figures, tables and notes inside a question */
-.cbt .media-fig{margin:0 0 16px}
+.cbt .media-fig{margin:0 auto 16px}
 .cbt .media-fig img{display:block;max-width:100%;max-height:min(60vh,520px);height:auto;border:1px solid var(--ui-stroke-secondary);border-radius:6px;cursor:zoom-in}
 .cbt .media-fig figcaption{font-size:12px;color:var(--ui-text-secondary);margin-top:6px}
 .cbt .media-missing{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px dashed var(--ui-stroke-secondary);border-radius:6px;font-size:12px;color:var(--ui-text-secondary)}
-.cbt .media-wrap{max-width:100%;overflow-x:auto}
+.cbt .media-wrap{max-width:min(100%,var(--cbt-col-read));margin-inline:auto;overflow-x:auto}
 .cbt .media-table{border-collapse:collapse;margin:0 0 16px;font-size:12.5px}
 .cbt .media-table th,.cbt .media-table td{border:1px solid var(--ui-stroke-secondary);padding:6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cbt .media-table th{font-size:11.5px;font-weight:600;color:var(--ui-text-secondary)}
@@ -464,7 +470,7 @@ const CSS = `
    whose next block owns the bottom boundary, which a grid table has none of. */
 .cbt .media-table tbody tr:last-child td{border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .media-table caption{caption-side:bottom;text-align:left;font-size:12px;color:var(--ui-text-secondary);padding-top:6px}
-.cbt .media-note{font-size:12px;color:var(--ui-text-secondary);border-left:2px solid var(--ui-stroke-secondary);padding-left:12px;margin:0 0 16px}
+.cbt .media-note{font-size:12px;color:var(--ui-text-secondary);border-left:2px solid var(--ui-stroke-secondary);padding-left:12px;margin:0 auto 16px}
 .cbt .zoom{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--ui-scrim,rgba(0,0,0,.8));cursor:zoom-out}
 .cbt .zoom img{max-width:100%;max-height:calc(100% - 56px);object-fit:contain;border-radius:6px}
 .cbt .zoom .zoom-close{position:absolute;top:14px;right:14px}
