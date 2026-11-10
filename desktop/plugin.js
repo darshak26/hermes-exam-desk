@@ -1360,9 +1360,11 @@ function PaperRow({ pack, attempts, onStart, onResume }) {
 // never changes with the active filter.
 function ExamHistory({ exam, attempts, onResume, onViewResult }) {
   const qc = useQueryClient()
-  // A short history is not worth a click: five sittings open by default, and the
-  // disclosure only earns its place once there is something to hide.
-  const [open, setOpen] = useState(attempts.length <= 5)
+  // Folded always. The disclosure line carries the count, so nothing is hidden that a
+  // reader cannot see at a glance; opening is one click and an explicit one. (The
+  // previous rule opened itself at ≤5 sittings, which made the same control behave
+  // differently on every card.)
+  const [open, setOpen] = useState(false)
   const [modeFilter, setModeFilter] = useState(null)
   // The mode filter can only ever filter when both modes exist in this exam. With one
   // mode it is three words and three counts to say "all of them".
@@ -1458,14 +1460,14 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
     ] }),
     // Seven columns always: this table is the EXAM's history, so each row says which
     // paper it was sat on. One paper today is still a paper you will add a second of.
-    // Nothing to show is a place to start, not a header with empty air under it: say
-    // what is missing and what fills it.
-    open ? (emptyState
+    // Nothing to list says so whether the table is folded or open — the message is a
+    // line, not a table, so the folded default must not hide it.
+    emptyState
       ? jsxs('div', { className: 'cbt-hist-empty', children: [
           jsx('strong', { children: emptyState[0] }),
           jsx('span', { className: 'cbt-sub', children: emptyState[1] }),
         ] })
-      : jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-hist has-paper', children: [
+      : open ? jsx('div', { className: 'cbt-tablewrap', children: jsxs('table', { className: 'cbt-table cbt-hist has-paper', children: [
       jsx('thead', { children: jsx('tr', { children: [
         ['Paper', ''], ['Mode', ''], ['Date', ''], ['Status', ''], ['Score', 'num'], ['Result', ''], ['Delete', ''],
         ].map(([h, cls]) => jsx('th', {
@@ -1497,7 +1499,7 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
             children: `Show ${hidden} more`,
           }) })
         : null,
-    ] }) }) ) : null,
+    ] }) }) : null,
     // Deleting is confirmed in a dialog, not inside a 9%-wide table cell: the inline
     // prompt could never fit and pushed the row's height around.
     confirmDel
