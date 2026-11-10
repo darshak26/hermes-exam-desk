@@ -131,6 +131,11 @@ const CSS = `
 .cbt .cbt-pattern{table-layout:fixed;width:100%;min-width:0}
 .cbt .cbt-pattern th:nth-child(1),.cbt .cbt-pattern td:nth-child(1){width:auto}
 .cbt .cbt-pattern th:nth-child(n+2),.cbt .cbt-pattern td:nth-child(n+2){width:104px}
+/* Marks is the one column whose content is a sentence, not a number: a section can
+   carry two (mark, penalty) pairs ("+1 / -0.33 · +2 / -0.67"), which wrapped inside a
+   104px cell and made one row taller than its neighbours. Give it the width its
+   longest value needs and keep it on one line. */
+.cbt .cbt-pattern th:last-child,.cbt .cbt-pattern td:last-child{width:184px;white-space:nowrap}
 /* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
 .cbt .cbt-sec{table-layout:fixed;width:auto;min-width:640px}
 .cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:72px}
@@ -452,7 +457,7 @@ const CSS = `
    squeezed into a phone's width is not a table, it is a ladder of 3px columns. */
 .cbt .cbt-tablewrap{overflow-x:auto;overflow-y:hidden;max-width:100%}
 .cbt .cbt-hist{min-width:632px}
-.cbt .cbt-pattern{min-width:420px}
+.cbt .cbt-pattern{min-width:520px}
 .cbt .cbt-stats{min-width:440px}
 .cbt .cbt-sec{min-width:560px}
 @media (max-width: 640px){
@@ -742,19 +747,31 @@ function mediaNode(blocks, paperId, keyPrefix = 'media') {
 }
 
 
-// A section may override the pattern's marking. Older agent halves omit the
-// per-section marks entirely (they only shipped attempt_limit), so fall back to
-// the pattern before ever printing "+undefined / undefined" at the user.
-function sectionMarks(section, pattern) {
-  const pick = (k) => section?.[k] ?? pattern?.[k] ?? null
-  return { correct: pick('marks_correct'), wrong: pick('marks_wrong') }
-}
-
-function marksLabel(section, pattern) {
-  const m = sectionMarks(section, pattern)
-  if (m.correct == null && m.wrong == null) return '—'
-  const fmt = (v) => (v == null ? '?' : v > 0 ? `+${v}` : String(v))
-  return `${fmt(m.correct)} / ${fmt(m.wrong)}`
+function marksLabel(section, pack) {
+  // Marks are per QUESTION, not per section: JAM BT 2026 pays 1 mark for Q1–Q10
+  // and Q41–Q50 and 2 for the rest, and the negative is a third of the question's
+  // own marks — so the pairs are (1, -0.33) and (2, -0.67), not a section-wide
+  // number. Print the actual pairs; a range of two independent spans makes the
+  // reader work out which penalty goes with which mark.
+  const qs = (pack?.questions || []).filter(q => q.section === section.id)
+  const src = qs.length ? qs : [section]
+  const pairs = new Map()
+  for (const q of src) {
+    const c = q.marks_correct ?? section?.marks_correct
+    const w = q.marks_wrong ?? section?.marks_wrong
+    if (typeof c !== 'number') continue
+    const pair = [round2(c), round2(typeof w === 'number' ? w : 0)]
+    pairs.set(pair.join('/'), pair)
+  }
+  const list = [...pairs.values()].sort((a, b) => a[0] - b[0] || b[1] - a[1])
+  if (!list.length) return '—'
+  const anyPenalty = list.some(([, w]) => w < 0)
+  if (!anyPenalty) {
+    const span = list.length === 1 ? fmtMark(list[0][0])
+      : `${fmtMark(list[0][0])} – ${fmtMark(list[list.length - 1][0])}`
+    return `${span} / 0`
+  }
+  return list.map(([c, w]) => `${fmtMark(c)} / ${fmtMark(w)}`).join(' · ')
 }
 // Short labels + a right-aligned count in a fixed grid: the key used to reflow
 // every time a count changed width, which is what made the panel feel jumpy.
@@ -817,7 +834,24 @@ function fmtScore(v) {
   if (v === null || v === undefined) return '—'
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n > 0 ? `+${n}` : String(n)
+  const r = round2(n)
+  return r > 0 ? `+${r}` : String(r)
+}
+
+// Every mark a paper prints is exact to two decimals. A "1/3 negative" rule is
+// stored as -0.3333333333 (a third of one mark), and printing that raw is what
+// reads as a defect on the instructions page: the rule is a third, the display is
+// a number a student can hold in their head. Rounding happens at the PRINT edge —
+// the arithmetic keeps the full value.
+function round2(n) {
+  return Math.round((n + (n >= 0 ? 1 : -1) * Number.EPSILON) * 100) / 100
+}
+function fmtMark(v) {
+  if (v === null || v === undefined) return '?'
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '?'
+  const r = round2(n)
+  return r > 0 ? `+${r}` : String(r)
 }
 
 function fmtHMS(seconds) {
@@ -1157,7 +1191,7 @@ function CbtInstructions({ pack, mode, onBegin, onBack }) {
         jsx('td', { children: s.title }),
         jsx('td', { className: 'num', children: String(s.question_count) }),
         ...(showAttemptLimit ? [jsx('td', { className: 'num', children: s.attempt_limit ? `first ${s.attempt_limit}` : 'all' })] : []),
-        jsx('td', { className: 'num', children: marksLabel(s, pack.pattern) }),
+        jsx('td', { className: 'num', children: marksLabel(s, pack) }),
       ] })) }),
     ] }) }),
     jsx('div', { className: 'cbt-section', children: 'How the paper works' }),
@@ -2013,7 +2047,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       jsxs('div', { className: 'cbt-row cbt-gap-sm', style: { marginBottom: 12 }, children: [
         jsx('span', { className: 'cbt-sub', children: `Question ${qIndex} of ${pack.questions.length} · ${QTYPE_LABEL[cur.type] || cur.type}` }),
         cur.type !== 'nat'
-          ? jsx('span', { className: 'cbt-sub', children: `+${cur.marks_correct ?? secMeta.marks_correct} / ${cur.marks_wrong ?? secMeta.marks_wrong}` })
+          ? jsx('span', { className: 'cbt-sub', children: `${fmtMark(cur.marks_correct ?? secMeta.marks_correct)} / ${fmtMark(cur.marks_wrong ?? secMeta.marks_wrong)}` })
           : null,
         marked.includes(curIdResolved) ? jsx(Badge, { variant: 'muted', size: 'xs', children: 'Marked' }) : null,
         jsx(Badge, { variant: curAnswered ? 'success' : 'outline', size: 'xs', children: curAnswered ? 'Answered' : 'Not answered' }),
@@ -2736,7 +2770,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
       ] }),
       jsx('div', { className: 'cbt-sub', style: { marginTop: 12 }, children: [
         `${r.totals.correct} of ${total} questions correct · ${pct}%`,
-        penalties.length === 1 && penalties[0] < 0 ? ` · ${penalties[0]} for each wrong answer` : '',
+        penalties.length === 1 && penalties[0] < 0 ? ` · ${fmtMark(penalties[0])} for each wrong answer` : '',
         penalties.length > 1 ? ' · negative marking differs by section — see the table' : '',
       ] }),
       jsx(Separator, { className: 'cbt-sep' }),
