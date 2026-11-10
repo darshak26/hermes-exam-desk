@@ -303,12 +303,13 @@ const CSS = `
 .cbt .cbt-icon-btn{border:0;background:transparent;color:var(--ui-text-secondary);padding:4px}
 .cbt .cbt-icon-btn:hover{color:var(--ui-text-primary)}
 .cbt .cbt-row-end{margin-left:4px}
-/* The disclosure holds a fixed slot: switching between "History · n" and "Hide history"
-   must not shove the filters or the discarded link sideways. The slot is sized to the
-   widest label plus 8px of padding a side — 118px carried 20px of padding and 8px of
-   slack, which made a one-word disclosure read as a boxed button. At 108px with 4px
-   between chevron and label, the label starts exactly on the table header's edge. */
-.cbt .cbt-hist-toggle{flex:0 0 108px;width:108px;padding:4px 8px;gap:4px;justify-content:flex-start;text-align:left}
+/* The disclosure holds a fixed SLOT and its button fits its own label inside it: a
+   fixed-width button left 10px of slack on the right of a shorter label, so the
+   hover box read as padded on one side only. The slot keeps the mode chips and the
+   discarded link at one x across the flip; the button is 8px a side around whatever
+   it says, and its -8px flush puts the label on the table header's own edge. */
+.cbt .cbt-hist-slot{flex:0 0 104px;width:104px;display:flex;align-items:center;min-width:0}
+.cbt .cbt-hist-toggle{flex:0 0 auto;width:auto;padding:4px 8px;gap:4px;justify-content:flex-start;text-align:left}
 .cbt .cbt-stat-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin-top:4px}
 .cbt .cbt-warn-count{display:inline-flex;align-items:center;gap:4px;color:var(--ui-text-warn,var(--ui-text-secondary))}
 
@@ -1425,14 +1426,15 @@ function ExamHistory({ exam, attempts, onResume, onViewResult }) {
   return jsxs('div', { className: 'cbt-shelf-hist', children: [
     jsxs('div', { className: 'cbt-hist-row', children: [
       // A disclosure, not a fourth chip: no border, no fill.
-      jsx(Button, {
-        className: 'cbt-flush cbt-hist-toggle',
-        variant: 'ghost', size: 'sm', 'aria-expanded': open,
-        style: { color: 'var(--ui-text-secondary)' },
-        onClick: () => setOpen(!open),
-        children: [jsx(Codicon, { key: 'c', name: open ? 'chevron-down' : 'chevron-right', size: 12 }),
-          open ? 'Hide history' : historyLabel],
-      }),
+      jsx('div', { className: 'cbt-hist-slot', children:
+        jsx(Button, {
+          className: 'cbt-flush cbt-hist-toggle',
+          variant: 'ghost', size: 'sm', 'aria-expanded': open,
+          style: { color: 'var(--ui-text-secondary)' },
+          onClick: () => setOpen(!open),
+          children: [jsx(Codicon, { key: 'c', name: open ? 'chevron-down' : 'chevron-right', size: 12 }),
+            open ? 'Hide history' : historyLabel],
+        }) }),
       // Filters are words, not chips — the same treatment as Show discarded — and they
       // only render when both modes exist, otherwise they can never filter anything.
       bothModes
