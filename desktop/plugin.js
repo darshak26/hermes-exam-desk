@@ -311,6 +311,22 @@ const CSS = `
    the .cbt root sets) — so center it on the FIRST line: (24 − 13) / 2 = 5.5px.
    A wrapped option keeps the control on line 1 */
 .cbt .opt input{flex:0 0 auto;margin:5.5px 0 0}
+/* A free-entry answer is a FIELD, and the browser default draws nothing on this
+   background — the box carries its own stroke, radius, fill and focus ring. It is
+   capped at 320px because an answer is a number, not prose, and the rule beside
+   it (whole number / decimal / free text) comes from the pack's own instruction
+   for THAT question, so the field stops a mistyped unit before it is saved. */
+.cbt .cbt-qbody .cbt-entry{display:flex;flex-direction:column;gap:6px;max-width:320px;margin-inline:0}
+.cbt .cbt-entry-field{
+  box-sizing:border-box;width:100%;font:inherit;font-size:16px;line-height:1.4;
+  padding:10px 12px;border-radius:6px;
+  border:1px solid var(--ui-stroke-secondary);
+  background:var(--ui-surface-background,var(--chrome-action-hover,transparent));
+  color:var(--ui-text-primary,inherit);font-variant-numeric:tabular-nums;
+}
+.cbt .cbt-entry-field::placeholder{color:var(--ui-text-secondary)}
+.cbt .cbt-entry-field:focus{outline:none;border-color:var(--ui-accent);box-shadow:0 0 0 1px var(--ui-accent)}
+.cbt .cbt-entry-hint{font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .cbt .cbt-review-head{justify-content:flex-start;padding:8px 0;border-bottom:1px solid var(--ui-stroke-secondary);flex-wrap:nowrap;cursor:pointer}
 /* one verdict width for every row: "Skipped" and "Wrong (-0.5)" must not move the
    type/topic text that follows, so the label lives in a reserved slot */
@@ -585,6 +601,34 @@ function ExamPane({ attemptId, onFinished }) {
 }
 
 const QTYPE_LABEL = { mcq: 'MCQ', msq: 'MSQ', nat: 'Numerical' }
+
+// How a free-entry answer is typed, per question. The pack may state it (`input`:
+// integer | decimal | text); otherwise the prompt's own instruction decides —
+// the answer itself is hidden while the paper runs, so the client cannot read the
+// key's shape. JAM prints "(in integer)" inside the question for exactly this.
+const INPUT_HINT = {
+  integer: 'Whole number — digits only',
+  decimal: 'Number — digits and one decimal point',
+  text: 'Text — matched exactly against the key',
+}
+function answerInput(q) {
+  if (!q || q.type !== 'nat') return null
+  if (q.input === 'integer' || q.input === 'decimal' || q.input === 'text') return q.input
+  return /\binteger\b|\bwhole number\b/i.test(String(q.text || '')) ? 'integer' : 'decimal'
+}
+// Keep only what can still become a legal answer, so a pasted answer key or a
+// stray unit never lands in the field (and never reaches the save call).
+function cleanEntry(raw, kind) {
+  const s = String(raw == null ? '' : raw)
+  if (kind === 'text') return s
+  let out = '', dot = false
+  for (const ch of s) {
+    if (ch >= '0' && ch <= '9') out += ch
+    else if (ch === '-' && out === '') out += ch
+    else if (ch === '.' && kind === 'decimal' && !dot) { out += ch; dot = true }
+  }
+  return out
+}
 
 // the app ships the codicon set app-wide; icons here are for scanning, the label
 // still carries the meaning
@@ -1962,11 +2006,23 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       jsx('p', { className: 'cbt-qtext', children: cur.text }),
       mediaNode(cur.media, pack.paper_id, 'q'),
       cur.type === 'nat'
-        ? jsx('input', {
-            type: 'text', inputMode: 'decimal', placeholder: 'Your answer',
-            value: sel == null ? '' : String(sel),
-            onChange: e => setSel(e.target.value),
-          })
+        ? (() => {
+            const kind = answerInput(cur)
+            return jsxs('div', { className: 'cbt-entry', children: [
+              jsx('input', {
+                type: 'text',
+                className: 'cbt-entry-field',
+                inputMode: kind === 'integer' ? 'numeric' : kind === 'decimal' ? 'decimal' : 'text',
+                autoComplete: 'off',
+                spellCheck: false,
+                placeholder: kind === 'integer' ? 'Your answer — whole number' : 'Your answer',
+                'aria-label': `Your answer — ${INPUT_HINT[kind]}`,
+                value: sel == null ? '' : String(sel),
+                onChange: e => setSel(cleanEntry(e.target.value, kind)),
+              }),
+              jsx('span', { className: 'cbt-entry-hint', children: INPUT_HINT[kind] }),
+            ] })
+          })()
         : cur.options.map((o, i) => optRow(i, o, cur.type)),
     ] }),
     !palCollapsed && jsx('div', { className: `cbt-pal${isNarrow ? ' as-drawer' : ''}`, style: { gridArea: 'pal' }, children: [

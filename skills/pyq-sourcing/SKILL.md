@@ -90,6 +90,19 @@ All fetches go through `web_search` / `web_extract` (which handles PDFs); all fi
 - Never invent questions, options, or answer keys. A fabricated question in a practice exam is worse than a missing one.
 - NTA exams (GAT-B, CUET, etc.) do NOT publish a public master question paper — the paper is displayed per-candidate behind login at exams.nta.ac.in. Only GATE and JAM publish master papers publicly. For NTA exams you need either a candidate response sheet PDF or a coaching reconstruction.
 - NTA's servers (nta.ac.in / exams.nta.ac.in) may be unreachable from this VPS — TLS reset or cert-authentication failures. If curl and both browsers fail, stop retrying and ask the user to provide the PDF (or point to a reachable mirror). Do not report 'I sourced the paper' when you could not actually fetch it."
+- **The last question of a QP+AK PDF swallows the paper's tail.** Recent JAM files print
+  the question paper and the master answer key in one document, so a text extraction that
+  runs to the end appends `END OF THE QUESTION PAPER` and the whole key table to the final
+  question. That renders as a wall of numbers on the exam screen and prints the key inside
+  a question nobody has submitted. Trim every question's text at the first
+  `END OF THE QUESTION PAPER` / `MASTER ANSWER KEY` / `Question No. Subject` marker, keep
+  the `(in integer)` instruction that precedes it, and re-check: `lint_pack` warns
+  `question text runs into the paper's tail` on any question that still carries one.
+- **A numerical question's own instruction is data, not decoration.** When the paper says
+  `(in integer)` or `(round off to two decimal places)`, copy it into the question text —
+  the panel reads it to decide whether the answer field takes whole numbers or decimals —
+  and state the field explicitly with `"input": "integer" | "decimal" | "text"` when the
+  wording is ambiguous. `text` is for a key that is not a number at all (`2 to 3`, `x > 2`).
 - Answer indices are **0-based**. An index past the last option is the most common silent pack bug — the validator refuses it, so never skip step 5.
 - `question_count` per section must equal the actual count; the validator refuses a mismatch. If the real paper's structure can't be expressed (e.g. a true/false subpart), model it as its own section or type — do not force it.
 - Never hardcode numbers across exams (GAT-B's "attempt 60 of 100" is not GATE's rule). Every pattern number comes from step 1 of THIS run.

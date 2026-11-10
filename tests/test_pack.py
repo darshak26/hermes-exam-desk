@@ -37,6 +37,23 @@ class PackTests(unittest.TestCase):
             self.assertNotIn("answer", q); self.assertNotIn("explanation", q)
         self.assertEqual(s["pattern"], base_pack()["pattern"])
 
+    def test_sanitize_carries_the_field_shape_not_the_key(self):
+        """The in-progress view states how each free-entry answer is TYPED.
+
+        Without it the client cannot tell a range key from a number, and renders a
+        decimal field that the answer can never be typed into.
+        """
+        p = base_pack()
+        p["questions"][5].update(answer="2 to 3")          # nat keyed on a range
+        p["questions"][5].pop("tolerance", None)
+        s = sanitize_pack(p)
+        self.assertEqual(s["questions"][5]["input"], "text")
+        self.assertNotIn("answer", s["questions"][5])
+        for q in s["questions"]:
+            if q["type"] != "nat":
+                self.assertNotIn("input", q)
+        self.assertEqual(sanitize_pack(base_pack())["questions"][5]["input"], "decimal")
+
     def test_summarize_shape(self):
         sm = summarize(base_pack())
         self.assertEqual(sm["paper_id"], "gat-b-demo")
@@ -250,3 +267,53 @@ class MediaPackTests(unittest.TestCase):
         for answer in ("0", "2", "−1", "−y", "√3", "π/y", "eˣ", "y²/x",
                        "1 + logₑ(x)", "0.0001", "μ(mg + T)/2"):
             self.assertFalse(debris(answer), repr(answer))
+
+    def test_answer_input_follows_the_key_and_the_instruction(self):
+        """The field a nat question shows is data, not a default.
+
+        JAM prints "(in integer)" in the question and a decimal source says
+        "round off to two decimal places"; a key that is not a number at all
+        (a range) can only be typed as text.
+        """
+        from exam_desk.pack import answer_input
+        nat = base_pack()["questions"][5]
+        self.assertEqual(nat["type"], "nat")
+        self.assertEqual(answer_input(nat), "decimal")            # no instruction in the prompt
+        self.assertEqual(answer_input({**nat, "text": nat["text"] + " (in integer)"}), "integer")
+        self.assertEqual(answer_input({**nat, "answer": "2 to 3"}), "text")
+        self.assertEqual(answer_input({**nat, "input": "text"}), "text")
+        self.assertEqual(answer_input({**nat, "input": "integer", "answer": 3}), "integer")
+        self.assertIsNone(answer_input({"id": "A-01", "type": "mcq"}))
+
+    def test_input_is_validated_and_only_pins_typing(self):
+        p = base_pack()
+        p["questions"][5]["input"] = "roman"                     # not a kind
+        self.assertTrue(any("input must be one of" in e for e in validate_pack(p)))
+        p = base_pack()
+        p["questions"][0]["input"] = "integer"                   # mcq answers by option
+        self.assertTrue(any("only valid on nat" in e for e in validate_pack(p)))
+        p = base_pack()
+        p["questions"][5].update(input="integer", answer="2.5")  # field makes the key untypable
+        self.assertTrue(any("whole number" in e for e in validate_pack(p)))
+        p = base_pack()
+        p["questions"][5].update(input="decimal", answer="2 to 3")
+        self.assertTrue(any("use input 'text'" in e for e in validate_pack(p)))
+        p = base_pack()
+        p["questions"][5]["input"] = "decimal"
+        self.assertEqual(validate_pack(p), [])
+
+    def test_question_text_carrying_the_answer_key_is_a_warning(self):
+        """The last question of a QP+AK PDF sweeps up the paper's trailer.
+
+        It still grades, and it prints the master key inside a question nobody
+        has submitted yet — so it is a warning, never silently accepted.
+        """
+        from exam_desk.pack import lint_pack
+        p = base_pack()
+        p["questions"][5]["text"] += (" END OF THE QUESTION PAPER Question No. Subject "
+                                      "Question Type Answer Key/Range Mark(s) 1 MCQ A 1")
+        warns = [w for w in lint_pack(p) if "paper's tail" in w]
+        self.assertEqual(len(warns), 1, warns)
+        self.assertIn("B-03", warns[0])
+        clean = base_pack()
+        self.assertEqual([w for w in lint_pack(clean) if "paper's tail" in w], [])

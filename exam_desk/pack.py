@@ -33,6 +33,10 @@ KINDS = KIND_VALUES
 KEY_STATUSES = ("official", "unverified", "self-authored", "random")
 # Never serialised to the client while an attempt is in progress.
 HIDDEN_KEYS = ("answer", "explanation", "tolerance")
+# How a free-entry (nat) answer is TYPED. Absent means "infer from the key and
+# the prompt" — see answer_input(). The value names the keyboard, not the grader:
+# a number typed with a stray apostrophe is a scoring bug the field prevents.
+INPUT_KINDS = ("integer", "decimal", "text")
 
 YR = re.compile(r"-(?:19|20)\d{2}$")
 _SUPERSEDED = re.compile(r"-superseded-[0-9a-f]+$")
@@ -106,6 +110,10 @@ def pack_hash(pack):
 _DEBRIS_PUNCT = set(".,;:|_~^%$#@!?\\")
 _SEPARATOR_RUN = re.compile(r"[.,;:][\s.,;:]*[.,;:]")
 _SYMBOL_RUN = re.compile(r"([^\w\s])\1{3,}")
+# The paper's own furniture, printed after the last question in every QP+AK file:
+# catching it here is what keeps a parsing overrun from becoming exam content.
+_TAIL_LEAK = re.compile(r"END OF THE QUESTION PAPER|MASTER ANSWER KEY|Answer Key/Range|"
+                        r"Question No\.\s*Subject", re.I)
 
 
 def looks_like_ocr_debris(text):
@@ -160,17 +168,48 @@ def _num_or_none(val):
     return float(val) if _is_number(val) else None
 
 
-def _is_numeric(val):
+def numeric_value(val):
+    """The float for anything `_is_numeric` accepts, else None — the narrowing form."""
     if isinstance(val, bool):
-        return False
+        return None
     if isinstance(val, (int, float)):
-        return math.isfinite(val)
+        return float(val) if math.isfinite(val) else None
     if isinstance(val, str):
         try:
-            return math.isfinite(float(val))
+            num = float(val)
         except ValueError:
-            return False
-    return False
+            return None
+        return num if math.isfinite(num) else None
+    return None
+
+
+def _is_numeric(val):
+    return numeric_value(val) is not None
+
+
+_INTEGER_HINT = re.compile(r"\binteger\b|\bwhole number\b", re.I)
+
+
+def answer_input(q):
+    """How a free-entry answer is typed: ``'integer'``, ``'decimal'``, ``'text'``,
+    or ``None`` when the question carries options instead of a field.
+
+    A declared ``input`` wins. Otherwise the shape of the KEY decides, with the
+    prompt as the tie-breaker: a non-numeric key (GATE-style ranges) needs text,
+    and a prompt asking for a whole number (JAM prints "… (in integer)") takes
+    digits only — the field exists so that instruction is enforced while typing,
+    not discovered at grading.
+    """
+    if not isinstance(q, dict) or q.get("type") != "nat":
+        return None
+    declared = q.get("input")
+    if declared in INPUT_KINDS:
+        return declared
+    if not _is_numeric(q.get("answer")):
+        return "text"
+    if _INTEGER_HINT.search(str(q.get("text") or "")):
+        return "integer"
+    return "decimal"
 
 
 def answer_error(q, val):
@@ -398,6 +437,26 @@ def validate_pack(pack):
                 errs.append(f"{tag}: tolerance is only valid on nat questions")
             elif tol is None or tol < 0:
                 errs.append(f"{tag}: tolerance must be a number >= 0")
+        # `input` names the field a nat question shows; it is the one place the
+        # paper's own instruction ("in integer") becomes a rule instead of prose.
+        # Declaring it on a question with options has no field to act on, so it is
+        # an error rather than silently ignored.
+        if q.get("input") is not None:
+            declared_in = q["input"]
+            if q.get("type") != "nat":
+                errs.append(f"{tag}: input is only valid on nat questions "
+                            f"(a {q.get('type')} answers by choosing an option)")
+            elif declared_in not in INPUT_KINDS:
+                errs.append(f"{tag}: input must be one of {INPUT_KINDS}")
+            elif declared_in == "integer":
+                num = q.get("answer")
+                val = numeric_value(num)
+                if val is None or val != int(val):
+                    errs.append(f"{tag}: input 'integer' but answer {num!r} is not a "
+                                "whole number — the field would make the key untypable")
+            elif declared_in == "decimal" and not _is_numeric(q.get("answer")):
+                errs.append(f"{tag}: input 'decimal' but answer {q.get('answer')!r} "
+                            "is not a number (use input 'text')")
         for k in ("marks_correct", "marks_wrong"):
             if k not in q:
                 continue
@@ -466,6 +525,16 @@ def lint_pack(pack, assets_dir=None):
         topic = str(q.get("topic") or "")
         if topic and title and topic.startswith(title):
             warns.append(f"{qid}: topic {topic!r} looks like a placeholder — name the actual topic")
+        # A PDF extraction that reads past the last question drags the paper's
+        # trailer and the master key into the last question's text. It grades
+        # fine and reads as a wall of numbers on the exam screen, so it has to
+        # be a warning the reader sees before sitting — and the answer key is
+        # now printed inside a question that has not been submitted yet.
+        leak = _TAIL_LEAK.search(str(q.get("text") or ""))
+        if leak:
+            warns.append(f"{qid}: question text runs into the paper's tail "
+                         f"({leak.group(0)!r}) — the last question swallowed the answer key; "
+                         "trim the text at the end of the question")
         opts = q.get("options") or []
         norm = [str(o).strip().lower() for o in opts]
         dupes = sorted({o for o in norm if norm.count(o) > 1})
@@ -553,9 +622,21 @@ def clear_cache():
 
 
 def sanitize_pack(pack):
-    """Questions without answers/explanations/tolerances — the in-progress view."""
-    return {**pack, "questions": [{k: v for k, v in q.items() if k not in HIDDEN_KEYS}
-                                  for q in pack["questions"]]}
+    """Questions without answers/explanations/tolerances — the in-progress view.
+
+    Each free-entry question also carries ``input`` (see `answer_input`): the shape
+    of its answer FIELD, not the key. It has to travel with the pack — the client
+    cannot see the answer, so a nat question keyed on a range would otherwise be
+    given a decimal field that can never hold its answer.
+    """
+    rows = []
+    for q in pack["questions"]:
+        row = {k: v for k, v in q.items() if k not in HIDDEN_KEYS}
+        kind = answer_input(q)
+        if kind:
+            row["input"] = kind
+        rows.append(row)
+    return {**pack, "questions": rows}
 
 
 def key_status(pack):
