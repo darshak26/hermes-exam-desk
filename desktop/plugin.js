@@ -304,8 +304,11 @@ const CSS = `
 .cbt .cbt-icon-btn:hover{color:var(--ui-text-primary)}
 .cbt .cbt-row-end{margin-left:4px}
 /* The disclosure holds a fixed slot: switching between "History · n" and "Hide history"
-   must not shove the filters or the discarded link sideways. */
-.cbt .cbt-hist-toggle{flex:0 0 118px;width:118px;justify-content:flex-start;text-align:left}
+   must not shove the filters or the discarded link sideways. The slot is sized to the
+   widest label plus 8px of padding a side — 118px carried 20px of padding and 8px of
+   slack, which made a one-word disclosure read as a boxed button. At 108px with 4px
+   between chevron and label, the label starts exactly on the table header's edge. */
+.cbt .cbt-hist-toggle{flex:0 0 108px;width:108px;padding:4px 8px;gap:4px;justify-content:flex-start;text-align:left}
 .cbt .cbt-stat-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ui-text-secondary);margin-top:4px}
 .cbt .cbt-warn-count{display:inline-flex;align-items:center;gap:4px;color:var(--ui-text-warn,var(--ui-text-secondary))}
 
