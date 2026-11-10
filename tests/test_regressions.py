@@ -137,7 +137,7 @@ class PackIntegrity(Base):
     def test_lint_flags_ocr_debris_and_placeholder_topics(self):
         p = base_pack()
         p["questions"][0]["topic"] = "Demo Section A"        # placeholder: starts with title
-        p["questions"][1]["options"] = ["1", "2", "3", "4"]  # too short to be real options
+        p["questions"][1]["options"] = ["11001 . . :", ". .", "| |", "2"]  # artifacts, not answers
         p["questions"][2]["options"] = ["same", "same", "x", "y"]
         warns = " | ".join(pack_mod.lint_pack(p))
         self.assertIn("placeholder", warns)

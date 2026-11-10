@@ -235,3 +235,18 @@ class MediaPackTests(unittest.TestCase):
         p["questions"][0]["media"] = [{"type": "image", "src": "figures/a.png"}]
         warns = lint_pack(p)
         self.assertTrue(any("alt text" in w for w in warns), warns)
+
+    def test_short_numeric_options_are_not_ocr_debris(self):
+        """IIT JAM answers "0", "−y", "√3": brevity is not evidence of damage."""
+        from exam_desk.pack import lint_pack
+        p = base_pack()
+        p["questions"][0]["options"] = ["0", "1", "−y", "√3"]
+        self.assertEqual([w for w in lint_pack(p) if "OCR debris" in w], [])
+
+    def test_debris_is_read_by_shape_not_length(self):
+        from exam_desk.pack import looks_like_ocr_debris as debris
+        for junk in ("", "   ", "...", "| |", ". . :", "11001 . . :", "::::", ".,", "?"):
+            self.assertTrue(debris(junk), repr(junk))
+        for answer in ("0", "2", "−1", "−y", "√3", "π/y", "eˣ", "y²/x",
+                       "1 + logₑ(x)", "0.0001", "μ(mg + T)/2"):
+            self.assertFalse(debris(answer), repr(answer))

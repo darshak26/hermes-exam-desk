@@ -100,7 +100,37 @@ def pack_hash(pack):
     raw = json.dumps(pack, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
-MIN_OPTION_ALNUM = 2      # lint: an option with fewer letters/digits is OCR debris
+# Lint: option text that is a layout/OCR artifact rather than an answer.
+# Brevity is not evidence — a numeric MCQ legitimately answers "0", "−1", "√3"
+# or "π/y" — so the test reads the shape of the string, never its length.
+_DEBRIS_PUNCT = set(".,;:|_~^%$#@!?\\")
+_SEPARATOR_RUN = re.compile(r"[.,;:][\s.,;:]*[.,;:]")
+_SYMBOL_RUN = re.compile(r"([^\w\s])\1{3,}")
+
+
+def looks_like_ocr_debris(text):
+    """True when an option string is an extraction artifact, not an answer.
+
+    Sourced PDFs leak rule lines, leader dots and column colons into the option
+    text. Those show up as characters with nothing to say, so flag when
+
+      * nothing alphanumeric survives ("| |", "...", "?"),
+      * two separators sit next to each other (". . :", ".,"), or
+      * noise punctuation is more than half of what is visible.
+
+    A one-character answer ("0", "2", "−y") passes every one of those tests, and
+    must: IIT JAM asks for them. Length is never the signal.
+    """
+    s = str(text).strip()
+    if not s:
+        return True
+    if not any(ch.isalnum() for ch in s):
+        return True
+    if _SEPARATOR_RUN.search(s) or _SYMBOL_RUN.search(s):
+        return True
+    visible = [ch for ch in s if not ch.isspace()]
+    junk = sum(1 for ch in visible if ch in _DEBRIS_PUNCT)
+    return junk * 2 > len(visible)
 
 
 def is_clear(val):
@@ -442,7 +472,7 @@ def lint_pack(pack, assets_dir=None):
         if dupes:
             warns.append(f"{qid}: duplicate option text {dupes!r}")
         for i, o in enumerate(opts):
-            if sum(ch.isalnum() for ch in str(o)) < MIN_OPTION_ALNUM:
+            if looks_like_ocr_debris(o):
                 warns.append(f"{qid}: option {chr(65 + i)} looks like OCR debris ({str(o)[:24]!r})")
         if len(str(q.get("text", "")).strip()) < 15:
             warns.append(f"{qid}: question text is very short ({str(q.get('text'))[:30]!r})")
