@@ -45,6 +45,21 @@ attempt-limits cleared — and walks you into the normal instructions page.
 > install from the local path (`hermes plugins install file:///path/to/hermes-exam-desk`).
 > Nothing below is reachable for someone without that access.
 
+**Quick install — Hermes backend on this machine (3 steps):**
+
+```bash
+hermes plugins install https://github.com/darshak26/hermes-exam-desk
+hermes plugins enable exam-desk
+hermes gateway restart          # binds the plugin's skills and the LLM bridge
+```
+
+Then confirm with your eyes: **Exam Desk** appears in the desktop app's sidebar
+(Capabilities → Plugins also shows *Exam Desk* as enabled). A bare `curl` of the
+plugin API answers `401` before routing — it proves nothing about the install.
+
+Everything else in this section is the detail behind those steps — read it when
+the quick path does not match your setup.
+
 Two halves, and they install in different places — this trips people up, so read both.
 
 **1. The agent half** (API routes, pack store, the two skills) goes where Hermes runs:
@@ -132,6 +147,7 @@ one exam. The old `exam_id`/`family` spellings are still accepted as input.
 | POST | `/attempts` | `{paper_id, mode}` — `assisted` or `mock` (0.9.0 sent `exam_id` and `mode: "exam"`; both spellings still accepted) |
 | GET | `/attempts?limit=50` | newest first; `unreadable` lists corrupt files |
 | GET | `/attempts/{aid}` | grades it first if the clock already ran out |
+| GET | `/attempts/{aid}/export` | the whole record — attempt, pack (with key), behaviour view — as a downloadable JSON |
 | PATCH | `/attempts/{aid}` | `{answers?, marked?, visited?, current?}` — sparse |
 | POST | `/attempts/{aid}/submit` | idempotent |
 | POST | `/attempts/{aid}/abandon` | discards without grading; key stays hidden |
@@ -195,22 +211,36 @@ question keeps the full width in a narrow split.
 
 ## Develop
 
+`~/.hermes/plugins/exam-desk` is a **separate git clone** of this repo (its own
+`.git`, not a symlink), so ship a change in two hops:
+
 ```bash
-python -m pytest -q            # 195 tests, ~5 s
-hermes plugins validate .      # catalog gate
+# in the repo: run the suite, then commit + push
+python -m pytest -q                          # 210 tests, ~5 s — needs a venv with fastapi/pytest (the gateway's)
+hermes plugins validate .                    # catalog gate
+git commit -m "..." && git push
+
+# in the installed clone: bring the Python half live (skills + routes)
+git -C ~/.hermes/plugins/exam-desk pull --ff-only origin master
+# the panel: cp desktop/plugin.js ~/.hermes/desktop-plugins/exam-desk/plugin.js,
+# then md5sum both copies — one hash. The panel updates on reload; the Python
+# half only after the serving service restarts (whose routes the dashboard mounts at its boot).
 ```
+
+Do NOT rsync or `cp` into the installed clone — it writes the repo's state as
+'dirty', and the next `hermes plugins update` refuses a dirty checkout.
 
 Data written by 0.9.0 is migrated by `python3 scripts/migrate_names.py` (idempotent,
 `--dry-run` first): it renames the fields, states `exam`/`kind` on every paper, and
 carries each attempt's recorded paper hash over so no result page gains a phantom
 "the questions changed" notice.
 
-The installs here follow the linked-checkout pattern: `~/.hermes/plugins/exam-desk`
-is a symlink to this repo, so the gateway serves these working files directly and
-`test_meta.py` guards keep the three version strings and the panel's mode labels
-from drifting. Do NOT edit the installed path in parallel and do not rsync over it
-— that was the old copy-install, and a dirty clone breaks `hermes plugins update`.
-Ship a change: edit here, commit, push.
-
-Regressions for the 0.2.0 audit live in `tests/test_regressions.py`; each test names
-the failure it pins down.
+`tests/test_meta.py` keeps the three version strings and the panel's mode labels
+**machine-truthful**: run the suite, and the guards fail a change that edits one
+version string and forgets the others, or rewires the panel to different mode
+labels than `exam_desk.vocab.MODE_LABELS`. The 0.7.0/0.8.0 audit regressions live
+in `tests/test_regressions.py`; each test names the failure it pins down. After any
+CSS edit in the panel, run the stylesheet audit against the revision you compare
+with — `scripts/css_audit.py --repo ~/src/exam-desk --rev origin/master` — and
+`scripts/layout_fixture.py` builds a measuring fixture when a fresh browser
+profile has no plugin enabled (both carry their usage line at the top).
