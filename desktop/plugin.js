@@ -254,7 +254,12 @@ const CSS = `
 .cbt .cbt-exam-band h3{margin:0;font-size:16px;font-weight:600;line-height:1.2;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ui-text-primary)}
 .cbt .cbt-exam-band .cbt-sub{font-size:12.5px}
-/* a paper is a row: title, one line of facts, the ways to sit it on the right */
+/* a paper is a row: title, one line of facts, the ways to sit it on the right.
+   The title block keeps a 240px basis and a 200px floor — it was 320px, which broke
+   the line at ~660px of pane and dropped the buttons under the facts while the row
+   kept a hand's width of empty space to their left. Wrapping is still allowed, but
+   it now only happens when the title genuinely cannot keep 200px beside the action
+   group; below 640px the actions take the whole line by rule. */
 .cbt .cbt-papers{display:flex;flex-direction:column;gap:0;min-width:0}
 .cbt .cbt-paper{display:flex;align-items:center;flex-wrap:wrap;gap:10px 24px;padding:16px 0;
   border-bottom:1px solid var(--ui-stroke-secondary);min-width:0}
@@ -262,7 +267,7 @@ const CSS = `
    added to that and put 28px over the title against 16px under the meta line; the
    first row tops up by 4 so both sides read 16. */
 .cbt .cbt-papers > .cbt-paper:first-child{padding-top:3px}
-.cbt .cbt-paper-main{display:flex;flex-direction:column;gap:6px;flex:1 1 320px;min-width:0}
+.cbt .cbt-paper-main{display:flex;flex-direction:column;gap:6px;flex:1 1 240px;min-width:200px}
 .cbt .cbt-paper-head{display:flex;align-items:center;gap:8px;min-width:0}
 .cbt .cbt-paper-title{font-size:14px;font-weight:500;line-height:1.4;margin:0;min-width:0;
   color:var(--ui-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -462,6 +467,7 @@ const CSS = `
 .cbt .cbt-sec{min-width:560px}
 @media (max-width: 640px){
   /* a row of controls stops pinning itself past the edge and takes its own line */
+  .cbt .cbt-paper{flex-wrap:wrap}
   .cbt .cbt-paper-actions{flex:1 1 100%;margin-left:0;flex-wrap:wrap}
   .cbt .cbt-exam-band{flex-wrap:wrap}
   .cbt .cbt-attempt-pill{white-space:normal}
