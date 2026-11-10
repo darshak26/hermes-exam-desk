@@ -4,8 +4,13 @@ Nothing here tests behaviour; every failure is a copy-paste hygiene bug that
 otherwise surfaces months later as "the panel says one word, the prompt says
 another", or as three versions disagreeing about what is running.
 """
-import os, re, sys, tempfile, unittest
+import os
+import re
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("EXAM_DESK_DATA_DIR", tempfile.mkdtemp(prefix="cbt-test-"))
 sys.path.insert(0, str(ROOT))
@@ -26,8 +31,8 @@ class VersionAgreement(unittest.TestCase):
     """One plugin, one version: the manifest, the agent half and the HTTP half agree."""
 
     def test_three_files_say_the_same_version(self):
-        import yaml
         import plugin_api
+        import yaml
         manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
         declared = str(manifest["version"])
         root, http = _root_version(), plugin_api.VERSION

@@ -1,5 +1,10 @@
-import json, subprocess, sys, tempfile, unittest
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "pyq-sourcing" / "scripts" / "validate_pack.py"
 FIXTURE = ROOT / "tests" / "fixtures" / "gat-b-demo.json"

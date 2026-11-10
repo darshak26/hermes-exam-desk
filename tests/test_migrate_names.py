@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "migrate_names.py"
 sys.path.insert(0, str(ROOT))
 
-from exam_desk import pack as pack_mod          # noqa: E402
+from exam_desk import pack as pack_mod  # noqa: E402
 
 LEGACY_PACK = {
     "schema": "cbt-pack/1", "exam_id": "gat-b-2023", "title": "GAT-B 2023", "year": 2023,

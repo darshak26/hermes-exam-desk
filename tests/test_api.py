@@ -1,16 +1,26 @@
-import json, os, shutil, sys, tempfile, time, types, unittest
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+import types
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ["EXAM_DESK_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-test-")
 sys.path.insert(0, str(ROOT))          # for exam_desk.* and tests.*
 sys.path.insert(0, str(ROOT / "dashboard"))
-import plugin_api                       # noqa: E402  (loads exam_desk via its own importlib dance)
+import plugin_api  # noqa: E402  (loads exam_desk via its own importlib dance)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 app = FastAPI(); app.include_router(plugin_api.router)
 client = TestClient(app)
 
-from tests.helpers import base_pack     # noqa: E402
+from tests.helpers import base_pack  # noqa: E402
+
 DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 def seed_pack():
@@ -357,7 +367,8 @@ class LlmApiTests(unittest.TestCase):
         client.post(f"/attempts/{baseline}/submit")            # history row (no events)
         aid = self._answer(self._attempt())
         client.patch(f"/attempts/{aid}", json={"current": "A-02"})   # an open event
-        import time; time.sleep(0.3)                           # real dwell between the open and its save
+        import time
+        time.sleep(0.3)                           # real dwell between the open and its save
         client.patch(f"/attempts/{aid}", json={"answers": {"A-02": 3}})
         client.post(f"/attempts/{aid}/submit")
         before = len(FAKE_LLM.calls)

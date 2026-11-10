@@ -1,9 +1,12 @@
-import sys, unittest
+import sys
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from exam_desk.pack import validate_pack, sanitize_pack, summarize, SCHEMA, exam_of, pack_hash, YR, pack_exam, derived_kind, KINDS
+from exam_desk.pack import YR, derived_kind, exam_of, pack_exam, pack_hash, sanitize_pack, summarize, validate_pack
 from tests.helpers import base_pack
+
 
 class PackTests(unittest.TestCase):
     def test_valid_pack_passes(self):

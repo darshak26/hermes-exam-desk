@@ -1,13 +1,21 @@
 """Drill papers, the topics ledger, the mode vocabulary, and the filtered feed."""
-import json, os, shutil, sys, tempfile, unittest
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("EXAM_DESK_DATA_DIR", tempfile.mkdtemp(prefix="cbt-test-"))
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "dashboard"))
 
-from exam_desk import drill, topics, pack as pack_mod, vocab   # noqa: E402
-from tests.helpers import base_pack                             # noqa: E402
+from exam_desk import drill, topics, vocab  # noqa: E402
+from exam_desk import pack as pack_mod
+from tests.helpers import base_pack  # noqa: E402
+
 DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 
@@ -24,7 +32,6 @@ def seeded_pack(pack=None, name="gat-b-demo"):
 
 def submitted_attempt(source_pack, aid="a-test-01", answers=None, client=None):
     """A grader-shaped attempt dict, in-memory (what build_drill_pack eats)."""
-    from exam_desk import grading
     from exam_desk.store import new_attempt, submit_attempt
     a = new_attempt(source_pack, "mock" if client else "exam") if not client else None
     if client:

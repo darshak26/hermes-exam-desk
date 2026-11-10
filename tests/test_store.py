@@ -1,11 +1,17 @@
-import json, os, shutil, sys, tempfile, unittest
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ["EXAM_DESK_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-store-test-")
 sys.path.insert(0, str(ROOT))
 
-from tests.helpers import base_pack
 from exam_desk import store
+from tests.helpers import base_pack
 
 DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 

@@ -1,14 +1,17 @@
 """Timeline: the event stream derives dwell, mind-changes and doubts — read-only."""
-import json, os, sys, tempfile, unittest
+import json
+import os
+import sys
+import tempfile
+import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("EXAM_DESK_DATA_DIR", tempfile.mkdtemp(prefix="cbt-tl-"))
 sys.path.insert(0, str(ROOT))
 
-from exam_desk import store, timeline                       # noqa: E402
-from exam_desk.pack import SCHEMA                            # noqa: E402
-from tests.helpers import base_pack                          # noqa: E402
+from exam_desk import store, timeline  # noqa: E402
+from tests.helpers import base_pack  # noqa: E402
 
 
 def pack():

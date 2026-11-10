@@ -4,15 +4,15 @@
 stdlib only, any python (like validate_pack.py). Read-only by design: the agent
 reviews the record, it never reaches state, so this takes only an id and prints.
 """
-import json
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))   # plugin root → import exam_desk
-from exam_desk import timeline as timeline_mod                # noqa: E402
-from exam_desk.store import _ID, migrate_attempt              # noqa: E402
+from exam_desk import timeline as timeline_mod  # noqa: E402
+from exam_desk.store import _ID, migrate_attempt  # noqa: E402
 
 DATA = os.environ.get("EXAM_DESK_DATA_DIR") or os.path.expanduser(
     "~/.hermes/plugin-data/exam-desk")

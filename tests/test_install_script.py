@@ -10,7 +10,8 @@ SCRIPT = ROOT / "skills" / "pyq-sourcing" / "scripts" / "install_pack.py"
 FIXTURE = ROOT / "tests" / "fixtures" / "gat-b-demo.json"
 
 sys.path.insert(0, str(ROOT))
-from exam_desk import pack as pack_mod, store
+from exam_desk import pack as pack_mod
+from exam_desk import store
 
 
 def run_install(*args):

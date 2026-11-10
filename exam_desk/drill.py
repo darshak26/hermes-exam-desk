@@ -42,7 +42,6 @@ def build_drill_pack(source, attempt, drill_id, clock=None):
     misses = miss_rows(attempt)
     if not misses:
         raise ValueError("nothing to drill: every question was correct")
-    by_id = {q["id"]: q for q in source["questions"]}
     questions = []
     for q in source["questions"]:
         verdict = misses.get(q["id"])

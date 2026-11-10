@@ -18,12 +18,13 @@ os.environ.setdefault("EXAM_DESK_DATA_DIR", tempfile.mkdtemp(prefix="cbt-reg-"))
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "dashboard"))
 
-import plugin_api                                    # noqa: E402
-from fastapi import FastAPI                          # noqa: E402
-from fastapi.testclient import TestClient            # noqa: E402
+import plugin_api  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from exam_desk import grading, pack as pack_mod, store  # noqa: E402
-from tests.helpers import base_pack                   # noqa: E402
+from exam_desk import grading, store  # noqa: E402
+from exam_desk import pack as pack_mod
+from tests.helpers import base_pack  # noqa: E402
 
 app = FastAPI()
 app.include_router(plugin_api.router)

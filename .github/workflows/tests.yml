@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Deps (the gateway venv provides these at runtime; CI installs its own)
+        run: pip install fastapi pydantic httpx pytest ruff
+      - name: Lint (ruff, config in pyproject.toml)
+        run: ruff check .
+      - name: Test suite (unittest through pytest)
+        run: pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Panel syntax
+        run: node --check desktop/plugin.js

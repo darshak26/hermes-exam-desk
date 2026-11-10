@@ -35,8 +35,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from exam_desk import pack as pack_mod          # noqa: E402
-from exam_desk import store as store_mod        # noqa: E402
+from exam_desk import pack as pack_mod  # noqa: E402
+from exam_desk import store as store_mod  # noqa: E402
 
 PACK_RENAMES = (("exam_id", "paper_id"), ("family", "exam"))
 

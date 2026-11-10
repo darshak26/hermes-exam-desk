@@ -23,7 +23,8 @@ from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 
-from . import grading, pack as pack_mod, vocab
+from . import grading, vocab
+from . import pack as pack_mod
 
 ENV_DATA_DIR = "EXAM_DESK_DATA_DIR"
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")

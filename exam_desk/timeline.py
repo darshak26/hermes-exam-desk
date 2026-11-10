@@ -22,7 +22,6 @@ consecutive duplicates (`save` of the same value) are the record's job to keep.
   windows, so a save of the same value twice is two saves and zero changes.
 """
 import json
-import math
 import statistics
 
 from . import store as store_mod

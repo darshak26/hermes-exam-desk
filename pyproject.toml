@@ -1,0 +1,34 @@
+[project]
+name = "exam-desk"
+version = "0.10.0"
+description = "Hermes plugin: exam-agnostic CBT practice panel — sourcing, drafting, drills, AI evaluation."
+requires-python = ">=3.11"
+dependencies = []          # runtime deps come from the gateway venv (fastapi, pydantic); this file is dev tooling
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "fastapi", "pydantic", "ruff"]
+
+[tool.ruff]
+line-length = 200
+output-format = "concise"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "W605"]
+
+[tool.ruff.lint.per-file-ignores]
+# The HTTP mount imports exam_desk as a separate module instance by path (the plugin
+# bridge pattern), so imports legitimately sit below module statements.
+"dashboard/plugin_api.py" = ["E402"]
+# Test fixtures insert the package path before importing it; the one-line
+# "p = base_pack(); p['schema'] = 'wrong'" idiom is the suite's mutation style.
+"tests/*" = ["E402", "E702", "E741"]
+# Skill scripts are stdlib-only on purpose and inject the plugin root before importing.
+"skills/*/scripts/*" = ["E402"]
+# The escaped backtick lives in a JS selector, not a Python escape.
+"scripts/css_audit.py" = ["W605"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["exam_desk"]
+
+[tool.pytest.ini_options]
+addopts = "-q"

@@ -1,9 +1,11 @@
-import sys, unittest
+import sys
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from exam_desk.grading import grade_attempt, is_correct
 from tests.helpers import base_pack
-from exam_desk.grading import is_correct, grade_attempt
 
 PACK = base_pack()
 Q = {q["id"]: q for q in PACK["questions"]}

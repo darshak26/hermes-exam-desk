@@ -4,19 +4,27 @@ The rule under test: a paper owns its sittings, so removing the paper removes th
 but never a sitting that is still running, because that would drop the question the
 exam shell is showing.
 """
-import json, os, shutil, sys, tempfile, unittest
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ["EXAM_DESK_DATA_DIR"] = tempfile.mkdtemp(prefix="cbt-del-")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "dashboard"))
-import plugin_api                       # noqa: E402
+import plugin_api  # noqa: E402
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 app = FastAPI(); app.include_router(plugin_api.router)
 client = TestClient(app)
 
-from tests.helpers import base_pack    # noqa: E402
+from tests.helpers import base_pack  # noqa: E402
+
 DATA = Path(os.environ["EXAM_DESK_DATA_DIR"])
 
 
