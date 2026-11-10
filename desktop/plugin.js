@@ -62,7 +62,7 @@ const CSS = `
 /* instructions page: meta chips, section labels, hairline-divided guidance rows */
 .cbt .cbt-sep{margin:16px 0}
 .cbt .cbt-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
-.cbt .cbt-section{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);margin:24px 0 8px}
+.cbt .cbt-section{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-text-secondary);margin-block:24px 8px}
 .cbt .cbt-how{display:flex;flex-direction:column}
 .cbt .cbt-how-row{padding:10px 0;font-size:12.5px;line-height:1.55;color:var(--ui-text-primary);
   border-bottom:1px solid var(--ui-stroke-secondary)}
@@ -136,6 +136,12 @@ const CSS = `
    104px cell and made one row taller than its neighbours. Give it the width its
    longest value needs and keep it on one line. */
 .cbt .cbt-pattern th:last-child,.cbt .cbt-pattern td:last-child{width:184px;white-space:nowrap}
+/* One edge per column — the hist doctrine applied here: header and values read from
+   the left, tabular figures keep the digits on a grid. */
+.cbt .cbt-pattern .num{text-align:left}
+/* The app's Separator has its margins reset to 0, so as a page child it hung left of
+   the column edge; every other capped child centres. */
+.cbt.cbt-page > .cbt-sep{margin-inline:auto}
 /* result sections — Section | Score | Max | Correct | Wrong | Skipped | Not counted */
 .cbt .cbt-sec{table-layout:fixed;width:auto;min-width:640px}
 .cbt .cbt-sec th:nth-child(2),.cbt .cbt-sec td:nth-child(2){width:72px}
@@ -491,6 +497,10 @@ const CSS = `
 /* Narrow screens. A table keeps its column widths and scrolls sideways: seven columns
    squeezed into a phone's width is not a table, it is a ladder of 3px columns. */
 .cbt .cbt-tablewrap{overflow-x:auto;overflow-y:hidden;max-width:100%}
+/* As a direct page child the wrap is a column child like the rest: without the cap
+   here the pattern table hung 14px left of every text block on the instructions
+   screen (the 100% above beat the page cap and auto-centring). */
+.cbt.cbt-page > .cbt-tablewrap{max-width:var(--cbt-col)}
 .cbt .cbt-hist{min-width:632px}
 .cbt .cbt-pattern{min-width:520px}
 .cbt .cbt-stats{min-width:440px}
