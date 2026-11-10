@@ -79,8 +79,10 @@ natively. Authoring rules:
   dollar sign, not math.
 - Prefer unicode for simple sub/superscripts (`10⁻³`, `pKₐ`, `Mg²⁺`) — it renders
   with no math engine and copies cleanly into notes.
-- Display math (`$$…$$`) renders as its own block: use it in stems and
-  explanations, not inside an option label.
+- Display math needs the fence form: `$$` alone on a line, the TeX on the next
+  line(s), `$$` alone to close. The parser reads a single-line `$$…$$` as inline
+  math even when it sits alone in a paragraph — this is the app pipeline's own
+  rule (remark-math), not a panel quirk.
 - `validate_pack` does not parse the delimiters — they are content, not markup. A
   TeX typo shows up on the panel as red source text, never as a grading problem.
 
