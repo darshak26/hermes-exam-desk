@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Deps (the gateway venv provides these at runtime; CI installs its own)
-        run: pip install fastapi pydantic httpx pytest ruff
+        run: pip install fastapi pydantic httpx pytest ruff pyyaml
       - name: Lint (ruff, config in pyproject.toml)
         run: ruff check .
       - name: Test suite (unittest through pytest)

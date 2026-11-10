@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = []          # runtime deps come from the gateway venv (fastapi, pydantic); this file is dev tooling
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "fastapi", "pydantic", "ruff"]
+dev = ["pytest", "httpx", "fastapi", "pydantic", "ruff", "pyyaml"]
 
 [tool.ruff]
 line-length = 200
