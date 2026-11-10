@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "pyq-sourcing" / "scripts" / "validate_pack.py"
+SCRIPT = ROOT / "skills" / "pyq" / "scripts" / "validate_pack.py"
 FIXTURE = ROOT / "tests" / "fixtures" / "gat-b-demo.json"
 
 def run(path):
@@ -30,7 +30,7 @@ class ValidateScriptTests(unittest.TestCase):
         self.assertIn("ERROR:", r.stdout)
         self.assertIn("FAIL:", r.stdout)
 
-LOAD = ROOT / "skills" / "attempt-review" / "scripts" / "load_attempt.py"
+LOAD = ROOT / "skills" / "review" / "scripts" / "load_attempt.py"
 
 def write_data_root(root):
     (root / "packs").mkdir(parents=True, exist_ok=True)

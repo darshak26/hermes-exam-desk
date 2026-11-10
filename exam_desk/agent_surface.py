@@ -13,8 +13,8 @@ Design contract, straight from the plugin docs:
 * The `pre_llm_call` injection is context, not a script: it names the state and
   hands the work to the toolset, so the tutor works the same with or without it.
 
-Everything here is read-only except `exam_desk_log_doubt`, which appends one
-event to a sitting's behaviour stream — the same write the exam-assist skill
+Everything here is read-only except `exam_desk_doubt`, which appends one
+event to a sitting's behaviour stream — the same write the assist skill
 script performs, deliberately the plugin's only agent-initiated write.
 """
 import json
@@ -55,7 +55,7 @@ def _current_live_file():
 
 
 def tool_live_context(args=None, **kwargs):
-    """The mirror the exam-assist tutor reads — replacing the terminal dance."""
+    """The mirror the assist tutor reads — replacing the terminal dance."""
     del args
     path = _current_live_file()
     if path is None:
@@ -227,38 +227,38 @@ def tool_papers(args=None, **kwargs):
 
 
 TOOLSET_SPEC = (
-    ("exam_desk_live_context", tool_live_context, {
-        "name": "exam_desk_live_context",
-        "description": ("Read the exam-desk live question mirror: the question currently on the student's screen "
-                        "during an ASSISTED exam-desk sitting, with the attempt ids and the remaining time. "
-                        "Answers {\"live\": false} when no assisted sitting runs — never call it for a review: "
-                        "finished attempts belong to exam_desk_attempt."),
+    ("exam_desk_live", tool_live_context, {
+        "name": "exam_desk_live",
+        "description": ("Read the live mirror: the question currently on the student's screen during an "
+                        "ASSISTED sitting, with the attempt id and the remaining time. Answers "
+                        "{\"live\": false} when nothing is running — finished sittings are "
+                        "exam_desk_attempt's job."),
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     }),
     ("exam_desk_attempt", tool_attempt, {
         "name": "exam_desk_attempt",
-        "description": ("Read ONE exam-desk CBT attempt's record: status, mode, score and verdicts, and — once the "
-                        "sitting is submitted — every question with text, the student's choice, the keyed answer and "
-                        "the explanation. Read-only; the exam panel owns all state changes."),
+        "description": ("Read ONE sitting's record: status, mode, score and verdicts, and — once submitted — "
+                        "every question with text, the student's choice, the keyed answer and the "
+                        "explanation. Read-only; the panel owns all state changes."),
         "parameters": {"type": "object", "properties": {
             "attempt_id": {"type": "string", "description": "The sitting's id, e.g. a-1a2b3c4d5"},
         }, "required": ["attempt_id"], "additionalProperties": False},
     }),
-    ("exam_desk_log_doubt", tool_log_doubt, {
-        "name": "exam_desk_log_doubt",
-        "description": ("During a LIVE assisted exam-desk sitting, append one tutor-doubt event to the sitting's "
-                        "behaviour stream — what the student asked about the question on screen. This is the "
-                        "plugin's ONLY agent-initiated write; it never touches answers or the attempt itself."),
+    ("exam_desk_doubt", tool_log_doubt, {
+        "name": "exam_desk_doubt",
+        "description": ("On a LIVE assisted sitting, append one tutor-doubt event to its behaviour stream — "
+                        "what the student asked about the question on screen. The plugin's ONLY "
+                        "agent-initiated write; it never touches answers or the attempt."),
         "parameters": {"type": "object", "properties": {
-            "attempt_id": {"type": "string", "description": "The live sitting's id (from exam_desk_live_context)"},
+            "attempt_id": {"type": "string", "description": "The live sitting's id (from exam_desk_live)"},
             "question_id": {"type": "string", "description": "The question the doubt was about, e.g. B-03"},
             "note": {"type": "string", "description": "One short phrase — what was asked"},
         }, "required": ["attempt_id", "question_id"], "additionalProperties": False},
     }),
     ("exam_desk_topics", tool_topics, {
         "name": "exam_desk_topics",
-        "description": ("The exam-desk topics ledger: what the post-exam evaluations keep flagging, newest first, "
-                        "with the attempt ids that backed each row. Use it to answer 'what should I study'."),
+        "description": ("The topics ledger: what the post-exam evaluations keep flagging, newest first, with "
+                        "the sitting ids that backed each row. Use it to answer 'what should I study'."),
         "parameters": {"type": "object", "properties": {
             "exam": {"type": "string", "description": "Optional exam slug to narrow the ledger (e.g. gat-b)"},
             "limit": {"type": "integer", "description": "How many rows (default 20)"},
@@ -266,7 +266,7 @@ TOOLSET_SPEC = (
     }),
     ("exam_desk_papers", tool_papers, {
         "name": "exam_desk_papers",
-        "description": ("List the exam-desk panel's papers: id, title, exam, kind, year, question count and the key's "
+        "description": ("List the panel's papers: id, title, exam, kind, year, question count and the key's "
                         "declared trust. Use it for 'what papers do I have' or to plan a sitting."),
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     }),
@@ -348,7 +348,7 @@ def on_pre_llm_call(session_id, **kwargs):
             f"{block}\n"
             "The answer key is not in this context: hint first (name the concept, walk back from the wrong option) "
             "and give the full answer only when the student asks for it. Log the doubt once per answered doubt with "
-            "the exam_desk_log_doubt tool. If the student changes what is on screen, the tools show the fresh mirror."
+            "the exam_desk_doubt tool. If the student changes what is on screen, the tools show the fresh mirror."
         )
     except Exception:
         return None

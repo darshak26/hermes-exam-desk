@@ -96,13 +96,13 @@ class AgentSurfaceTests(unittest.TestCase):
 
     # ---- live context tool ----------------------------------------------- #
     def test_live_context_answers_no_sitting(self):
-        out = _out("exam_desk_live_context")
+        out = _out("exam_desk_live")
         self.assertFalse(out["live"])
         self.assertIn("no live", out["reason"])
 
     def test_live_context_roundtrip(self):
         a = self._assisted()
-        out = _out("exam_desk_live_context")
+        out = _out("exam_desk_live")
         self.assertTrue(out["live"])
         self.assertEqual(out["attempt_id"], a["id"])
         self.assertEqual(out["mode"], "assisted")
@@ -111,7 +111,7 @@ class AgentSurfaceTests(unittest.TestCase):
         # submitting clears the mirror: the tool must answer live:false after
         a2 = store.get_attempt(a["id"])
         a2 = store.submit_attempt(a2, store.get_pack(a2["paper_id"]))
-        out2 = _out("exam_desk_live_context")
+        out2 = _out("exam_desk_live")
         self.assertFalse(out2["live"])
         self.assertIn("ended", out2["reason"])
 
@@ -151,7 +151,7 @@ class AgentSurfaceTests(unittest.TestCase):
     # ---- doubt log: the one agent-initiated write ------------------------ #
     def test_log_doubt_roundtrip_and_guards(self):
         a = self._assisted()
-        out = _out("exam_desk_log_doubt", {"attempt_id": a["id"], "question_id": "B-03", "note": "what does pH mean"})
+        out = _out("exam_desk_doubt", {"attempt_id": a["id"], "question_id": "B-03", "note": "what does pH mean"})
         self.assertTrue(out["logged"])
         events = timeline_mod.read_stream(a["id"])
         self.assertEqual([e["type"] for e in events], ["doubt"])
@@ -159,12 +159,12 @@ class AgentSurfaceTests(unittest.TestCase):
         # a finished attempt refuses the write
         a2 = store.get_attempt(a["id"])
         a2 = store.submit_attempt(a2, store.get_pack(a2["paper_id"]))
-        out2 = _out("exam_desk_log_doubt", {"attempt_id": a["id"], "question_id": "A-01", "note": "late"})
+        out2 = _out("exam_desk_doubt", {"attempt_id": a["id"], "question_id": "A-01", "note": "late"})
         self.assertIn("error", out2)
         self.assertIn("submitted", out2["error"])
         # invalid ids answer the error shape instead of raising
-        self.assertIn("error", _out("exam_desk_log_doubt", {"attempt_id": "../x", "question_id": "A-01"}))
-        self.assertIn("error", _out("exam_desk_log_doubt", {"attempt_id": a["id"], "question_id": "a b"}))
+        self.assertIn("error", _out("exam_desk_doubt", {"attempt_id": "../x", "question_id": "A-01"}))
+        self.assertIn("error", _out("exam_desk_doubt", {"attempt_id": a["id"], "question_id": "a b"}))
 
     # ---- topics + papers -------------------------------------------------- #
     def test_papers_lists_and_marks_key_status(self):

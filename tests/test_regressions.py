@@ -232,7 +232,7 @@ class AnswerSemantics(Base):
 
 
 class LiveContext(Base):
-    """The exam-assist tutor reads this file; describing the wrong question is the
+    """The assist tutor reads this file; describing the wrong question is the
     worst failure mode in the plugin because it is invisible."""
 
     def live_headline(self, aid):
@@ -481,9 +481,9 @@ class Audit070Regressions(Base):
         return calls
 
     def test_doubt_log_cli_rejects_injection_and_appends_stream(self):
-        """0.7.0 finding 1: doubt-log shell injection in exam-assist skill."""
+        """0.7.0 finding 1: doubt-log shell injection in assist skill."""
         import importlib.util
-        script = ROOT / "skills" / "exam-assist" / "scripts" / "log_doubt.py"
+        script = ROOT / "skills" / "assist" / "scripts" / "log_doubt.py"
         self.assertTrue(script.is_file())
         spec = importlib.util.spec_from_file_location("log_doubt_cli", script)
         mod = importlib.util.module_from_spec(spec)
@@ -509,7 +509,7 @@ class Audit070Regressions(Base):
         self.assertEqual(lines[0]["note"], note)
 
         # SKILL.md must call log_doubt.py, not python -c one-liner
-        skill_text = (ROOT / "skills" / "exam-assist" / "SKILL.md").read_text()
+        skill_text = (ROOT / "skills" / "assist" / "SKILL.md").read_text()
         self.assertIn("log_doubt.py", skill_text)
         self.assertNotIn("type': 'doubt', 'qid': '<QUESTION-ID>'", skill_text)
 
@@ -649,7 +649,7 @@ class Audit070Regressions(Base):
     def test_load_attempt_cli_rejects_path_traversal_ids(self):
         """0.7.0 finding 6: load_attempt.py resolves user-supplied ids as paths."""
         import importlib.util
-        script = ROOT / "skills" / "attempt-review" / "scripts" / "load_attempt.py"
+        script = ROOT / "skills" / "review" / "scripts" / "load_attempt.py"
         spec = importlib.util.spec_from_file_location("load_attempt_cli", script)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Append a mid-exam tutor doubt event to an attempt's behaviour stream.
 
-stdlib only. Called by the exam-assist skill when the student asks about a
+stdlib only. Called by the assist skill when the student asks about a
 question on screen. Appends an event to `attempts/<aid>.log.jsonl` without
 modifying the attempt record itself.
 """

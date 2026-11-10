@@ -6,7 +6,7 @@ place, or two copies drift):
 * dwell per question: sum of the [open → next event about another question]
   windows; a revisit adds another window, so "opened twice, 20s + 40s" is 60s.
 * mind-changes: `save` events whose `prev` differs from `value`.
-* doubts: `doubt` events (appended by the exam-assist tutor half).
+* doubts: `doubt` events (appended by the assist tutor half).
 
 Every view function is tolerant of absence: an attempt graded before the
 stream existed yields the same shape with `None` where nothing is known —

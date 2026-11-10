@@ -24,11 +24,11 @@ Three parts:
 |---|---|---|
 | Desktop panel | `desktop/plugin.js` | route `/exam-desk` — home, instructions, exam shell, result |
 | Dashboard API | `dashboard/plugin_api.py` | mounted at `/api/plugins/exam-desk/*` |
-| Agent half | `__init__.py` + `skills/` | bundles `pyq-sourcing`, `paper-gen`, `exam-assist`, `attempt-review`; exposes the plugin `ctx` for the LLM bridge |
+| Agent half | `__init__.py` + `skills/` | bundles `pyq`, `draft`, `assist`, `review`; exposes the plugin `ctx` for the LLM bridge |
 
-Question packs come from two routes, and the panel has one button for both:
+Papers come from two routes, and the panel has one button for both:
 
-- **Add a paper** → the turn names `pyq-sourcing` first and `paper-gen` second. The
+- **Add a paper** → the turn names `pyq` first and `draft` second. The
   agent tries the official paper (previous years, keys labelled by what could be
   verified) and only drafts one — badged AI-drafted, key `self-authored` — when no
   official paper exists for that exam and year, or when you ask for extra practice on
@@ -108,9 +108,9 @@ The plugin registers Hermes agent **tools** (bound when the gateway starts) — 
 agent in any chat on the host can read the desk without the panel:
 
 - `exam_desk_papers` — what papers exist; `exam_desk_topics` — the weak-topic ledger
-- `exam_desk_live_context` — the question on screen during an assisted sitting
+- `exam_desk_live` — the question on screen during an assisted sitting
 - `exam_desk_attempt` — one sitting's full record (key only once submitted)
-- `exam_desk_log_doubt` — logs a tutor doubt on a live sitting (its only write)
+- `exam_desk_doubt` — logs a tutor doubt on a live sitting (its only write)
 
 Plus **`/examdesk`** — a one-message status (papers, what's running, latest
 sittings, weakest topics) in any chat — and an automation blueprint
@@ -119,23 +119,23 @@ plugin also injects the current question into the tutor chat's turns by itself;
 the answer key never rides that channel.
 
 For real papers, click **Add a paper**: it opens a chat and the agent runs
-`exam-desk:pyq-sourcing` — it asks which exam and which year (one question at a time),
+`exam-desk:pyq` — it asks which exam and which year (one question at a time),
 finds the official paper, extracts the questions, validates and files them. When no
 official paper exists for that year (or you ask for extra practice on specific topics),
-the same turn switches to `exam-desk:paper-gen` and drafts one to the official pattern,
+the same turn switches to `exam-desk:draft` and drafts one to the official pattern,
 badged AI-drafted. Sourcing needs web tools enabled on the agent; without them, write a
-pack by hand against `skills/pyq-sourcing/references/pack-schema.md` and drop it in the
-packs directory.
+paper by hand against `skills/pyq/references/pack-schema.md` and drop it in the
+papers directory.
 
-## Packs
+## Papers
 
 `~/.hermes/plugin-data/exam-desk/packs/<paper_id>.json` (or `$EXAM_DESK_DATA_DIR`).
-Schema and every rule the grader enforces: `skills/pyq-sourcing/references/pack-schema.md`.
+Schema and every rule the grader enforces: `skills/pyq/references/pack-schema.md`.
 
 ```bash
-python3 skills/pyq-sourcing/scripts/validate_pack.py my-pack.json
+python3 skills/pyq/scripts/validate_pack.py my-paper.json
 # PASS ... then WARN lines for OCR debris / placeholder topics that still grade
-python3 skills/pyq-sourcing/scripts/install_pack.py my-pack.json
+python3 skills/pyq/scripts/install_pack.py my-paper.json
 # PASS installed <slug>
 ```
 
@@ -203,7 +203,7 @@ question keeps the full width in a narrow split.
 - **Attempt limit counts first *saved* answers.** A cleared answer keeps its slot and
   grades as skipped. A whitespace NAT entry is a clear, not a wrong answer.
 - **`current` is the question on screen.** It drives the `live/*.md` file that the
-  `exam-assist` skill reads; the skill verifies the attempt is still running before
+  `assist` skill reads; the skill verifies the attempt is still running before
   trusting it, and files for finished attempts are pruned.
 - **Timer lives in the server.** `remaining_seconds` is derived from `started_at`;
   the panel renders a local countdown from it and the server grades on expiry even if

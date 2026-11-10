@@ -473,7 +473,7 @@ def abandon_attempt(a, now=None):
 
 
 # --------------------------------------------------------------------------- #
-# live exam context (what the exam-assist skill reads)
+# live exam context (what the assist skill reads)
 # --------------------------------------------------------------------------- #
 def delete_attempt(aid):
     """Remove a finished attempt and its live context. Refuses a live one.
@@ -536,7 +536,7 @@ def live_file(aid):
 
 
 def write_live_context(a, pack, qid=None):
-    """Mirror the question on screen so the exam-assist skill can answer doubts about it.
+    """Mirror the question on screen so the assist skill can answer doubts about it.
 
     Best-effort: returns None instead of breaking the exam flow.
     """

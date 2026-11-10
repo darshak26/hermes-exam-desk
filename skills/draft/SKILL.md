@@ -1,58 +1,58 @@
 ---
-name: paper-gen
-description: Draft AI-generated practice papers (a cbt-pack/1) into exam-desk packs.
+name: draft
+description: Draft practice papers with an AI-written key.
 version: 0.1.0
 author: Swapnil Padmane (darshak26)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [cbt, exams, paper-gen, drafting]
+    tags: [exam-desk, drafting, practice]
     related_skills: []
 ---
 
-# paper-gen Skill
+# draft Skill
 
 Draft a NEW practice paper — questions and answer key written by you — as a validated
-`cbt-pack/1` JSON installed in the exam-desk plugin's packs directory. This is the
-plugin's second question source next to `pyq-sourcing`: use it when no official
+`cbt-pack/1` JSON installed in the exam-desk plugin's papers directory. This is the
+plugin's second question source next to `pyq`: use it when no official
 paper exists, the user wants extra questions on a topic the PYQs under-cover, or
 when they ask for an AI-generated paper outright.
 
 The one rule this skill exists to enforce: **a drafted paper never claims to be
 exam facts.** It declares itself — `key_status: "self-authored"`, generation note
-in `provenance` — and the panel marks the pack AI-drafted so its scoreline is
+in `provenance` — and the panel marks the paper AI-drafted so its scoreline is
 always read as practice, never as a real attempt's proof.
 
 ## When to Use
 
 - User asks for AI-generated questions / a generated mock ("make me a mini GAT-B mock", "draft 20 more questions on molecular techniques").
-- `pyq-sourcing` could not find any paper for the exam and the user still wants material (get their consent for a drafted paper first).
+- `pyq` could not find any paper for the exam and the user still wants material (get their consent for a drafted paper first).
 - The user wants a practice set scoped to specific topics or a difficulty mix.
 
-Don't use for: previous-year papers (`exam-desk:pyq-sourcing` — real questions),
-mid-exam doubts (`exam-desk:exam-assist`), post-exam review (`exam-desk:attempt-review`),
+Don't use for: previous-year papers (`exam-desk:pyq` — real questions),
+mid-exam doubts (`exam-desk:assist`), post-exam review (`exam-desk:review`),
 or writing study notes.
-While a CBT attempt is still running, adding a NEW pack is fine — but never `--replace`,
-overwrite or delete the paper that attempt is sitting: the live exam shell reads the pack
-during the attempt. File it after the sitting submits.
+While a sitting is still running, adding a NEW paper is fine — but never `--replace`,
+overwrite or delete the paper that sitting is reading (the rule and the reason are in
+`exam-desk:pyq`): file it after the sitting submits.
 
 ## The interview (how a run usually starts)
 
 You are the second half of the panel's one **Add a paper** button: the turn names both
-`exam-desk:pyq-sourcing` and this skill. pyq-sourcing goes first and checks for an
+`exam-desk:pyq` and this skill. `pyq` goes first and checks for an
 official paper; you take over when it reports there is none for that exam and year, or
 when the user says they want extra practice on specific topics rather than another full
 paper. Do not start drafting before one of those two conditions is true. Open with ONE
 question, never a checklist:
 
 1. **Which exam?** The pattern must come from somewhere real: re-use an official
-   pattern you know from a sourced pack, or fetch it (same official-bulletin rule
-   pyq-sourcing uses — every pattern number traced to an official URL). If neither
+   pattern you know from a sourced paper, or fetch it (same official-bulletin rule
+   `pyq` uses — every pattern number traced to an official URL). If neither
    is possible, say what the user must supply and STOP rather than invent a pattern.
 2. **Which topics / syllabus scope?** Get a list the user can verify ("molecular
    techniques, enzymes" — not "biology"). Where a syllabus document or the
-   existing packs' topics are available, offer those as candidates.
+   existing papers' topics are available, offer those as candidates.
 3. **Shape:** how many questions, difficulty mix, one section only or like the
    real paper. Defaults if the user shrugs: 20 questions, one section, 60 marks.
 
@@ -62,7 +62,7 @@ Never re-ask what the opening turn already contained.
 
 - **Original items, official style.** Write questions in the pattern and difficulty
   of the exam, but never copy a real exam question verbatim and never reuse a real
-  question from an existing pack. A drafted paper's value is fresh items.
+  question from an existing paper. A drafted paper's value is fresh items.
 - **Solve every question before keying it.** Derive the answer from your own
   working, not from "what looks right". If you cannot solve an item cleanly,
   drop the item — a draft with a disputed question is worse than a shorter draft.
@@ -70,19 +70,19 @@ Never re-ask what the opening turn already contained.
   - exactly one option correct for `mcq` (or say why more, and make it `msq`);
   - distractors plausible but provably wrong — each one you can refute in a line;
   - balanced answer letters (avoid 8 As in a row);
-  - answer indices are **0-based** (A=0, B=1, …) — the most common pack bug;
+  - answer indices are **0-based** (A=0, B=1, …) — the most common paper bug;
   - `nat` questions state units and take a numeric string `answer` with a `tolerance`
     where rounding matters, and must be solvable within exam pace without a calculator.
 - **Fix the shape to the validator, not vice versa:** type in `mcq/msq/nat`, section
   ids matching `pattern.sections`, marks per the pattern, `topic` on every question
   (a REAL topic name — this feeds the plugin's topics ledger and the AI evaluation).
 - **Honesty of the key is a property you declare, not fix later:**
-  pack-level `"key_status": "self-authored"`, pack-level `provenance` naming you as
+  paper-level `"key_status": "self-authored"`, paper-level `provenance` naming you as
   the generator:
   `"AI-drafted practice paper generated by <model> on <date> from the official
   <exam> pattern; questions and key are original, not exam items."`
-  per-question `provenance` may say the topic basis. A pack of any other shape
-  (claiming official keys) is a falsified pack — never write one.
+  per-question `provenance` may say the topic basis. A paper of any other shape
+  (claiming official keys) is a falsified paper — never write one.
 - **Paper identity fields:** set `exam` (the exam slug, e.g. `gat-b`),
   `kind: "practice"`, and `scope` (free text naming the syllabus area covered,
   e.g. `Photosynthesis`). The `paper_id` slug is a cosmetic human label: it may
@@ -95,12 +95,12 @@ Never re-ask what the opening turn already contained.
 
 ## Procedure
 
-1. **Pin the pattern.** From an existing pack of the same exam (read its JSON) or
-   the official bulletin (see `pyq-sourcing/references/sources.md` for portals).
+1. **Pin the pattern.** From an existing paper of the same exam (read its JSON) or
+   the official bulletin (see `pyq/references/sources.md` for portals).
    Record duration, sections, counts, attempt limits, marking. **Completion
-   criterion:** every pattern number traces to a pack file or an official URL.
-2. **Draft.** Write the full pack JSON offline (a scratch file, NOT the packs dir)
-   per `../pyq-sourcing/references/pack-schema.md` — same schema, same rules.
+   criterion:** every pattern number traces to a paper file or an official URL.
+2. **Draft.** Write the full paper JSON offline (a scratch file, NOT the papers dir)
+   per `../pyq/references/pack-schema.md` — same schema, same rules.
    **Completion criterion:** every question has id, section, type, REAL topic,
    text, options (or numeric answer), a `provenance`/`source_url`, and an answer.
 3. **Self-check the key.** Re-derive every answer with fresh reasoning (not by
@@ -109,12 +109,12 @@ Never re-ask what the opening turn already contained.
    answer. Fix, don't fudge: if you disagree with your own key on a significant
    item, rewrite the question. **Completion criterion:** every item passes this
    re-derivation.
-4. **Validate:** `terminal(command="python3 <plugin-dir>/skills/pyq-sourcing/scripts/validate_pack.py <scratch pack>", timeout=60)`
+4. **Validate:** `terminal(command="python3 <plugin-dir>/skills/pyq/scripts/validate_pack.py <scratch paper>", timeout=60)`
    where `<plugin-dir>` is the installed exam-desk plugin (`~/.hermes/plugins/exam-desk/`).
    Must print `PASS: <id> ...` (exit 0). Fix all `WARN:` lines too — placeholder
    topics, duplicate options, very short questions.
-5. **Install:** run `python3 <plugin-dir>/skills/pyq-sourcing/scripts/install_pack.py <scratch pack>` (add `--replace` only when intentionally replacing an existing paper; ensure file stem equals `paper_id`). Never copy directly into `packs/`. Confirm the
-   pack appears with the panel's own list (`GET /api/plugins/exam-desk/packs`) and
+5. **Install:** run `python3 <plugin-dir>/skills/pyq/scripts/install_pack.py <scratch paper>` (add `--replace` only when intentionally replacing an existing paper; ensure file stem equals `paper_id`). Never copy directly into `packs/`. Confirm the
+   paper appears with the panel's own list (`GET /api/plugins/exam-desk/packs`) and
    carries the "AI-drafted" badge (that comes from the key status alone).
 6. **Report, concisely and honestly:** exam + pattern source, topics covered,
    questions per section, marks, and the line the user must read once: "key is
@@ -136,4 +136,4 @@ Never re-ask what the opening turn already contained.
   exact-integer NATs state the unit in the question text.
 - Keep the marks and the section counts consistent: the validator refuses a
   `question_count` that disagrees with reality, and the grader trusts the section's
-  marks — a 1-mark section holding 3-mark questions is a pack bug, not practice.
+  marks — a 1-mark section holding 3-mark questions is a paper bug, not practice.

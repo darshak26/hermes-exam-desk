@@ -3,6 +3,21 @@
 One paragraph per release, in the words a user cares about. The commit history
 carries the detail; this file carries the deltas worth reading before an update.
 
+## 0.13.0 — one word per thing
+
+- **Shorter names, no new concepts.** Tools: `exam_desk_live_context` → `exam_desk_live`,
+  `exam_desk_log_doubt` → `exam_desk_doubt`. Skills: `pyq-sourcing` → `pyq`,
+  `paper-gen` → `draft`, `exam-assist` → `assist`, `attempt-review` → `review`.
+  Anything that names the old tools or skills must move with them — the manifest,
+  the panel's prompt strings, the automation blueprint and the tests all did.
+- **"Paper" everywhere the reader is a person.** The README, the panel's empty state
+  and the skill text said "pack"; the glossary always said "paper". The on-disk
+  field names (`paper_id`, `cbt-pack/1`, the `packs/` directory) are unchanged — a
+  data migration buys nothing a label does not.
+- **No repeated rules.** The "never replace a paper a running sitting is reading"
+  paragraph lived in two skills and the "decline help mid-mock" rule in two others;
+  each now lives where it belongs and the other points at it.
+
 ## 0.12.0 — the agent gets first-class access
 
 - **Five real tools** (registered in the manifest, loadable by any Hermes agent on

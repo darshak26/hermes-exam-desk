@@ -961,12 +961,12 @@ async function goToChatAndStage(text) {
 // the panel's: an official previous-year paper is the better material whenever it
 // exists, and only the skill can find out whether it does. So the turn names both
 // skills and states the order — never two buttons competing for the same click.
-const ADD_PAPER_PROMPT = 'Load the skill exam-desk:pyq-sourcing and help me add a paper. '
+const ADD_PAPER_PROMPT = 'Load the skill exam-desk:pyq and help me add a paper. '
   + 'Ask me which exam and which year first — one question at a time. Look for the official '
   + 'paper first. If there is no official paper for that exam and year, or I tell you I want '
-  + 'extra practice on specific topics instead, switch to exam-desk:paper-gen and draft one '
+  + 'extra practice on specific topics instead, switch to exam-desk:draft and draft one '
   + 'to the official pattern. Say which route you took and why before you start, then '
-  + 'validate the pack and file it.'
+  + 'validate the paper and file it.'
 
 // The exam for a paper slug — mirror of exam_desk/pack.exam_of.
 // The dashboard mounts the Python routes once at ITS boot, so a session can be served
@@ -989,11 +989,11 @@ function examOf(paperId) {
 
 function anotherPaperPrompt(label, years) {
   const yearsText = years && years.length > 0 ? ` — I already have ${years.join(', ')}` : ''
-  return `Load the skill exam-desk:pyq-sourcing. I want another paper for ${label}${yearsText}. `
+  return `Load the skill exam-desk:pyq. I want another paper for ${label}${yearsText}. `
     + 'Ask me which year, look for the official paper first. If there is no official paper for that exam '
     + 'and year, or I tell you I want extra practice on specific topics instead, switch to '
-    + 'exam-desk:paper-gen and draft one to the official pattern. Say which route you took and why '
-    + 'before you start, then validate the pack and file it.'
+    + 'exam-desk:draft and draft one to the official pattern. Say which route you took and why '
+    + 'before you start, then validate the paper and file it.'
 }
 
 // One click for the deep review. The result page keeps the AI's basic analysis; the
@@ -1010,7 +1010,7 @@ function discussPrompt(att, packTitle, continuing = false) {
     ? `Continuing my review of "${title}" (attempt id ${att.id}). `
     : `Review my sitting of "${title}" (attempt id ${att.id}). `
   return lead
-    + 'Load the skill exam-desk:attempt-review and review my finished '
+    + 'Load the skill exam-desk:review and review my finished '
     + 'CBT attempt in detail: analyse every wrong, skipped and not-counted question, '
     + 'then build the study plan.'
 }
@@ -1090,7 +1090,7 @@ async function launchSourcing(prompt = ADD_PAPER_PROMPT) {
 }
 
 async function primeAssistedChat(attemptId) {
-  const sent = await goToChatAndStage('Load the skill exam-desk:exam-assist — I am starting an assisted CBT exam (attempt '
+  const sent = await goToChatAndStage('Load the skill exam-desk:assist — I am starting an assisted CBT exam (attempt '
     + attemptId + '). Answer my doubts using the live question context file.')
   if (!sent) return
   // A sitting started from the home page had no active chat at creation, so its
@@ -1684,11 +1684,11 @@ function CbtHome({ onStart, onResume, onViewResult }) {
     packs.isLoading
       ? jsx('div', { className: 'cbt-loading', children: [jsx(Codicon, { name: 'loading', size: 14, spinning: true }), ' Loading papers…'] })
       : packs.isError
-        ? jsx(ErrorBox, { what: 'Loading packs', onRetry: () => packs.refetch() })
+        ? jsx(ErrorBox, { what: 'Loading papers', onRetry: () => packs.refetch() })
         : (packList.length === 0
           ? jsxs('div', { children: [
               jsx(EmptyState, { title: 'No papers yet',
-                description: 'Click Add exam and the agent sources the official previous-year paper — it files itself here once validated (or drafts one when none exists). A hand-written pack works too: `validate_pack.py` then `install_pack.py` from the plugin’s skills directory.' }),
+                description: 'Click Add exam and the agent sources the official previous-year paper — it files itself here once validated (or drafts one when none exists). A hand-written paper works too: `validate_pack.py` then `install_pack.py` from the plugin’s skills directory.' }),
               jsx(Button, { variant: 'default', size: 'sm', onClick: source, children: 'Add exam' }),
             ] })
           : examKeys.map(examKey => jsx(ExamShelf, {
@@ -1909,7 +1909,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
       }
       const leave = neighbors()
       // Walking without saving: record where we are and where we are going. `current`
-      // is what the exam-assist tutor reads, so it has to move with the screen.
+      // is what the assist tutor reads, so it has to move with the screen.
       if (kind === 'back' || kind === 'next') {
         const target = leave[kind]
         adopt(await rest(patchPath, { method: 'PATCH', body: target
@@ -2473,7 +2473,7 @@ function ResultTopics({ attempt, pack }) {
 
 // The result page carries the BASIC analysis only: overall comment, sections, weak
 // topics. Per-question notes and the 2-week plan are the chat's job ("Discuss in
-// chat" opens a session loaded with the attempt-review skill), and the per-question
+// chat" opens a session loaded with the review skill), and the per-question
 // review rows below already carry your answer vs the key.
 function EvaluationCard({ d, pack }) {
   if (!d) return null

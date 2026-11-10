@@ -1,6 +1,6 @@
 """exam-desk — exam-agnostic CBT practice plugin (backend + desktop panel + sourcing skill).
 
-The agent half is deliberately thin: it bundles the two skills and publishes the
+The agent half is deliberately thin: it bundles the four skills and publishes the
 plugin `ctx` under a canonical `sys.modules` name, because `dashboard/plugin_api.py`
 is imported as a *separate* module instance by the HTTP mount while running in this
 same process.
@@ -11,7 +11,7 @@ import sys
 import types
 from pathlib import Path
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 BRIDGE = "exam_desk_ctx_bridge"
 
 

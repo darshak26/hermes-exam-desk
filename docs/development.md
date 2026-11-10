@@ -2,7 +2,7 @@
 
 Everything a second developer needs to change, verify and ship this plugin.
 The user-facing half of the story (install, API, pack schema) lives in the
-README and `skills/pyq-sourcing/references/pack-schema.md`; this file holds the
+README and `skills/pyq/references/pack-schema.md`; this file holds the
 parts that used to live only in the author's head.
 
 ## Layout in one breath
