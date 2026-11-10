@@ -11,7 +11,7 @@ import sys
 import types
 from pathlib import Path
 
-VERSION = "0.13.1"
+VERSION = "0.13.2"
 BRIDGE = "exam_desk_ctx_bridge"
 
 

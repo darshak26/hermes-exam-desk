@@ -66,6 +66,24 @@ data tables, and a stem like "the gel below shows…" is useless without them.
   compares figures (four gels, four circuits). A figure on one option only draws
   the eye to it — lint warns when coverage is partial.
 
+### Math in text (`$…$`)
+
+Question, option, note and explanation text may carry LaTeX math: `$…$` inline,
+`$$…$$` display, `\(…\)` / `\[…\]` equivalently. The panel renders it through the
+app's own math pipeline — the same renderer chat uses (KaTeX, memoized), not a
+plugin-bundled copy. The agent half reads the raw source, which LLMs handle
+natively. Authoring rules:
+
+- The delimiter must hug its content: a `$` followed by whitespace, or one
+  preceded by whitespace, is prose. Currency (`$5 and $10`) renders as a literal
+  dollar sign, not math.
+- Prefer unicode for simple sub/superscripts (`10⁻³`, `pKₐ`, `Mg²⁺`) — it renders
+  with no math engine and copies cleanly into notes.
+- Display math (`$$…$$`) renders as its own block: use it in stems and
+  explanations, not inside an option label.
+- `validate_pack` does not parse the delimiters — they are content, not markup. A
+  TeX typo shows up on the panel as red source text, never as a grading problem.
+
 ## Rules the grader lives by (so the pack can express them)
 
 - per-question marks override section marks; negative marking is data, not code.

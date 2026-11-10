@@ -3,6 +3,18 @@
 One paragraph per release, in the words a user cares about. The commit history
 carries the detail; this file carries the deltas worth reading before an update.
 
+## 0.13.2 — math in papers
+
+- **Pack text may carry LaTeX.** Question stems, options, media notes and
+  explanations render `$…$` (inline) and `$$…$$` (display) through the app's own
+  math pipeline — the same renderer chat uses, memoized KaTeX included. Text
+  without a marker takes the plain path it always took, so papers without
+  formulae pay nothing.
+- **The demo paper shows it**: E-02's Beer–Lambert stem carries inline math,
+  C-02's explanation a display equation.
+- Delimiter rules for authors live in the pack schema ("Math in text"); the
+  whitespace guard keeps currency literal.
+
 ## 0.13.1 — the demo shows everything
 
 - **The bundled demo paper is a full capability tour.** 16 questions over 5 sections:

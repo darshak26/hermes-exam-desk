@@ -214,7 +214,7 @@
    "answer": 1.3,
    "tolerance": 0.05,
    "input": "decimal",
-   "explanation": "pH = −log₁₀[H⁺] = −log₁₀(0.05) ≈ 1.30. The key carries a tolerance (1.30 ± 0.05), so 1.3 and 1.30 both grade correct.",
+   "explanation": "$$\\text{pH} = -\\log_{10}[\\text{H}^+] = -\\log_{10}(0.05) \\approx 1.30$$ The key carries a tolerance ($\\pm\\, 0.05$), so 1.3 and 1.30 both grade correct.",
    "provenance": "bundled demo question, written for this plugin",
    "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
@@ -355,7 +355,7 @@
    "type": "mcq",
    "topic": "Spectrophotometry",
    "difficulty": "easy",
-   "text": "A solution's absorbance is measured within the Beer–Lambert range. What happens to the absorbance if the analyte concentration is doubled?",
+   "text": "A solution's absorbance is measured within the linear range of the Beer–Lambert law, $A = \\varepsilon\\, c\\, l$. What happens to the absorbance $A$ if the analyte concentration $c$ is doubled?",
    "options": [
     "It is unchanged",
     "It halves",
@@ -363,7 +363,7 @@
     "It doubles"
    ],
    "answer": 3,
-   "explanation": "A = ε·l·c is linear in c, so doubling the concentration doubles the absorbance. This question overrides the section's marking to 1 mark correct / −0.33 wrong — the same section carries 2-mark questions beside it.",
+   "explanation": "$A = \\varepsilon c\\, l$ is linear in $c$, so doubling the concentration doubles the absorbance. The question overrides the section's marking to 1 mark correct / −0.33 wrong; the same section carries 2-mark questions beside it.",
    "provenance": "bundled demo question, written for this plugin",
    "source_url": "https://github.com/darshak26/hermes-exam-desk",
    "marks_correct": 1,

@@ -2,7 +2,7 @@
 import {
   host, ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, STATUSBAR_AREAS, useQuery, useQueryClient,
   Badge, Button, Codicon, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  EmptyState, Kbd, SegmentedControl, Separator, Tip, icons,
+  EmptyState, Kbd, MessageTextContent, SegmentedControl, Separator, Tip, icons,
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
@@ -84,8 +84,8 @@ const CSS = `
 .cbt-dlg .num{text-align:right;font-variant-numeric:tabular-nums;width:86px}
 /* submit-dialog section counts — Section | Answered | Marked | Blank | Not visited */
 .cbt-dlg .cbt-stats th:nth-child(n+2),.cbt-dlg .cbt-stats td:nth-child(n+2){width:88px}
-.cbt-dlg .cbt-paper-q{margin:8px 0}
-.cbt-dlg .cbt-paper-q p{font-size:13px;margin:0}
+.cbt-dlg .cbt-paper-q{margin:8px 0;font-size:13px}
+.cbt-dlg .cbt-paper-q p{margin:0}
 
 /* tables: ONE spec for the whole plugin — one left edge, right gutter only, tabular
    figures, a header that sits over its own column. Every table declares its grid so
@@ -358,8 +358,19 @@ const CSS = `
 .cbt .hit{color:var(--ui-success)}
 .cbt .miss{color:var(--ui-red)}
 .cbt .cbt-pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ui-text-secondary);margin:6px 0 0}
-.cbt .cbt-paper-q{margin:8px 0}
-.cbt .cbt-paper-q p{font-size:13px;margin:0}
+.cbt .cbt-paper-q{margin:8px 0;font-size:13px}
+.cbt .cbt-paper-q p{margin:0}
+
+/* Math: pack text carrying $…$ / $$…$$ renders through the app's own markdown
+   pipeline (MessageTextContent — the chat renderer, memoized KaTeX included).
+   Its container carries chat tokens (font-size var, foreground colour, prose
+   margins); the exam shell inherits its own instead. Text with no math marker
+   never mounts this — it stays the plain string node it always was. */
+.cbt .cbt-md{display:block}
+.cbt .cbt-md .aui-md{font-size:inherit;line-height:inherit;color:inherit}
+.cbt .cbt-md p{margin:0 0 8px}
+.cbt .cbt-md p:last-child{margin-bottom:0}
+.cbt .cbt-qtext .cbt-md p{margin:0}
 
 /* shell */
 .cbt-shell{display:grid;height:100%;min-height:0;
@@ -671,6 +682,21 @@ function icon(name, className) {
   return jsx(C, { className, 'aria-hidden': 'true' })
 }
 
+// Inline math in pack text: `$…$` (inline) and `$$…$$` (display), or \(…\) / \[…\].
+// Text carrying no marker takes the plain path — the same string node as before —
+// so only papers that actually carry formulae pay for the markdown pipeline.
+// The whitespace guard keeps currency ("$5 and $10") a literal dollar sign: an
+// opening `$` followed by a space, or a closing `$` preceded by one, is prose.
+const MATH_RE = /\$\$[^$]+\$\$|\$(?!\s)[^$\n]+?(?<!\s)\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/
+function MdText({ text }) {
+  const s = String(text ?? '')
+  if (!MATH_RE.test(s)) return s
+  return jsx('span', {
+    className: 'cbt-md',
+    children: jsx(MessageTextContent, { text: s, media: false, previewOnly: true }),
+  })
+}
+
 // A figure's src is either an http(s) URL or a path inside the pack's asset dir.
 // Relative ones come back through the plugin's own route, so the browser fetches
 // them from the same origin — an <img> cannot read the gateway's filesystem.
@@ -754,7 +780,7 @@ function mediaNode(blocks, paperId, keyPrefix = 'media') {
       ] }) })
     }
     if (b && b.type === 'text') {
-      return jsx('p', { key, className: 'media-note', children: b.text })
+      return jsx('div', { key, className: 'media-note', children: jsx(MdText, { text: b.text }) })
     }
     return jsx(MediaFigure, { key, src: mediaSrc(paperId, b?.src), alt: b?.alt || '', caption: b?.caption })
   })
@@ -1980,7 +2006,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
     return jsxs('label', { key: i, className: `opt${on ? ' sel' : ''}`, children: [
       input,
       jsxs('span', { className: 'opt-body', children: [
-        jsx('span', { children: `${String.fromCharCode(65 + i)}) ${text}` }),
+        jsx('span', { children: jsx(MdText, { text: `${String.fromCharCode(65 + i)}) ${text}` }) }),
         figs ? mediaNode(figs, pack.paper_id, `opt${i}`) : null,
       ] }),
     ] })
@@ -2112,7 +2138,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         marked.includes(curIdResolved) ? jsx(Badge, { variant: 'muted', size: 'xs', children: 'Marked' }) : null,
         jsx(Badge, { variant: curAnswered ? 'success' : 'outline', size: 'xs', children: curAnswered ? 'Answered' : 'Not answered' }),
       ] }),
-      jsx('p', { className: 'cbt-qtext', children: cur.text }),
+      jsx('div', { className: 'cbt-qtext', children: jsx(MdText, { text: cur.text }) }),
       mediaNode(cur.media, pack.paper_id, 'q'),
       cur.type === 'nat'
         ? (() => {
@@ -2249,7 +2275,7 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
           ...sections.map(s => jsxs('div', { key: s.id, children: [
             jsx('h3', { children: s.title }),
             ...secQs(s.id).map((x, i) => jsxs('div', { key: x.id, className: 'cbt-paper-q', children: [
-              jsx('p', { children: [jsx('strong', { children: `${i + 1}. ` }), x.text] }),
+              jsx('div', { children: [jsx('strong', { children: `${i + 1}. ` }), jsx(MdText, { text: x.text })] }),
               mediaNode(x.media, pack.paper_id, `paper-${x.id}`),
             ] })),
           ] })),
@@ -2996,10 +3022,10 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
             ],
           }),
           expanded && jsxs('div', { className: 'cbt-review-body', children: [
-            jsx('p', { children: qq.text }),
+            jsx('div', { children: jsx(MdText, { text: qq.text }) }),
             mediaNode(qq.media, pack.paper_id, `rev-${row.id}`),
             (qq.options || []).map((o, i) => jsxs('div', { key: i, className: 'cbt-sub', children: [
-              `${String.fromCharCode(65 + i)}) ${o}`,
+              jsx(MdText, { text: `${String.fromCharCode(65 + i)}) ${o}` }),
               qq.option_media?.[i] ? mediaNode(qq.option_media[i], pack.paper_id, `rev-${row.id}-o${i}`) : null,
             ] })),
             jsxs('div', { className: 'cbt-ans', children: [
@@ -3013,7 +3039,7 @@ function CbtResult({ attemptId, onHome, onRetake, onDrill }) {
               jsx('span', { className: 'cbt-ans-k', children: 'Correct answer' }),
               jsx('span', { className: 'hit', children: fmtAns(qq, qq.answer) }),
             ] }),
-            qq.explanation ? jsx('p', { className: 'cbt-sub', children: qq.explanation }) : null,
+            qq.explanation ? jsx('div', { className: 'cbt-sub', children: jsx(MdText, { text: qq.explanation }) }) : null,
           ] }),
         ] })
       }) }),

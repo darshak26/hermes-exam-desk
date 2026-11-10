@@ -134,6 +134,9 @@ Never re-ask what the opening turn already contained.
   against step 3 before moving on.
 - NAT tolerance: an untimed answer needing π or a fraction must carry a `tolerance`;
   exact-integer NATs state the unit in the question text.
+- **Formulae:** text may carry `$…$` inline / `$$…$$` display math — the panel renders
+  it through the app's math pipeline. Prefer unicode for simple sub/superscripts;
+  the delimiter rules are in `../pyq/references/pack-schema.md` ("Math in text").
 - Keep the marks and the section counts consistent: the validator refuses a
   `question_count` that disagrees with reality, and the grader trusts the section's
   marks — a 1-mark section holding 3-mark questions is a paper bug, not practice.
