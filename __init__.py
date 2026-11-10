@@ -11,7 +11,7 @@ import sys
 import types
 from pathlib import Path
 
-VERSION = "0.13.0"
+VERSION = "0.13.1"
 BRIDGE = "exam_desk_ctx_bridge"
 
 
@@ -50,7 +50,9 @@ def register(ctx):
 
 
 def _seed_packs() -> None:
-    """Copy `packs/*.json` from the package into the plugin's data dir, once each."""
+    """Copy `packs/*.json` and their `*.assets/` directories into the plugin's data
+    dir, once each. An asset directory is part of its paper — a figure pack seeds
+    half-installed without it."""
     seed = Path(__file__).parent / "packs"
     if not seed.is_dir():
         return
@@ -67,6 +69,10 @@ def _seed_packs() -> None:
             dst = target / src.name
             if not dst.exists():
                 shutil.copyfile(src, dst)
+        for src in sorted(seed.glob("*.assets")):
+            dst = target / src.name
+            if not dst.exists():
+                shutil.copytree(src, dst)
     except Exception:
         # seeding is a convenience; it must never take registration down with it
         pass

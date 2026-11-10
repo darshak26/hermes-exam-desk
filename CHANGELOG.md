@@ -3,6 +3,19 @@
 One paragraph per release, in the words a user cares about. The commit history
 carries the detail; this file carries the deltas worth reading before an update.
 
+## 0.13.1 — the demo shows everything
+
+- **The bundled demo paper is a full capability tour.** 16 questions over 5 sections:
+  MCQ (plain, short numeric options, a text-note block), MSQ with a data table, all
+  three free-entry field shapes (integer, decimal with a tolerance, the GATE range
+  key, text entry), figure questions (a stem figure, per-option figures, a nat on a
+  figure) and an attempt-any-3-of-4 section carrying per-question mark overrides.
+- **Figures seed with their paper.** `_seed_packs` copies `packs/*.assets/` alongside
+  the JSON, so a fresh install of a figure paper is not half-installed.
+- **A declared `input: "text"` silences the non-numeric-key lint warning.** The
+  warning told the author to declare exactly that; the demo's text-entry question
+  made the gap visible.
+
 ## 0.13.0 — one word per thing
 
 - **Shorter names, no new concepts.** Tools: `exam_desk_live_context` → `exam_desk_live`,

@@ -165,9 +165,15 @@ class ProvenanceRule(Base):
         self.assertTrue(any("source_url or a provenance note" in e for e in errs), errs)
 
     def test_bundled_demo_pack_is_valid_and_lint_clean(self):
-        demo = json.loads((Path(__file__).resolve().parents[1] / "packs" / "demo-basics.json").read_text())
+        root = Path(__file__).resolve().parents[1]
+        demo = json.loads((root / "packs" / "demo-basics.json").read_text())
         self.assertEqual(pack_mod.validate_pack(demo), [])
         self.assertEqual(pack_mod.lint_pack(demo), [])
+        # The demo carries figures: linted against its asset directory the same way
+        # the panel's pack listing lints it, so a missing file fails here, not on the
+        # reader's home card.
+        self.assertEqual(
+            pack_mod.lint_pack(demo, assets_dir=root / "packs" / "demo-basics.assets"), [])
 
 
 class SeedPacks(Base):
@@ -186,9 +192,13 @@ class SeedPacks(Base):
                 mod._seed_packs()
                 target = Path(tmp) / "packs" / "demo-basics.json"
                 self.assertTrue(target.exists())
+                asset = Path(tmp) / "packs" / "demo-basics.assets" / "figures" / "growth-curve.png"
+                self.assertTrue(asset.is_file())          # the paper's figures seed with it
+                asset.write_bytes(b"mine")
                 target.write_text('{"mine": true}')
                 mod._seed_packs()                      # second start
                 self.assertEqual(target.read_text(), '{"mine": true}')
+                self.assertEqual(asset.read_bytes(), b"mine")
             finally:
                 if old is None:
                     os.environ.pop("EXAM_DESK_DATA_DIR", None)

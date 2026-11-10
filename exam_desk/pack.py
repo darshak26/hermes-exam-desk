@@ -543,9 +543,11 @@ def lint_pack(pack, assets_dir=None):
                          f"({leak.group(0)!r}) — the last question swallowed the answer key; "
                          "trim the text at the end of the question")
         # A nat key that is not a number is legal (grading matches it as a string),
-        # but it is also what a mangled OCR key looks like — so say it out loud
-        # and name the declaration that makes it deliberate.
-        if q.get("type") == "nat" and q.get("answer") is not None and not _is_numeric(q.get("answer")):
+        # but it is also what a mangled OCR key looks like — so say it out loud and
+        # name the declaration that makes it deliberate. A DECLARED input 'text' is
+        # that declaration applied, so the declared case stays silent.
+        if (q.get("type") == "nat" and q.get("answer") is not None
+                and not _is_numeric(q.get("answer")) and q.get("input") != "text"):
             warns.append(f"{qid}: numerical answer {str(q.get('answer'))[:24]!r} is not a number — "
                          "grading will compare it as text, so declare input 'text' if that is intended")
         opts = q.get("options") or []

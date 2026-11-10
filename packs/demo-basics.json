@@ -1,15 +1,20 @@
 {
  "schema": "cbt-pack/1",
- "title": "Demo paper — how this panel works",
+ "paper_id": "demo-basics",
+ "exam": "demo-basics",
+ "kind": "practice",
+ "title": "Demo paper — every question type in one sitting",
  "body": "bundled sample",
  "language": "en",
+ "scope": "Every question type, media block and marking rule the panel supports",
  "provenance": "bundled demo, written for this plugin — not a previous-year paper. Delete it once you have sourced a real one.",
+ "source_url": "https://github.com/darshak26/hermes-exam-desk",
  "pattern": {
-  "duration_minutes": 15,
+  "duration_minutes": 25,
   "sections": [
    {
     "id": "A",
-    "title": "Warm-up",
+    "title": "Single correct",
     "question_count": 3,
     "attempt_limit": null,
     "marks_correct": 1,
@@ -18,9 +23,36 @@
    },
    {
     "id": "B",
-    "title": "Mixed types",
+    "title": "Multiple correct",
+    "question_count": 2,
+    "attempt_limit": null,
+    "marks_correct": 2,
+    "marks_wrong": 0,
+    "marks_unanswered": 0
+   },
+   {
+    "id": "C",
+    "title": "Free entry",
+    "question_count": 4,
+    "attempt_limit": null,
+    "marks_correct": 1,
+    "marks_wrong": 0,
+    "marks_unanswered": 0
+   },
+   {
+    "id": "D",
+    "title": "Figures and data",
     "question_count": 3,
     "attempt_limit": null,
+    "marks_correct": 2,
+    "marks_wrong": -0.6666666667,
+    "marks_unanswered": 0
+   },
+   {
+    "id": "E",
+    "title": "Attempt any 3 of 4",
+    "question_count": 4,
+    "attempt_limit": 3,
     "marks_correct": 2,
     "marks_wrong": -0.5,
     "marks_unanswered": 0
@@ -33,6 +65,7 @@
    "section": "A",
    "type": "mcq",
    "topic": "Cell biology",
+   "difficulty": "easy",
    "text": "Which organelle is the main site of ATP synthesis in a eukaryotic cell?",
    "options": [
     "Mitochondrion",
@@ -43,47 +76,56 @@
    "answer": 0,
    "explanation": "Oxidative phosphorylation happens on the inner mitochondrial membrane.",
    "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
   {
    "id": "A-02",
    "section": "A",
    "type": "mcq",
-   "topic": "Acids and bases",
-   "text": "A solution of pH 3 is how many times more acidic than a solution of pH 5?",
+   "topic": "DNA structure",
+   "difficulty": "medium",
+   "text": "In a double-stranded DNA molecule, 20% of the bases are guanine. What percentage of the bases are adenine?",
    "options": [
-    "2× as acidic",
-    "10× as acidic",
-    "100× as acidic",
-    "1000× as acidic"
+    "20%",
+    "30%",
+    "40%",
+    "60%"
    ],
-   "answer": 2,
-   "explanation": "pH is logarithmic: two pH units = a hundredfold difference in hydrogen ion concentration.",
+   "answer": 1,
+   "explanation": "G = C, so C is also 20% and G+C = 40%; the remaining 60% splits equally, A = T = 30%. Short numeric options like these are legitimate answers — the lint guard rejects debris, never brevity.",
    "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
   {
    "id": "A-03",
    "section": "A",
    "type": "mcq",
-   "topic": "Nucleic acids",
-   "text": "Which base is found in RNA but not in DNA?",
+   "topic": "Amino acids",
+   "difficulty": "medium",
+   "text": "Which amino acid carries a net positive charge at physiological pH?",
    "options": [
-    "Uracil",
-    "Adenine",
-    "Guanine",
-    "Cytosine"
+    "Alanine",
+    "Lysine",
+    "Aspartate",
+    "Serine"
    ],
-   "answer": 0,
-   "explanation": "RNA pairs uracil with adenine where DNA uses thymine.",
-   "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "answer": 1,
+   "explanation": "Lysine's side-chain amine stays protonated (pKa ~10.5) at pH 7.4; aspartate is negative, alanine and serine are neutral.",
+   "media": [
+    {
+     "type": "text",
+     "text": "Assume standard side-chain pKₐ values and pH 7.4."
+    }
+   ],
+   "provenance": "bundled demo question, written for this plugin — carries a text-note media block",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
   {
    "id": "B-01",
    "section": "B",
    "type": "msq",
    "topic": "Nucleic acids",
+   "difficulty": "easy",
    "text": "Select every component of a nucleotide.",
    "options": [
     "Phosphate group",
@@ -96,40 +138,278 @@
     1,
     2
    ],
-   "explanation": "A nucleotide is sugar + base + phosphate; amino acids build proteins, not nucleotides.",
+   "explanation": "A nucleotide is sugar + base + phosphate; amino acids build proteins, not nucleotides. MSQ grades on the exact set — any missing or extra tick is wrong, and this section carries no negative marking (GATE-style).",
    "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
   {
    "id": "B-02",
    "section": "B",
-   "type": "nat",
-   "topic": "Human genetics",
-   "text": "How many chromosomes are in a normal human somatic cell?",
-   "answer": 46,
-   "explanation": "23 pairs: 22 autosomal pairs plus one sex chromosome pair.",
-   "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "type": "msq",
+   "topic": "Restriction enzymes",
+   "difficulty": "medium",
+   "text": "The table lists four restriction enzymes and where each cuts inside its recognition site. Which of them leave blunt ends?",
+   "options": [
+    "EcoRI",
+    "SmaI",
+    "HindIII",
+    "HaeIII"
+   ],
+   "answer": [
+    1,
+    3
+   ],
+   "explanation": "A cut in the middle of a palindromic site (SmaI CCC^GGG, HaeIII GG^CC) leaves flush blunt ends; the staggered cuts of EcoRI and HindIII leave single-stranded overhangs — sticky ends.",
+   "media": [
+    {
+     "type": "table",
+     "caption": "^ marks the phosphodiester bond cut on the strand shown (5′→3′).",
+     "head": [
+      "Enzyme",
+      "Recognition site"
+     ],
+     "rows": [
+      [
+       "EcoRI",
+       "G^AATTC"
+      ],
+      [
+       "SmaI",
+       "CCC^GGG"
+      ],
+      [
+       "HindIII",
+       "A^AGCTT"
+      ],
+      [
+       "HaeIII",
+       "GG^CC"
+      ]
+     ]
+    }
+   ],
+   "provenance": "bundled demo question, written for this plugin — carries a data-table media block",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
   },
   {
-   "id": "B-03",
-   "section": "B",
+   "id": "C-01",
+   "section": "C",
+   "type": "nat",
+   "topic": "Human genetics",
+   "difficulty": "easy",
+   "text": "How many chromosomes are present in a normal human somatic cell?",
+   "answer": 46,
+   "input": "integer",
+   "explanation": "23 pairs: 22 autosomal pairs plus one sex chromosome pair. The field here is declared 'integer' — digits only, no decimal point.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "C-02",
+   "section": "C",
+   "type": "nat",
+   "topic": "Acids and bases",
+   "difficulty": "medium",
+   "text": "An aqueous solution contains 0.05 M of a strong monoprotic acid. What is its pH? (round to two decimal places)",
+   "answer": 1.3,
+   "tolerance": 0.05,
+   "input": "decimal",
+   "explanation": "pH = −log₁₀[H⁺] = −log₁₀(0.05) ≈ 1.30. The key carries a tolerance (1.30 ± 0.05), so 1.3 and 1.30 both grade correct.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "C-03",
+   "section": "C",
+   "type": "nat",
+   "topic": "Microbial growth",
+   "difficulty": "hard",
+   "text": "A bacterial culture grows from 10² to 10⁸ cells in 6 hours. What is its mean doubling time, in minutes? (round to one decimal)",
+   "answer": 18,
+   "tolerance": 0.5,
+   "explanation": "Generations = log₂(10⁶) ≈ 19.93; 360 min ÷ 19.93 ≈ 18.1 min. Real keys state a range for such answers, so this one is stored the GATE way: midpoint 18 with tolerance 0.5. With no declared input, the decimal field is inferred from the key and the prompt.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "C-04",
+   "section": "C",
+   "type": "nat",
+   "topic": "Cell death",
+   "difficulty": "easy",
+   "text": "What is the term for the programmed, gene-directed death of a cell? Answer with one word, in lowercase — grading matches the text exactly.",
+   "answer": "apoptosis",
+   "input": "text",
+   "explanation": "Apoptosis. This field accepts any text; grading is an exact string match, so the paper states the expected form.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "D-01",
+   "section": "D",
    "type": "mcq",
-   "topic": "Exam arithmetic",
-   "text": "A 180-minute paper has 60 equally weighted questions. What is the average time per question, in minutes?",
+   "topic": "Microbial growth",
+   "difficulty": "medium",
+   "text": "The figure shows growth of the same bacterial strain in two cultures, A at 37 °C and B at 25 °C. Which conclusion does the figure support?",
    "options": [
-    "2 minutes",
-    "3 minutes",
-    "4 minutes",
-    "5 minutes"
+    "Culture B grows faster than culture A throughout the experiment.",
+    "Culture B never enters exponential growth.",
+    "Culture B has a longer lag phase but reaches the same final density as culture A.",
+    "Culture A reaches a higher stationary-phase density than culture B."
+   ],
+   "answer": 2,
+   "explanation": "B's rise starts about 3–4 h later than A's (longer lag), but both curves flatten on the same dotted line at OD₆₀₀ ≈ 1.0 — the stationary density is equal, B's slope never exceeds A's, and B clearly passes through exponential growth.",
+   "media": [
+    {
+     "type": "image",
+     "src": "figures/growth-curve.png",
+     "alt": "Two sigmoid growth curves on one pair of axes: curve A (37 °C) begins rising around 2 h and curve B (25 °C) around 5 h; both flatten at OD600 ≈ 1.0",
+     "caption": "Growth of one strain at 37 °C (A) and 25 °C (B); the dotted line marks OD₆₀₀ = 1.0."
+    }
+   ],
+   "provenance": "bundled demo question, written for this plugin — figure generated for this paper",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "D-02",
+   "section": "D",
+   "type": "mcq",
+   "topic": "Enzyme kinetics",
+   "difficulty": "hard",
+   "text": "The four curves show initial velocity v against substrate concentration [S] for the same enzyme under four conditions; exactly one condition includes an inhibitor. Which curve shows competitive inhibition?",
+   "options": [
+    "Curve A",
+    "Curve B",
+    "Curve C",
+    "Curve D"
    ],
    "answer": 1,
-   "explanation": "180 divided by 60 is 3 minutes per question.",
+   "explanation": "Competitive inhibition raises apparent Km without changing Vmax: curve B plateaus at the same height as the uninhibited curve A but needs more substrate to get there. Curve C plateaus lower (non-competitive, Vmax halved); curve D is sigmoidal (cooperative kinetics), not Michaelis–Menten at all. Every option carries its own figure — option-level media.",
+   "option_media": [
+    [
+     {
+      "type": "image",
+      "src": "figures/kinetics-a.png",
+      "alt": "Curve A: a hyperbola rising steeply and plateauing at v ≈ 1.0 by [S] ≈ 5 mM"
+     }
+    ],
+    [
+     {
+      "type": "image",
+      "src": "figures/kinetics-b.png",
+      "alt": "Curve B: a hyperbola rising more gradually than A, reaching the same plateau at v ≈ 1.0 only near [S] ≈ 10 mM"
+     }
+    ],
+    [
+     {
+      "type": "image",
+      "src": "figures/kinetics-c.png",
+      "alt": "Curve C: a hyperbola that plateaus at half the height of A, at v ≈ 0.5"
+     }
+    ],
+    [
+     {
+      "type": "image",
+      "src": "figures/kinetics-d.png",
+      "alt": "Curve D: a sigmoidal curve, flat below [S] ≈ 0.5 mM and steeper than a hyperbola around its midpoint"
+     }
+    ]
+   ],
+   "provenance": "bundled demo question, written for this plugin — option figures generated for this paper",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "D-03",
+   "section": "D",
+   "type": "nat",
+   "topic": "Quantitative microbiology",
+   "difficulty": "medium",
+   "text": "Colony counts from a serial dilution are shown in the figure. A plate is countable when it carries 30–300 colonies. How many colony-forming units per mL were in the ORIGINAL sample? (whole number)",
+   "answer": 120000,
+   "explanation": "Plate 3 (10⁻³) holds 120 colonies — the only countable plate (450 is over 300, 12 is under 30). 120 × 10³ = 1.2 × 10⁵ = 120000 CFU/mL. A free-entry question can ride on a figure, and 'whole number' in the prompt makes this field digits-only; a nat never takes a penalty, so this question overrides the section's −0.67 with 0.",
+   "provenance": "bundled demo question, written for this plugin — figure generated for this paper",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk",
+   "marks_wrong": 0
+  },
+  {
+   "id": "E-01",
+   "section": "E",
+   "type": "mcq",
+   "topic": "Carbohydrates",
+   "difficulty": "easy",
+   "text": "Which of the following sugars is a ketose?",
+   "options": [
+    "Galactose",
+    "Glucose",
+    "Fructose",
+    "Ribose"
+   ],
+   "answer": 2,
+   "explanation": "Fructose is a ketohexose; glucose, galactose and ribose are aldoses.",
    "provenance": "bundled demo question, written for this plugin",
-   "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json"
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "E-02",
+   "section": "E",
+   "type": "mcq",
+   "topic": "Spectrophotometry",
+   "difficulty": "easy",
+   "text": "A solution's absorbance is measured within the Beer–Lambert range. What happens to the absorbance if the analyte concentration is doubled?",
+   "options": [
+    "It is unchanged",
+    "It halves",
+    "It squares",
+    "It doubles"
+   ],
+   "answer": 3,
+   "explanation": "A = ε·l·c is linear in c, so doubling the concentration doubles the absorbance. This question overrides the section's marking to 1 mark correct / −0.33 wrong — the same section carries 2-mark questions beside it.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk",
+   "marks_correct": 1,
+   "marks_wrong": -0.3333333333
+  },
+  {
+   "id": "E-03",
+   "section": "E",
+   "type": "msq",
+   "topic": "PCR",
+   "difficulty": "medium",
+   "text": "Which of the following are components of a standard PCR mix?",
+   "options": [
+    "Taq polymerase",
+    "dNTPs",
+    "Ethidium bromide",
+    "Mg²⁺"
+   ],
+   "answer": [
+    0,
+    1,
+    3
+   ],
+   "explanation": "The mix is buffer + Mg²⁺, dNTPs, primers and Taq. Ethidium bromide stains gels after the run — it is never part of the reaction mix.",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk"
+  },
+  {
+   "id": "E-04",
+   "section": "E",
+   "type": "mcq",
+   "topic": "Glycolysis",
+   "difficulty": "medium",
+   "text": "How many ATP molecules does glycolysis yield NET per molecule of glucose?",
+   "options": [
+    "2",
+    "4",
+    "1",
+    "8"
+   ],
+   "answer": 0,
+   "explanation": "Four ATP are made, two are invested in the priming steps — net 2. Like E-02, this one is worth 1 mark (override), and only the first 3 saved answers in this section are graded (attempt limit 3 of 4).",
+   "provenance": "bundled demo question, written for this plugin",
+   "source_url": "https://github.com/darshak26/hermes-exam-desk",
+   "marks_correct": 1,
+   "marks_wrong": -0.3333333333
   }
- ],
- "source_url": "https://github.com/darshak26/hermes-exam-desk/blob/main/packs/demo-basics.json",
- "paper_id": "demo-basics",
- "exam": "demo-basics"
+ ]
 }

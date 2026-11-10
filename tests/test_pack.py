@@ -325,11 +325,19 @@ class MediaPackTests(unittest.TestCase):
     def test_non_numeric_nat_key_is_announced(self):
         from exam_desk.pack import lint_pack
         p = base_pack()
-        p["questions"][5].update(answer="2 to 3", input="text")
+        p["questions"][5].update(answer="2 to 3")
         p["questions"][5].pop("tolerance", None)
+        p["questions"][5].pop("input", None)
         warns = [w for w in lint_pack(p) if "is not a number" in w]
         self.assertEqual(len(warns), 1, warns)
         self.assertIn("input 'text'", warns[0])
+        # A DECLARED input 'text' is the intent the warning asks for — applying it
+        # must silence the warning, or a deliberate text-keyed nat (like the demo's)
+        # would carry a permanent warning chip for following the warning's advice.
+        declared = base_pack()
+        declared["questions"][5].update(answer="2 to 3", input="text")
+        declared["questions"][5].pop("tolerance", None)
+        self.assertEqual([w for w in lint_pack(declared) if "is not a number" in w], [])
 
     def test_question_text_carrying_the_answer_key_is_a_warning(self):
         """The last question of a QP+AK PDF sweeps up the paper's trailer.
