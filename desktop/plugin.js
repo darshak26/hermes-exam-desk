@@ -312,14 +312,17 @@ const CSS = `
    A wrapped option keeps the control on line 1 */
 .cbt .opt input{flex:0 0 auto;margin:5.5px 0 0}
 /* A free-entry answer is a FIELD, and the browser default draws nothing on this
-   background — the box carries its own stroke, radius, fill and focus ring. It is
-   capped at 320px because an answer is a number, not prose. The rule for THAT
-   question (digits only / one decimal point / free text) lives in the field's own
-   filtering and its placeholder — a line of helper text under an empty box said the
-   same thing twice. */
-.cbt .cbt-qbody .cbt-entry{display:flex;flex-direction:column;gap:6px;max-width:320px;margin-inline:0}
+   background — the box carries its own stroke, radius, fill and focus ring. The
+   WRAPPER takes the question column's own measure and centring (.cbt-qbody > *
+   caps every child at --cbt-col-read and centres it), so the field's left edge is
+   the question text's left edge; pinning the wrapper to the body's edge instead put
+   the box 135px left of the sentence it answers. The FIELD inside is capped at
+   320px because an answer is a number, not prose. The rule for THAT question
+   (digits only / one decimal point / free text) lives in the field's own filtering
+   and its placeholder — a line of helper text under an empty box said it twice. */
+.cbt .cbt-entry{display:flex;flex-direction:column;gap:6px;max-width:var(--cbt-col-read);width:100%;margin-inline:auto}
 .cbt .cbt-entry-field{
-  box-sizing:border-box;width:100%;font:inherit;font-size:16px;line-height:1.4;
+  box-sizing:border-box;width:100%;max-width:320px;font:inherit;font-size:16px;line-height:1.4;
   padding:10px 12px;border-radius:6px;
   border:1px solid var(--ui-stroke-secondary);
   background:var(--ui-surface-background,var(--chrome-action-hover,transparent));
@@ -351,15 +354,19 @@ const CSS = `
 .cbt-shell.pal-collapsed{--cols:minmax(0,1fr);--areas:"head" "tabs" "body" "act"}
 .cbt-shell.pal-collapsed.single-sec{--rows:minmax(44px,auto) minmax(0,1fr) minmax(48px,auto);--areas:"head" "body" "act"}
 /* Shell header, tabs and body share one text edge. The shell's grid area gives all
-   three the same box x, so only their own padding moves text: body 20px, head 20px
-   (its first control sits there), and tabs 18px because the app's SegmentedControl
-   adds 2px of inner padding to the first tab. Measured, not guessed. */
+   three the same box x, so only their own padding moves text: body 20px, head 20px,
+   tabs 20px — the tabs used to read 18px because the app's SegmentedControl insets
+   its first tab by 2px, and the row is plain words now, so they line up at 20. */
 .cbt-head{display:flex;align-items:center;gap:8px;padding:0 20px;min-height:44px;border-bottom:1px solid var(--ui-stroke-secondary)}
 .cbt .cbt-head-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .cbt .timer{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600}
 .cbt .timer.low{color:var(--ui-text-warn,var(--ui-accent))}
 .cbt .timer.crit{color:var(--ui-red)}
-.cbt .cbt-tabs{padding:0 20px 0 18px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
+/* Section switcher: words with a count, not a segmented control — the same treatment
+   as the home page's All/Mock/Assisted filters (muted text, the active one
+   underlined in the primary colour). Three bordered pills above the question read as
+   a second toolbar; a row of labels reads as where you are in the paper. */
+.cbt .cbt-tabs{padding:0 20px;gap:16px;min-height:38px;border-bottom:1px solid var(--ui-stroke-secondary);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;display:flex;align-items:center}
 /* The paper body is the scroller for the question column, so IT must span its grid
    cell: a max-width here parks the bar in the middle of the pane on a wide window.
    The reading measure lives on the content instead. */
@@ -1960,6 +1967,10 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
         : jsx(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowPaper(v => !v), children: [icon('book', 'size-4'), 'Question Paper'] }),
       // The terminal action belongs in the persistent chrome: it used to sit in the
       // question map, so folding the map took submitting away with it.
+      // Order right→left is the app's: the panel toggle (chrome) at the edge, then
+      // the primary action, then the clock, then the paper. The clock used to sit in
+      // the strongest slot and pushed Submit inward.
+      jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
       jsx(Tip, { label: confirming ? 'Confirmation is open' : 'Review the counts, then submit the paper', children:
         jsx(Button, {
           variant: 'default', size: 'sm',
@@ -1968,7 +1979,6 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
           onClick: () => { setConfirming(true); setPalCollapsed(true) },
           children: [icon('check', 'size-4'), 'Submit'],
         }) }),
-      jsx(Countdown, { left: serverLeft, compact: isNarrow, onExpire: () => { void doSubmit() } }),
       // the panel toggle is the last thing in the header — it governs the panel on
       // the right, so it sits on the right of everything else
       jsx(Tip, { label: palCollapsed ? 'Show the question map' : 'Hide the question map', children:
@@ -1980,19 +1990,24 @@ function CbtExam({ attemptId, onResult, onHome, onClose, inPane = false, narrow 
           children: jsx(Codicon, { name: 'layout-sidebar-right', size: 14 }),
         }) }),
     ] }),
-    multiSection ? jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, children:
-      jsx(SegmentedControl, {
-        value: activeSecId,
-        onChange: sid => jumpSection(sid),
-        sizing: 'content',
-        options: sections.map(sec => {
-          const qs = secQs(sec.id)
-          const done = qs.filter(x => {
-            const v = answered[x.id]
-            return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
-          }).length
-          return { id: sec.id, label: `${sec.title} ${done}/${qs.length}` }
-        }),
+    multiSection ? jsx('div', { className: 'cbt-tabs', style: { gridArea: 'tabs' }, role: 'group', 'aria-label': 'Section', children:
+      // Words with their count, the same treatment as the home page's mode filters:
+      // no border, no fill, the active section underlined in the primary colour.
+      sections.map(sec => {
+        const qs = secQs(sec.id)
+        const done = qs.filter(x => {
+          const v = answered[x.id]
+          return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
+        }).length
+        const on = sec.id === activeSecId
+        return jsx(Button, {
+          key: sec.id,
+          className: 'cbt-filter' + (on ? ' on' : ''),
+          variant: 'ghost', size: 'xs',
+          'aria-pressed': on,
+          onClick: () => jumpSection(sec.id),
+          children: `${sec.title} ${done}/${qs.length}`,
+        })
       }) }) : null,
     jsx('div', { ref: bodyRef, className: 'cbt-qbody', style: { gridArea: 'body' }, children: [
       jsxs('div', { className: 'cbt-row cbt-gap-sm', style: { marginBottom: 12 }, children: [
