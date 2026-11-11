@@ -93,7 +93,7 @@ def _attempt_rows(a, pack):
         given = (a.get("answers") or {}).get(q["id"], None)
         if isinstance(given, list):
             given = [chr(65 + i) if isinstance(i, int) and q.get("options") else i for i in sorted(given)] or "skipped"
-        elif not given:
+        elif given is None or given == "":
             given = "skipped"
         elif isinstance(given, int) and q.get("options"):
             given = chr(65 + given)

@@ -143,6 +143,21 @@ class AgentSurfaceTests(unittest.TestCase):
         self.assertIn("behaviour", out)
         self.assertGreaterEqual(out["behaviour"]["events"], 1)
 
+    def test_attempt_reports_option_a_answer_not_skipped(self):
+        """A saved option A is index 0 — falsy, but an ANSWER, never a skip."""
+        a = store.new_attempt(base_pack(), "mock")
+        aid = a["id"]
+        with store.attempt_lock(aid):
+            a = store.get_attempt(aid)
+            a["answers"] = {"A-01": 0}      # option A, and A-01's key is option B
+            a["answer_seq"] = ["A-01"]
+            store.log_events(aid, [{"type": "open", "qid": "A-01"}])
+        a = store.submit_attempt(a, store.get_pack("gat-b-demo"))
+        rows = {row["id"]: row for row in _out("exam_desk_attempt", {"attempt_id": aid})["questions"]}
+        self.assertEqual(rows["A-01"]["verdict"], "wrong")
+        self.assertEqual(rows["A-01"]["student"], "A")
+        self.assertNotEqual(rows["A-02"]["student"] if "student" in rows["A-02"] else "skipped", "A")
+
     def test_attempt_unknown_and_bad_ids(self):
         self.assertIn("error", _out("exam_desk_attempt", {"attempt_id": "nope"}))
         self.assertIn("error", _out("exam_desk_attempt", {"attempt_id": "../escape"}))
