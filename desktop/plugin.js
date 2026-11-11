@@ -181,7 +181,7 @@ const CSS = `
 /* Result layout: centred column of rounded cards. Every block shares the measured
    column, and inside each card content sits 20px in on the same left edge. */
 .cbt.cbt-result{display:flex;flex-direction:column;gap:var(--cbt-gap);box-sizing:border-box}
-.cbt.cbt-result > *{max-width:var(--rg-col);width:100%;margin-inline:auto;box-sizing:border-box}
+.cbt.cbt-result > *{max-width:var(--cbt-col-read);width:100%;margin-inline:auto;box-sizing:border-box}
 .cbt.cbt-result .cbt-card{border:1px solid var(--ui-stroke-secondary);border-radius:10px;padding:20px;margin-bottom:0;box-sizing:border-box}
 .cbt.cbt-result .cbt-card .cbt-more{padding:12px 0 0;margin-top:12px}
 .cbt.cbt-result .cbt-sec{width:100%;min-width:0}
