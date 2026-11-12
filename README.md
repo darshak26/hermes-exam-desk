@@ -5,7 +5,18 @@ scored result with an AI review of what you missed.
 
 Any exam works. A paper is a JSON file, so a new exam is a new file, not new code.
 
-Needs Hermes 0.23.0 or newer. Version 0.13.2.
+Needs Hermes 0.23.0 or newer. Version 0.13.3.
+
+## What it looks like
+
+A mock sitting, with the question's figure and the palette beside it:
+
+![Exam shell showing a question with its figure](docs/screenshots/exam-shell-figure.png)
+
+Figures can sit on the options themselves, so a curve-identification question
+reads like the paper it came from:
+
+![Option-level figures on one question](docs/screenshots/option-figures.png)
 
 ## Words
 
