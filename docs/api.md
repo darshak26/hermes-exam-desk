@@ -17,6 +17,8 @@ exam. The old spellings are still accepted on input.
 | GET | `/health` | `{ok, llm, version}`. `llm:false` means the agent half is not loaded. |
 | GET | `/packs` | summaries, plus non fatal `warnings` |
 | GET | `/packs/{paper_id}` | sanitised, no `answer`, `explanation` or `tolerance` |
+| GET | `/packs/{paper_id}/assets/{name}` | figure bytes (`packs/<paper_id>.assets/<name>`) — for a plain `<img>` on an HTTP-served panel |
+| GET | `/packs/{paper_id}/asset-data/{name}` | the same figure as `{content_type, bytes, data_url}` — the JSON door a desktop-app pane can reach |
 | DELETE | `/packs/{paper_id}` | removes the paper, its assets and its sittings; `409` while a sitting runs |
 | DELETE | `/exams/{exam}` | removes every paper of the exam and their sittings; `409` while a sitting runs |
 | POST | `/attempts` | `{paper_id, mode}`, mode `assisted` or `mock` |

@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import shutil
@@ -510,7 +511,10 @@ class DeleteTests(unittest.TestCase):
 
 
 class MediaTests(unittest.TestCase):
-    """Figures live beside the JSON and are served as bytes, never inlined."""
+    """Figures live beside the JSON and are served two ways: raw bytes for an <img>
+    in the browser-served panel, and a `data:` URL for the desktop app, whose panes
+    render from a local bundle and can only reach the server through the JSON REST
+    door."""
 
     def setUp(self):
         self._old = os.environ.get("EXAM_DESK_DATA_DIR")
@@ -530,11 +534,25 @@ class MediaTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertTrue(r.content.startswith(b"\x89PNG"))
 
+    def test_serves_a_figure_as_a_data_url(self):
+        r = client.get("/packs/gat-b-demo/asset-data/figures/gel.png")
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(body["content_type"], "image/png")
+        self.assertEqual(body["bytes"], len(b"\x89PNG\r\n\x1a\nFAKE"))
+        self.assertTrue(body["data_url"].startswith("data:image/png;base64,"), body["data_url"][:40])
+        decoded = base64.b64decode(body["data_url"].split(",", 1)[1])
+        self.assertEqual(decoded, (self.assets / "figures" / "gel.png").read_bytes())
+
     def test_missing_figure_is_404(self):
         self.assertEqual(client.get("/packs/gat-b-demo/assets/figures/nope.png").status_code, 404)
+        self.assertEqual(client.get("/packs/gat-b-demo/asset-data/figures/nope.png").status_code, 404)
 
     def test_path_traversal_is_refused(self):
         r = client.get("/packs/gat-b-demo/assets/../../gat-b-demo.json")
+        self.assertIn(r.status_code, (400, 404))
+        self.assertNotIn(b"schema", r.content)
+        r = client.get("/packs/gat-b-demo/asset-data/../gat-b-demo.json")
         self.assertIn(r.status_code, (400, 404))
         self.assertNotIn(b"schema", r.content)
 

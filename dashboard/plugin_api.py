@@ -8,8 +8,10 @@ attempt, which is allowed to reveal the key.
 Concurrency: handlers that mutate an attempt run inside `store.attempt_lock`, so
 two tabs (or a tab racing the server-side auto-submit) cannot lose an answer.
 """
+import base64
 import importlib.util
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -22,7 +24,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-VERSION = "0.13.2"
+VERSION = "0.13.3"
 ASSET_MAX_BYTES = 20 * 1024 * 1024      # a figure, not a video
 ALLOWED_ASSET_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
@@ -199,9 +201,8 @@ def delete_exam(exam: str):
     return {"deleted": exam, "papers": len(ids), "attempts": len(removed)}
 
 
-@router.get("/packs/{paper_id}/assets/{name:path}")
-def get_pack_asset(paper_id: str, name: str):
-    """Static bytes for a question figure (`packs/<paper_id>.assets/<name>`).
+def _asset_file(paper_id: str, name: str):
+    """Resolve `packs/<paper_id>.assets/<name>` to a file on disk, or raise HTTPException.
 
     The browser loads these with a plain <img src>, so the path is checked twice:
     the paper_id must be a plain slug and the resolved file must still sit inside
@@ -223,11 +224,39 @@ def get_pack_asset(paper_id: str, name: str):
         raise HTTPException(404, "no such asset")
     if target.stat().st_size > ASSET_MAX_BYTES:
         raise HTTPException(413, "asset is too large to serve")
+    return target
+
+
+@router.get("/packs/{paper_id}/assets/{name:path}")
+def get_pack_asset(paper_id: str, name: str):
+    """Static bytes for a question figure (`packs/<paper_id>.assets/<name>`)."""
+    target = _asset_file(paper_id, name)
     headers = {
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'",
     }
     return FileResponse(target, headers=headers)
+
+
+@router.get("/packs/{paper_id}/asset-data/{name:path}")
+def get_pack_asset_data(paper_id: str, name: str):
+    """One figure as a `data:` URL, for a panel that cannot fetch bytes.
+
+    The desktop app renders plugin panes from its own local bundle, so a relative
+    `<img src>` resolves against `file://` and never reaches this server; the
+    plugin's JSON REST door is the only authenticated path from such a pane, and
+    it carries JSON. Same checks, same bytes, base64-armoured.
+    """
+    target = _asset_file(paper_id, name)
+    mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    raw = target.read_bytes()
+    return {
+        "paper_id": paper_id,
+        "name": name,
+        "content_type": mime,
+        "bytes": len(raw),
+        "data_url": f"data:{mime};base64," + base64.b64encode(raw).decode("ascii"),
+    }
 
 
 @router.get("/packs/{paper_id}")

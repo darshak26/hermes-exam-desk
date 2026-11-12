@@ -3,6 +3,19 @@
 One paragraph per release, in the words a user cares about. The commit history
 carries the detail; this file carries the deltas worth reading before an update.
 
+## 0.13.3 — figures load in the app
+
+- **A paper's figures now show in the desktop app.** The panel was pointing its
+  `<img>` at a path relative to the server; the app renders plugin panes from its
+  own local bundle, so that path resolved against `file://` and never reached
+  Hermes — every figure read "Figure unavailable". The panel now asks the
+  plugin's own REST door for the picture (a `data:` URL from the new
+  `/packs/{paper_id}/asset-data/{name}` route), which is the one authenticated
+  path both surfaces share. The browser-hosted panel loads the same way, and a
+  figure that is genuinely missing still says so, with its alt text.
+- Raw-bytes `/packs/{paper_id}/assets/{name}` stays: it is the route a plain
+  `<img>` can use wherever the panel is served over HTTP.
+
 ## 0.13.2 — math in papers
 
 - **Pack text may carry LaTeX.** Question stems, options, media notes and

@@ -719,22 +719,36 @@ function MdText({ text }) {
 }
 
 // A figure's src is either an http(s) URL or a path inside the pack's asset dir.
-// Relative ones come back through the plugin's own route, so the browser fetches
-// them from the same origin — an <img> cannot read the gateway's filesystem.
-function mediaSrc(paperId, src) {
-  const clean = String(src || '')
-  if (/^https?:\/\//i.test(clean)) return clean
-  const path = clean.split('/').filter(Boolean).map(encodeURIComponent).join('/')
-  return `/api/plugins/exam-desk/packs/${encodeURIComponent(paperId)}/assets/${path}`
+// An http(s) one is the browser's own fetch. A relative one comes back through the
+// plugin's REST namespace as a `data:` URL: the desktop app renders plugin panes
+// from its own local bundle, so a relative <img src> resolves against file:// and
+// never reaches the gateway — `ctx.rest` is the only authenticated door from that
+// pane, and it speaks JSON. One path, both surfaces.
+function assetDataPath(paperId, src) {
+  const path = String(src || '').split('/').filter(Boolean).map(encodeURIComponent).join('/')
+  return `/packs/${encodeURIComponent(paperId)}/asset-data/${path}`
 }
 
-// A figure that 404s (or is unreadable) otherwise collapses to a broken-image
-
-// A figure that 404s (or is unreadable) otherwise collapses to a broken-image
-// sliver; show a placeholder with the alt text so the question still makes sense.
-function MediaFigure({ src, alt, caption }) {
+// A figure that fails (missing, unreadable, a failed fetch) otherwise collapses to
+// a broken-image sliver; show a placeholder with the alt text so the question still
+// makes sense.
+function MediaFigure({ paperId, src, alt, caption }) {
+  const raw = String(src || '')
+  const external = /^https?:\/\//i.test(raw)
+  const canLoad = !external && !!paperId && !!raw
   const [failed, setFailed] = useState(false)
   const [zoom, setZoom] = useState(false)
+  const figQ = useQuery({
+    queryKey: ['cbt', 'figure', paperId, raw],
+    queryFn: () => rest(assetDataPath(paperId, raw)),
+    enabled: canLoad,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+  const url = external ? raw : (figQ.data?.data_url || '')
+  // no src, no paper id, a failed fetch or a broken image — all read the same way:
+  // say the figure is unavailable rather than spin forever
+  const missing = failed || !raw || (!external && (!paperId || figQ.isError))
   // capture phase: while a figure is enlarged, Esc closes the figure and not the
   // paper dialog sitting behind it
   useEffect(() => {
@@ -744,23 +758,28 @@ function MediaFigure({ src, alt, caption }) {
     return () => window.removeEventListener('keydown', onEsc, true)
   }, [zoom])
   return jsxs('figure', { className: 'media-fig', children: [
-    failed
+    missing
       ? jsxs('div', { className: 'media-missing', children: [
           jsx(Codicon, { name: 'file-media', size: 14 }),
           jsx('span', { children: alt ? `Figure unavailable — ${alt}` : 'Figure unavailable' }),
         ] })
-      : jsx(Tip, { label: alt ? `${alt} — click to enlarge` : 'Click to enlarge', children:
-          jsx('img', {
-            src, alt: alt || '', loading: 'lazy',
-            onError: () => setFailed(true),
-            onClick: e => { e.preventDefault(); e.stopPropagation(); setZoom(true) },
-          }) }),
+      : !url
+        ? jsxs('div', { className: 'media-missing', children: [
+            jsx(Codicon, { name: 'loading', size: 14, spinning: true }),
+            jsx('span', { children: 'Loading figure…' }),
+          ] })
+        : jsx(Tip, { label: alt ? `${alt} — click to enlarge` : 'Click to enlarge', children:
+            jsx('img', {
+              src: url, alt: alt || '', loading: 'lazy',
+              onError: () => setFailed(true),
+              onClick: e => { e.preventDefault(); e.stopPropagation(); setZoom(true) },
+            }) }),
     caption ? jsx('figcaption', { children: caption }) : null,
-    zoom
+    zoom && url
       ? jsxs('div', {
           className: 'zoom', onClick: () => setZoom(false), role: 'dialog', 'aria-modal': 'true', 'aria-label': alt || 'Figure',
           children: [
-            jsx('img', { src, alt: alt || '' }),
+            jsx('img', { src: url, alt: alt || '' }),
             jsx(Button, {
               type: 'button', variant: 'floating', size: 'icon-sm', className: 'zoom-close',
               'aria-label': 'Close figure', onClick: () => setZoom(false),
@@ -803,7 +822,7 @@ function mediaNode(blocks, paperId, keyPrefix = 'media') {
     if (b && b.type === 'text') {
       return jsx('div', { key, className: 'media-note', children: jsx(MdText, { text: b.text }) })
     }
-    return jsx(MediaFigure, { key, src: mediaSrc(paperId, b?.src), alt: b?.alt || '', caption: b?.caption })
+    return jsx(MediaFigure, { key, paperId, src: b?.src, alt: b?.alt || '', caption: b?.caption })
   })
 }
 
